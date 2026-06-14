@@ -1,102 +1,60 @@
-local codescreen = require("codescreen")
 local lobby = require("lobby")
 local game = require("game")
 
-GameState = {
-    current = "code"
-}
+GameState = { current = "lobby" }
 
--- Защита от двойных тапов (Android иногда дублирует события)
-local lastTouchTime = 0
-local TOUCH_COOLDOWN = 0.05  -- 50 мс
-
--- Определяем платформу
 local isMobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
+local lastTap = 0
 
 function love.load()
-    love.window.setMode(0, 0, {
-        fullscreen = true,
-        borderless = true,
-        vsync = 0,
-        msaa = 0,
-        resizable = true
-    })
-    love.graphics.setDefaultFilter("linear", "linear")
-
-    codescreen.load()
+    love.graphics.setDefaultFilter("linear", "linear", 4)  -- linear + анизотропка
     lobby.load()
     game.load()
 end
 
 function love.update(dt)
     if dt > 0.05 then dt = 0.05 end
-
-    if GameState.current == "code" then
-        codescreen.update(dt)
-    elseif GameState.current == "lobby" then
-        lobby.update(dt)
-    elseif GameState.current == "game" then
-        game.update(dt)
-    end
+    local s = GameState.current
+    if s == "lobby" then lobby.update(dt)
+    elseif s == "game" then game.update(dt) end
 end
 
 function love.draw()
-    if GameState.current == "code" then
-        codescreen.draw()
-    elseif GameState.current == "lobby" then
-        lobby.draw()
-    elseif GameState.current == "game" then
-        game.draw()
-    end
+    local s = GameState.current
+    if s == "lobby" then lobby.draw()
+    elseif s == "game" then game.draw() end
 end
 
 function love.resize(w, h)
-    if codescreen.resize then codescreen.resize(w, h) end
     if lobby.resize then lobby.resize(w, h) end
     if game.load then game.load() end
 end
 
-function love.touchpressed(id, x, y, dx, dy, pressure)
-    -- Защита от дабл-тапа
+local function dispatch(fn, id, x, y)
+    local s = GameState.current
+    if s == "lobby" and lobby[fn] then lobby[fn](id, x, y)
+    elseif s == "game" and game[fn] then game[fn](id, x, y) end
+end
+
+function love.touchpressed(id, x, y)
     local now = love.timer.getTime()
-    if now - lastTouchTime < TOUCH_COOLDOWN then return end
-    lastTouchTime = now
-
-    if GameState.current == "code" then
-        codescreen.touchpressed(id, x, y)
-    elseif GameState.current == "lobby" then
-        lobby.touchpressed(id, x, y)
-    elseif GameState.current == "game" then
-        game.touchpressed(id, x, y)
-    end
+    if now - lastTap < 0.05 then return end
+    lastTap = now
+    dispatch("touchpressed", id, x, y)
 end
 
-function love.touchmoved(id, x, y, dx, dy, pressure)
-    if GameState.current == "game" then
-        game.touchmoved(id, x, y)
-    end
-end
+function love.touchmoved(id, x, y) dispatch("touchmoved", id, x, y) end
+function love.touchreleased(id, x, y) dispatch("touchreleased", id, x, y) end
 
-function love.touchreleased(id, x, y, dx, dy, pressure)
-    if GameState.current == "game" then
-        game.touchreleased(id, x, y)
-    end
-end
-
--- Мышь — ТОЛЬКО на ПК (на мобиле игнорируем, чтобы не было дублей)
-function love.mousepressed(x, y, button)
-    if isMobile then return end   -- ВАЖНО: на Android не дублируем
+function love.mousepressed(x, y)
+    if isMobile then return end
     love.touchpressed(1, x, y)
 end
-
-function love.mousemoved(x, y, dx, dy)
+function love.mousemoved(x, y)
     if isMobile then return end
-    if love.mouse.isDown(1) then
-        love.touchmoved(1, x, y)
-    end
+    if love.mouse.isDown(1) then love.touchmoved(1, x, y) end
 end
-
-function love.mousereleased(x, y, button)
+function love.mousereleased(x, y)
     if isMobile then return end
     love.touchreleased(1, x, y)
 end
