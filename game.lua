@@ -1,15 +1,11 @@
 local controls = require("controls")
-local native = require("native")
+local native = require("native")  -- C++ модуль
 
 local game = {}
 
 local player = {
-    x = 0, y = 0,
-    size = 60,
-    speed = 220,
-    vx = 0, vy = 0,
-    accel = 18,
-    dirX = 0, dirY = -1
+    x = 0, y = 0, size = 60, speed = 220,
+    vx = 0, vy = 0, accel = 18, dirX = 0, dirY = -1
 }
 
 local cam = { x = 0, y = 0, smoothness = 12 }
@@ -55,11 +51,8 @@ function game.update(dt)
         walkTimer = walkTimer + dt
         if walkTimer > 0.08 then
             walkTimer = 0
-            native.spawn(
-                player.x - player.dirX * 20,
-                player.y - player.dirY * 20 + player.size/3,
-                20, 0.4, 4, 0.9, 0.8, 0.4
-            )
+            native.spawn(player.x - player.dirX * 20, player.y - player.dirY * 20 + player.size/3,
+                20, 0.4, 4, 0.9, 0.8, 0.4)
         end
     else
         player.vx, player.vy = 0, 0
@@ -97,6 +90,7 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-cam.x, -cam.y)
     
+    -- C++ частицы
     local count = native.count()
     for i = 1, count do
         local x, y, size, alpha, r, g, b = native.get(i)
@@ -106,6 +100,7 @@ function game.draw()
     
     controls.drawWorld(player.x, player.y)
     
+    -- Игрок
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", player.x - player.size/2 + 4, player.y - player.size/2 + 4, 
         player.size, player.size, 10, 10)
@@ -126,6 +121,7 @@ function game.draw()
     love.graphics.print("FPS: " .. love.timer.getFPS(), w - 80, 10)
 end
 
+-- Частицы выстрела через C++
 local origTouchReleased = controls.touchreleased
 controls.touchreleased = function(id, x, y)
     local hadBullets = #controls.bullets
