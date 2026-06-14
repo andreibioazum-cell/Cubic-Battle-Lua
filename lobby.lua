@@ -2,83 +2,113 @@ local lobby = {}
 
 local buttonX, buttonY, buttonW, buttonH
 local titleY = 0
+local gradientMesh = nil
+
+-- Создаём градиентный меш один раз (так делается настоящий градиент в LÖVE)
+local function createGradient(w, h)
+    -- 4 вершины: top-left, top-right, bottom-right, bottom-left
+    -- Каждая вершина: {x, y, u, v, r, g, b, a}
+    local vertices = {
+        -- Верх (светло-фиолетовый/малиновый)
+        {0, 0,    0, 0, 0.55, 0.20, 0.85, 1},   -- TL
+        {w, 0,    1, 0, 0.85, 0.25, 0.65, 1},   -- TR
+        -- Низ (тёмно-фиолетовый)
+        {w, h,    1, 1, 0.10, 0.02, 0.25, 1},   -- BR
+        {0, h,    0, 1, 0.18, 0.05, 0.35, 1},   -- BL
+    }
+    return love.graphics.newMesh(vertices, "fan", "static")
+end
 
 function lobby.load()
-    -- Будет пересчитано в draw, но инициализируем
-    buttonW = 300
-    buttonH = 100
+    buttonW = 180
+    buttonH = 65
 end
 
 function lobby.update(dt)
-    -- Анимация заголовка (плавно качается)
     titleY = titleY + dt
 end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
-    
-    -- Фиолетовый фон с градиентом
-    love.graphics.clear(0.2, 0.05, 0.35, 1)  -- тёмно-фиолетовый
-    
-    -- Светлый фиолетовый сверху (имитация градиента)
-    love.graphics.setColor(0.5, 0.2, 0.7, 0.5)
-    love.graphics.rectangle("fill", 0, 0, w, h/3)
-    
-    -- Заголовок
+
+    -- Пересоздаём градиент если размер окна изменился
+    if not gradientMesh then
+        gradientMesh = createGradient(w, h)
+    end
+
+    -- Рисуем настоящий градиент через mesh
     love.graphics.setColor(1, 1, 1, 1)
-    local font = love.graphics.newFont(50)
-    love.graphics.setFont(font)
-    local title = "MY GAME"
-    local tw = font:getWidth(title)
-    local offsetY = math.sin(titleY * 2) * 10  -- анимация
+    love.graphics.draw(gradientMesh, 0, 0)
+
+    -- Декоративные кружочки на фоне (для глубины)
+    love.graphics.setColor(1, 1, 1, 0.05)
+    for i = 1, 8 do
+        local cx = (w / 9) * i + math.sin(titleY * 0.5 + i) * 20
+        local cy = h * 0.7 + math.cos(titleY * 0.3 + i) * 30
+        love.graphics.circle("fill", cx, cy, 40 + i * 5)
+    end
+
+    -- Заголовок CUBIC BATTLE
+    love.graphics.setColor(1, 1, 1, 1)
+    local titleFont = love.graphics.newFont(56)
+    love.graphics.setFont(titleFont)
+    local title = "CUBIC BATTLE"
+    local tw = titleFont:getWidth(title)
+    local offsetY = math.sin(titleY * 2) * 8
+
+    -- Тень заголовка
+    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.print(title, w/2 - tw/2 + 4, h/4 + offsetY + 4)
+
+    -- Сам заголовок
+    love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print(title, w/2 - tw/2, h/4 + offsetY)
-    
+
     -- Подзаголовок
-    local font2 = love.graphics.newFont(20)
-    love.graphics.setFont(font2)
-    love.graphics.setColor(0.8, 0.8, 1, 0.7)
-    local sub = "Touch screen to play"
-    local sw = font2:getWidth(sub)
-    love.graphics.print(sub, w/2 - sw/2, h/4 + 80)
-    
-    -- Кнопка "PLAY"
+    local subFont = love.graphics.newFont(18)
+    love.graphics.setFont(subFont)
+    love.graphics.setColor(1, 1, 1, 0.6)
+    local sub = "Touch & dodge"
+    local sw = subFont:getWidth(sub)
+    love.graphics.print(sub, w/2 - sw/2, h/4 + 75)
+
+    -- Кнопка PLAY (компактная)
     buttonX = w/2 - buttonW/2
-    buttonY = h/2
-    
-    -- Тень кнопки
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", buttonX + 5, buttonY + 5, buttonW, buttonH, 20, 20)
-    
-    -- Сама кнопка
-    love.graphics.setColor(0.6, 0.3, 0.9, 1)
-    love.graphics.rectangle("fill", buttonX, buttonY, buttonW, buttonH, 20, 20)
-    
-    -- Обводка
-    love.graphics.setColor(1, 1, 1, 0.5)
-    love.graphics.setLineWidth(3)
-    love.graphics.rectangle("line", buttonX, buttonY, buttonW, buttonH, 20, 20)
-    
-    -- Текст на кнопке
-    love.graphics.setColor(1, 1, 1, 1)
-    local font3 = love.graphics.newFont(40)
-    love.graphics.setFont(font3)
+    buttonY = h/2 + 40
+
+    -- Тень
+    love.graphics.setColor(0, 0, 0, 0.4)
+    love.graphics.rectangle("fill", buttonX + 3, buttonY + 4, buttonW, buttonH, 14, 14)
+
+    -- Кнопка (полупрозрачно-белая)
+    love.graphics.setColor(1, 1, 1, 0.95)
+    love.graphics.rectangle("fill", buttonX, buttonY, buttonW, buttonH, 14, 14)
+
+    -- Текст
+    love.graphics.setColor(0.3, 0.1, 0.5, 1)
+    local btnFont = love.graphics.newFont(26)
+    love.graphics.setFont(btnFont)
     local btnText = "PLAY"
-    local btw = font3:getWidth(btnText)
-    local bth = font3:getHeight()
+    local btw = btnFont:getWidth(btnText)
+    local bth = btnFont:getHeight()
     love.graphics.print(btnText, buttonX + buttonW/2 - btw/2, buttonY + buttonH/2 - bth/2)
-    
-    -- Версия внизу
+
+    -- Версия
     love.graphics.setColor(1, 1, 1, 0.3)
-    love.graphics.setFont(love.graphics.newFont(14))
-    love.graphics.print("v1.0", 10, h - 25)
+    love.graphics.setFont(love.graphics.newFont(12))
+    love.graphics.print("v1.1", 10, h - 22)
 end
 
 function lobby.touchpressed(id, x, y)
-    -- Проверяем нажатие на кнопку PLAY
     if x >= buttonX and x <= buttonX + buttonW and
        y >= buttonY and y <= buttonY + buttonH then
         GameState.current = "game"
     end
+end
+
+-- Перезагружаем градиент при изменении размера окна
+function lobby.resize(w, h)
+    gradientMesh = nil
 end
 
 return lobby
