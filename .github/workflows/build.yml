@@ -4,7 +4,7 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout my game
         uses: actions/checkout@v4
@@ -20,61 +20,31 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache NDK
-        id: ndk-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-25.2.9519653-v1
-
-      - name: Install NDK (if cache miss)
-        if: steps.ndk-cache.outputs.cache-hit != 'true'
+      - name: Install NDK
         run: |
           yes | sdkmanager --install "ndk;25.2.9519653" 2>&1 | tail -3
-
-      - name: Set NDK env
-        run: |
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      - name: Cache love-android repo
-        id: love-cache
-        uses: actions/cache@v4
-        with:
-          path: love-android
-          key: love-android-main-v3
-
-      - name: Clone love-android (if cache miss)
-        if: steps.love-cache.outputs.cache-hit != 'true'
+      - name: Clone love-android
         run: |
           git clone --recursive --depth 1 https://github.com/love2d/love-android.git
-          echo "Cloned"
 
-      - name: Remove SDL submodule gradle wrappers (fix validation)
+      - name: Remove SDL gradle wrappers
         run: |
-          echo "=== Removing nested gradle-wrapper.jar files in SDL ==="
-          find love-android/app/src/main/cpp/megasource/libs/SDL2/android-project -name "gradle-wrapper.jar" -delete 2>/dev/null || true
-          find love-android/app/src/main/cpp/megasource/libs/SDL3/android-project -name "gradle-wrapper.jar" -delete 2>/dev/null || true
-          echo "=== Remaining wrapper jars ==="
-          find love-android -name "gradle-wrapper.jar" -type f
+          find love-android/app/src/main/cpp -name "gradle-wrapper.jar" -delete 2>/dev/null || true
 
-      - name: Package game into .love
+      - name: Package game
         run: |
           mkdir -p game-temp
           cd mygame
           for f in *.lua; do
-            [ -f "$f" ] && cp "$f" ../game-temp/ && echo "Added: $f"
+            [ -f "$f" ] && cp "$f" ../game-temp/
           done
-          [ -d "assets" ] && cp -r assets ../game-temp/
-          [ -d "images" ] && cp -r images ../game-temp/
-          [ -d "sounds" ] && cp -r sounds ../game-temp/
-
           cd ../game-temp
-          echo "=== .love contents ==="
           ls -la
           zip -9 -q -r ../game.love .
           cd ..
-          echo "game.love size:"
           ls -la game.love
 
       - name: Embed game.love
@@ -83,19 +53,21 @@ jobs:
           cp game.love love-android/app/src/embed/assets/game.love
           ls -la love-android/app/src/embed/assets/
 
-      - name: Force arm64-v8a only
+      - name: Force arm64 + force APK output
         run: |
           cd love-android
           BUILD_FILE="app/build.gradle"
           [ -f "app/build.gradle.kts" ] && BUILD_FILE="app/build.gradle.kts"
 
-          if ! grep -q "abiFilters" "$BUILD_FILE"; then
-            sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' "$BUILD_FILE"
-            echo "abiFilters added"
-          fi
-          grep -A 1 "abiFilters" "$BUILD_FILE" || true
+          # arm64 only
+          sed -i '/abiFilters/d' "$BUILD_FILE"
+          sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' "$BUILD_FILE"
 
-      - name: Configure Gradle for speed
+          echo ""
+          echo "=== Final build.gradle ==="
+          cat "$BUILD_FILE"
+
+      - name: Gradle config
         run: |
           cd love-android
           cat > gradle.properties << 'EOF'
@@ -103,56 +75,70 @@ jobs:
           org.gradle.parallel=true
           org.gradle.daemon=false
           org.gradle.caching=true
-          org.gradle.configureondemand=true
           android.useAndroidX=true
           android.enableJetifier=false
-          android.enableR8.fullMode=false
-          kotlin.incremental=false
           EOF
 
-      - name: Build APK directly (skip setup-gradle action)
+      - name: Build APK
         working-directory: love-android
-        timeout-minutes: 20
+        timeout-minutes: 22
         run: |
           chmod +x gradlew
-          echo "=== Building EmbedNoRecordDebug for arm64-v8a only ==="
+          # Сначала пробуем EmbedNoRecord
           ./gradlew assembleEmbedNoRecordDebug \
-            --no-daemon \
-            --max-workers=4 \
-            --build-cache \
-            -PdisableCheckLicense \
-            2>&1 | tail -120
-          echo "=== Build finished ==="
+            --no-daemon --max-workers=4 -PdisableCheckLicense 2>&1 | tail -80 || true
 
-      - name: Find APK location
+          # Если не вышло — пробуем просто Embed
+          if ! find . -name "*.apk" -type f | grep -q apk; then
+            echo "=== Trying assembleEmbedDebug ==="
+            ./gradlew assembleEmbedDebug \
+              --no-daemon --max-workers=4 -PdisableCheckLicense 2>&1 | tail -80 || true
+          fi
+
+          # Если опять не вышло — простой assembleDebug
+          if ! find . -name "*.apk" -type f | grep -q apk; then
+            echo "=== Trying assembleDebug ==="
+            ./gradlew assembleDebug \
+              --no-daemon --max-workers=4 -PdisableCheckLicense 2>&1 | tail -80 || true
+          fi
+
+      - name: Inspect outputs
         if: always()
         run: |
-          echo "=== ALL APK files ==="
-          find love-android -name "*.apk" -type f 2>&1
+          echo "=== ALL APK/AAB files ==="
+          find love-android -type f \( -name "*.apk" -o -name "*.aab" \) 2>/dev/null
+          echo ""
+          echo "=== outputs tree (full) ==="
+          find love-android/app/build/outputs -type f 2>/dev/null
+          echo ""
+          echo "=== outputs structure ==="
+          ls -laR love-android/app/build/outputs/ 2>/dev/null | head -100
 
+      - name: Copy APK to root
+        if: always()
+        run: |
           APK_PATH=$(find love-android -name "*.apk" -type f | head -1)
           if [ -n "$APK_PATH" ]; then
-            echo ""
-            echo "✅ Found APK: $APK_PATH"
+            echo "✅ Found: $APK_PATH"
             ls -la "$APK_PATH"
             cp "$APK_PATH" "$GITHUB_WORKSPACE/CubicBattle.apk"
             ls -la "$GITHUB_WORKSPACE/CubicBattle.apk"
           else
-            echo ""
-            echo "❌ NO APK FOUND!"
-            echo "=== outputs structure ==="
-            ls -laR love-android/app/build/outputs/ 2>/dev/null | head -50
-            echo ""
-            echo "=== Build logs (last error) ==="
-            find love-android -name "*.log" -type f 2>/dev/null | head -3
+            echo "❌ No APK. Trying AAB..."
+            AAB_PATH=$(find love-android -name "*.aab" -type f | head -1)
+            if [ -n "$AAB_PATH" ]; then
+              echo "Found AAB instead: $AAB_PATH"
+              cp "$AAB_PATH" "$GITHUB_WORKSPACE/CubicBattle.aab"
+            fi
           fi
 
-      - name: Upload APK to artifacts
+      - name: Upload artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CubicBattle_APK
-          path: CubicBattle.apk
+          name: CubicBattle_Build
+          path: |
+            CubicBattle.apk
+            CubicBattle.aab
           if-no-files-found: warn
           retention-days: 30
-          compression-level: 0
