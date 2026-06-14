@@ -3,7 +3,7 @@ local joystick = {}
 local touchId = nil
 local centerX, centerY = 0, 0
 local stickX, stickY = 0, 0
-local radius = 60         -- маленький
+local radius = 60
 local stickRadius = 26
 
 function joystick.load(cx, cy)
@@ -14,13 +14,9 @@ function joystick.load(cx, cy)
 end
 
 function joystick.draw()
-    -- База
+    -- Только внешняя база (БЕЗ внутреннего круга)
     love.graphics.setColor(0.6, 0.3, 0.9, 0.15)
     love.graphics.circle("fill", centerX, centerY, radius)
-
-    -- Внутренний круг
-    love.graphics.setColor(1, 1, 1, 0.08)
-    love.graphics.circle("fill", centerX, centerY, radius * 0.7)
 
     -- Обводка
     love.graphics.setColor(1, 1, 1, 0.35)
