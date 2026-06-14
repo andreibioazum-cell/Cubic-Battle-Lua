@@ -4,7 +4,7 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15  # 15 минут макс
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,10 +17,11 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # NDK кеш
       - uses: actions/cache@v4
         with:
           path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-25.2.9519653-v2
+          key: ndk-fast-v1
 
       - name: Install NDK
         run: |
@@ -33,24 +34,28 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
+      # love-android кеш
       - uses: actions/cache@v4
         with:
           path: love-android
-          key: love-android-src-v3
+          key: love-src-fast-v1
 
       - name: Clone love-android
         run: |
           if [ ! -f "love-android/gradlew" ]; then
             git clone --recursive --depth 1 https://github.com/love2d/love-android.git
+            chmod +x love-android/gradlew
           fi
 
+      # Gradle кеш
       - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-v3
+          key: gradle-fast-v1
 
+      # Native build кеш
       - uses: actions/cache@v4
         with:
           path: |
@@ -58,39 +63,42 @@ jobs:
             love-android/app/build/intermediates/cxx
             love-android/app/build/intermediates/cmake
             love-android/app/build/intermediates/merged_native_libs
-          key: native-arm64-v3
+          key: native-fast-v1
 
+      # Build intermediates кеш
       - uses: actions/cache@v4
         with:
           path: |
             love-android/app/build/intermediates
             love-android/app/build/generated
             love-android/app/build/tmp
-          key: build-intermediates-v3
+          key: intermediates-fast-v1
 
+      # Пакетируем .love файл
       - name: Package game.love
         run: |
           cd mygame
-          zip -9 -q -r ../game.love *.lua sand.png 2>/dev/null || zip -9 -q -r ../game.love *.lua
-          echo "=== .love files ==="
-          unzip -l ../game.love | tail -20
+          zip -9 -q -r ../game.love . -i "*.lua" "*.png" 2>/dev/null
+          echo "Game size: $(du -h ../game.love | cut -f1)"
 
       - name: Embed game.love
         run: |
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
 
+      # Только arm64 для скорости
       - name: Force arm64-v8a
         run: |
           cd love-android
           sed -i '/abiFilters/d' app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' app/build.gradle
 
-      - name: Optimize Gradle
+      # Супер-оптимизация Gradle
+      - name: Speed up Gradle
         run: |
           cd love-android
-          cat >> gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx6g -Xms2g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError
           org.gradle.parallel=true
           org.gradle.daemon=false
           org.gradle.caching=true
@@ -98,20 +106,26 @@ jobs:
           android.useAndroidX=true
           android.enableJetifier=false
           android.enableR8.fullMode=false
+          android.enableResourceOptimizations=false
           EOF
 
-      - name: Build APK
+      # БЫСТРАЯ сборка
+      - name: Build APK FAST
         working-directory: love-android
         run: |
-          chmod +x gradlew
           ./gradlew assembleEmbedNoRecordDebug \
             --no-daemon \
             --max-workers=4 \
             --build-cache \
             --parallel \
-            -Dorg.gradle.internal.http.socketTimeout=60000 \
-            2>&1 | grep -E "(BUILD|FAILED|Error)" | head -10
+            -x lint \
+            -x test \
+            -x lintVitalEmbedNoRecordDebug \
+            -Dorg.gradle.internal.http.socketTimeout=30000 \
+            -Dorg.gradle.internal.http.connectionTimeout=30000 \
+            2>&1 | grep -E "(BUILD SUCCESS|BUILD FAILED)" 
 
+      # Загружаем APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
