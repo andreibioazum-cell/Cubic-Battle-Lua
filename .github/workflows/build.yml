@@ -42,13 +42,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: love-android
-          key: love-android-main-v2
+          key: love-android-main-v3
 
       - name: Clone love-android (if cache miss)
         if: steps.love-cache.outputs.cache-hit != 'true'
         run: |
           git clone --recursive --depth 1 https://github.com/love2d/love-android.git
           echo "Cloned"
+
+      - name: Remove SDL submodule gradle wrappers (fix validation)
+        run: |
+          echo "=== Removing nested gradle-wrapper.jar files in SDL ==="
+          find love-android/app/src/main/cpp/megasource/libs/SDL2/android-project -name "gradle-wrapper.jar" -delete 2>/dev/null || true
+          find love-android/app/src/main/cpp/megasource/libs/SDL3/android-project -name "gradle-wrapper.jar" -delete 2>/dev/null || true
+          echo "=== Remaining wrapper jars ==="
+          find love-android -name "gradle-wrapper.jar" -type f
 
       - name: Package game into .love
         run: |
@@ -102,15 +110,9 @@ jobs:
           kotlin.incremental=false
           EOF
 
-      - name: Setup Gradle with cache
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
-          gradle-home-cache-cleanup: true
-
-      - name: Build APK
+      - name: Build APK directly (skip setup-gradle action)
         working-directory: love-android
-        timeout-minutes: 18
+        timeout-minutes: 20
         run: |
           chmod +x gradlew
           echo "=== Building EmbedNoRecordDebug for arm64-v8a only ==="
@@ -119,30 +121,30 @@ jobs:
             --max-workers=4 \
             --build-cache \
             -PdisableCheckLicense \
-            2>&1 | tail -100
+            2>&1 | tail -120
           echo "=== Build finished ==="
 
       - name: Find APK location
         if: always()
-        id: find_apk
         run: |
           echo "=== ALL APK files ==="
-          find love-android -name "*.apk" -type f 2>&1 | tee apk_list.txt
+          find love-android -name "*.apk" -type f 2>&1
 
-          # Берём первый найденный APK
           APK_PATH=$(find love-android -name "*.apk" -type f | head -1)
           if [ -n "$APK_PATH" ]; then
-            echo "Found APK: $APK_PATH"
+            echo ""
+            echo "✅ Found APK: $APK_PATH"
             ls -la "$APK_PATH"
-            # Копируем в корень с понятным именем
             cp "$APK_PATH" "$GITHUB_WORKSPACE/CubicBattle.apk"
             ls -la "$GITHUB_WORKSPACE/CubicBattle.apk"
-            echo "APK_FOUND=true" >> $GITHUB_OUTPUT
           else
+            echo ""
             echo "❌ NO APK FOUND!"
             echo "=== outputs structure ==="
             ls -laR love-android/app/build/outputs/ 2>/dev/null | head -50
-            echo "APK_FOUND=false" >> $GITHUB_OUTPUT
+            echo ""
+            echo "=== Build logs (last error) ==="
+            find love-android -name "*.log" -type f 2>/dev/null | head -3
           fi
 
       - name: Upload APK to artifacts
@@ -150,9 +152,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: CubicBattle_APK
-          path: |
-            CubicBattle.apk
-            love-android/app/build/outputs/apk/**/*.apk
+          path: CubicBattle.apk
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0
