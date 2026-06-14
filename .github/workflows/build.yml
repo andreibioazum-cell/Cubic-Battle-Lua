@@ -20,7 +20,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-fast-v1
+          key: ndk-25.2.9519653-v2
 
       - name: Install NDK
         run: |
@@ -36,13 +36,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: love-android
-          key: love-src-fast-v1
+          key: love-android-src-v3
 
       - name: Clone love-android
         run: |
           if [ ! -f "love-android/gradlew" ]; then
             git clone --recursive --depth 1 https://github.com/love2d/love-android.git
-            chmod +x love-android/gradlew
           fi
 
       - uses: actions/cache@v4
@@ -50,7 +49,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-fast-v1
+          key: gradle-v3
 
       - uses: actions/cache@v4
         with:
@@ -59,7 +58,7 @@ jobs:
             love-android/app/build/intermediates/cxx
             love-android/app/build/intermediates/cmake
             love-android/app/build/intermediates/merged_native_libs
-          key: native-fast-v1
+          key: native-arm64-v3
 
       - uses: actions/cache@v4
         with:
@@ -67,34 +66,31 @@ jobs:
             love-android/app/build/intermediates
             love-android/app/build/generated
             love-android/app/build/tmp
-          key: intermediates-fast-v1
+          key: build-intermediates-v3
 
       - name: Package game.love
         run: |
           cd mygame
-          echo "=== Файлы в проекте ==="
-          ls -la
-          zip -9 -r ../game.love *.lua sand.png native_particles.cpp 2>/dev/null || zip -9 -r ../game.love *.lua sand.png
-          echo "=== Содержимое .love ==="
-          unzip -l ../game.love
+          zip -9 -q -r ../game.love *.lua sand.png 2>/dev/null || zip -9 -q -r ../game.love *.lua
+          echo "=== .love files ==="
+          unzip -l ../game.love | tail -20
 
       - name: Embed game.love
         run: |
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
-          echo "game.love скопирован!"
 
-      - name: Force arm64-v8a only
+      - name: Force arm64-v8a
         run: |
           cd love-android
           sed -i '/abiFilters/d' app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' app/build.gradle
 
-      - name: Gradle properties
+      - name: Optimize Gradle
         run: |
           cd love-android
-          cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx6g -Xms2g -XX:MaxMetaspaceSize=1g
+          cat >> gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g
           org.gradle.parallel=true
           org.gradle.daemon=false
           org.gradle.caching=true
@@ -107,37 +103,34 @@ jobs:
       - name: Build APK
         working-directory: love-android
         run: |
-          echo "=== НАЧИНАЕМ СБОРКУ ==="
+          chmod +x gradlew
           ./gradlew assembleEmbedNoRecordDebug \
             --no-daemon \
             --max-workers=4 \
             --build-cache \
             --parallel \
-            -x lint \
-            -x test \
-            -x lintVitalEmbedNoRecordDebug \
-            2>&1 | tee build.log
-          echo "=== РЕЗУЛЬТАТ СБОРКИ ==="
-          tail -20 build.log
+            -Dorg.gradle.internal.http.socketTimeout=60000 \
+            2>&1 | grep -E "(BUILD|FAILED|Error)" | head -10
 
-      - name: Find APK
-        if: always()
+      - name: Find and Copy APK
         run: |
           echo "=== ИЩЕМ APK ==="
-          find love-android -name "*.apk" -type f 2>/dev/null || echo "APK НЕ НАЙДЕН"
-          echo "=== ВСЕ ФАЙЛЫ В OUTPUTS ==="
-          find love-android/app/build/outputs -type f 2>/dev/null || echo "Нет outputs"
-          echo "=== ПРОВЕРКА СБОРКИ ==="
-          ls -la love-android/app/build/outputs/apk/embedNoRecord/debug/ 2>/dev/null || echo "Нет debug папки"
+          find love-android -name "*.apk" -type f
+          echo "=== КОПИРУЕМ В КОРЕНЬ ==="
+          APK=$(find love-android/app/build -name "*.apk" -type f | head -1)
+          if [ -n "$APK" ]; then
+            cp "$APK" ./CubicBattle.apk
+            echo "✅ APK скопирован: $(du -h ./CubicBattle.apk | cut -f1)"
+          else
+            echo "❌ APK не найден в:"
+            find love-android/app/build -type d
+          fi
 
       - name: Upload APK
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: CubicBattle_APK
-          path: |
-            love-android/app/build/outputs/apk/**/*.apk
-            build.log
-          if-no-files-found: warn
+          path: ./CubicBattle.apk
+          if-no-files-found: error
           retention-days: 30
           compression-level: 0
