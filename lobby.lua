@@ -3,6 +3,7 @@ local lobby = {}
 local buttonX, buttonY, buttonW, buttonH
 local titleY = 0
 local gradientMesh = nil
+local lastW, lastH = 0, 0
 
 local function createGradient(w, h)
     local vertices = {
@@ -26,31 +27,29 @@ end
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
 
-    if not gradientMesh then
+    -- Пересоздаём градиент если изменился размер
+    if not gradientMesh or w ~= lastW or h ~= lastH then
         gradientMesh = createGradient(w, h)
+        lastW, lastH = w, h
     end
 
-    -- Градиент
+    -- Градиент на весь экран
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.draw(gradientMesh, 0, 0)
 
-    -- Заголовок CUBIC BATTLE
-    love.graphics.setColor(1, 1, 1, 1)
+    -- CUBIC BATTLE
     local titleFont = love.graphics.newFont(56)
     love.graphics.setFont(titleFont)
     local title = "CUBIC BATTLE"
     local tw = titleFont:getWidth(title)
-    local offsetY = math.sin(titleY * 1.2) * 3  -- слабая покачка
+    local offsetY = math.sin(titleY * 1.2) * 3
 
-    -- Тень
     love.graphics.setColor(0, 0, 0, 0.5)
     love.graphics.print(title, w/2 - tw/2 + 4, h/4 + offsetY + 4)
 
-    -- Сам заголовок
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print(title, w/2 - tw/2, h/4 + offsetY)
 
-    -- Подзаголовок
     local subFont = love.graphics.newFont(18)
     love.graphics.setFont(subFont)
     love.graphics.setColor(1, 1, 1, 0.6)
@@ -62,15 +61,12 @@ function lobby.draw()
     buttonX = w/2 - buttonW/2
     buttonY = h/2 + 40
 
-    -- Тень кнопки
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", buttonX + 3, buttonY + 4, buttonW, buttonH, 14, 14)
 
-    -- Кнопка
     love.graphics.setColor(1, 1, 1, 0.95)
     love.graphics.rectangle("fill", buttonX, buttonY, buttonW, buttonH, 14, 14)
 
-    -- Текст PLAY
     love.graphics.setColor(0.3, 0.1, 0.5, 1)
     local btnFont = love.graphics.newFont(26)
     love.graphics.setFont(btnFont)
