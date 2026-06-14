@@ -1,8 +1,9 @@
+local codescreen = require("codescreen")
 local lobby = require("lobby")
 local game = require("game")
 
 GameState = {
-    current = "lobby"
+    current = "code"   -- стартуем с экрана ввода кода
 }
 
 function love.load()
@@ -15,16 +16,17 @@ function love.load()
     })
     love.graphics.setDefaultFilter("linear", "linear")
 
-    -- Ограничиваем dt чтобы не было прыжков при лагах
+    codescreen.load()
     lobby.load()
     game.load()
 end
 
 function love.update(dt)
-    -- Ограничиваем максимальный dt (антирывки)
     if dt > 0.05 then dt = 0.05 end
 
-    if GameState.current == "lobby" then
+    if GameState.current == "code" then
+        codescreen.update(dt)
+    elseif GameState.current == "lobby" then
         lobby.update(dt)
     elseif GameState.current == "game" then
         game.update(dt)
@@ -32,7 +34,9 @@ function love.update(dt)
 end
 
 function love.draw()
-    if GameState.current == "lobby" then
+    if GameState.current == "code" then
+        codescreen.draw()
+    elseif GameState.current == "lobby" then
         lobby.draw()
     elseif GameState.current == "game" then
         game.draw()
@@ -40,12 +44,15 @@ function love.draw()
 end
 
 function love.resize(w, h)
+    if codescreen.resize then codescreen.resize(w, h) end
     if lobby.resize then lobby.resize(w, h) end
     if game.load then game.load() end
 end
 
 function love.touchpressed(id, x, y, dx, dy, pressure)
-    if GameState.current == "lobby" then
+    if GameState.current == "code" then
+        codescreen.touchpressed(id, x, y)
+    elseif GameState.current == "lobby" then
         lobby.touchpressed(id, x, y)
     elseif GameState.current == "game" then
         game.touchpressed(id, x, y)
