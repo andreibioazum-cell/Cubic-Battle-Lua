@@ -3,8 +3,15 @@ local lobby = require("lobby")
 local game = require("game")
 
 GameState = {
-    current = "code"   -- стартуем с экрана ввода кода
+    current = "code"
 }
+
+-- Защита от двойных тапов (Android иногда дублирует события)
+local lastTouchTime = 0
+local TOUCH_COOLDOWN = 0.05  -- 50 мс
+
+-- Определяем платформу
+local isMobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
 
 function love.load()
     love.window.setMode(0, 0, {
@@ -50,6 +57,11 @@ function love.resize(w, h)
 end
 
 function love.touchpressed(id, x, y, dx, dy, pressure)
+    -- Защита от дабл-тапа
+    local now = love.timer.getTime()
+    if now - lastTouchTime < TOUCH_COOLDOWN then return end
+    lastTouchTime = now
+
     if GameState.current == "code" then
         codescreen.touchpressed(id, x, y)
     elseif GameState.current == "lobby" then
@@ -71,16 +83,20 @@ function love.touchreleased(id, x, y, dx, dy, pressure)
     end
 end
 
+-- Мышь — ТОЛЬКО на ПК (на мобиле игнорируем, чтобы не было дублей)
 function love.mousepressed(x, y, button)
+    if isMobile then return end   -- ВАЖНО: на Android не дублируем
     love.touchpressed(1, x, y)
 end
 
 function love.mousemoved(x, y, dx, dy)
+    if isMobile then return end
     if love.mouse.isDown(1) then
         love.touchmoved(1, x, y)
     end
 end
 
 function love.mousereleased(x, y, button)
+    if isMobile then return end
     love.touchreleased(1, x, y)
 end
