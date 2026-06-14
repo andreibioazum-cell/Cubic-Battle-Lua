@@ -1,1 +1,2 @@
-# Cubic-Battle-Lua
+Cubic Battle 3
+Моя первая масштабная игра
