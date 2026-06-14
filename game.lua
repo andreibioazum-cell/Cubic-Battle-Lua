@@ -1,23 +1,92 @@
 local controls = require("controls")
-local native = require("native")  -- C++ модуль
 
 local game = {}
 
+-- ===== ИГРОК =====
 local player = {
-    x = 0, y = 0, size = 60, speed = 220,
-    vx = 0, vy = 0, accel = 18, dirX = 0, dirY = -1
+    x = 0, y = 0,
+    size = 60,
+    speed = 220,
+    vx = 0, vy = 0,
+    accel = 18,
+    dirX = 0, dirY = -1
 }
 
+-- ===== КАМЕРА =====
 local cam = { x = 0, y = 0, smoothness = 12 }
 local sand = { img = nil, w = 0, h = 0 }
 local fontFps
 local walkTimer = 0
 
+-- ===== ЧАСТИЦЫ (Lua) =====
+local particles = {}
+local particlePool = {}
+local MAX_PARTICLES = 3000
+
+local function spawnParticle(x, y, spread, life, size, r, g, b)
+    if #particles >= MAX_PARTICLES then return end
+    
+    local p
+    if #particlePool > 0 then
+        p = particlePool[#particlePool]
+        particlePool[#particlePool] = nil
+    else
+        p = {}
+    end
+    
+    local angle = math.random() * math.pi * 2
+    local speed = math.random() * spread
+    
+    p.x, p.y = x, y
+    p.vx = math.cos(angle) * speed
+    p.vy = math.sin(angle) * speed
+    p.life = life * (0.5 + math.random() * 0.5)
+    p.maxLife = p.life
+    p.size = size * (0.7 + math.random() * 0.6)
+    p.r, p.g, p.b = r, g, b
+    
+    particles[#particles + 1] = p
+end
+
+local function burstParticles(x, y, count, spread, life, size, r, g, b)
+    for i = 1, math.min(count, MAX_PARTICLES - #particles) do
+        spawnParticle(x, y, spread, life, size, r, g, b)
+    end
+end
+
+local function updateParticles(dt)
+    for i = #particles, 1, -1 do
+        local p = particles[i]
+        p.x = p.x + p.vx * dt
+        p.y = p.y + p.vy * dt
+        p.vx = p.vx * 0.98
+        p.vy = p.vy * 0.98
+        p.life = p.life - dt
+        
+        if p.life <= 0 then
+            if #particlePool < 500 then
+                particlePool[#particlePool + 1] = p
+            end
+            particles[i] = particles[#particles]
+            particles[#particles] = nil
+        end
+    end
+end
+
+local function drawParticles()
+    for _, p in ipairs(particles) do
+        local alpha = p.life / p.maxLife
+        love.graphics.setColor(p.r, p.g, p.b, alpha)
+        love.graphics.circle("fill", p.x, p.y, p.size * alpha)
+    end
+end
+
 function game.load()
     player.x, player.y = 0, 0
     player.vx, player.vy = 0, 0
     cam.x, cam.y = 0, 0
-    native.clear()
+    particles = {}
+    particlePool = {}
     
     if not sand.img then
         local ok, img = pcall(love.graphics.newImage, "sand.png", {mipmaps=true})
@@ -51,8 +120,11 @@ function game.update(dt)
         walkTimer = walkTimer + dt
         if walkTimer > 0.08 then
             walkTimer = 0
-            native.spawn(player.x - player.dirX * 20, player.y - player.dirY * 20 + player.size/3,
-                20, 0.4, 4, 0.9, 0.8, 0.4)
+            spawnParticle(
+                player.x - player.dirX * 20,
+                player.y - player.dirY * 20 + player.size/3,
+                20, 0.4, 4, 0.9, 0.8, 0.4
+            )
         end
     else
         player.vx, player.vy = 0, 0
@@ -65,7 +137,7 @@ function game.update(dt)
     cam.x = cam.x + (player.x - w/2 - cam.x) * cam.smoothness * dt
     cam.y = cam.y + (player.y - h/2 - cam.y) * cam.smoothness * dt
     
-    native.update(dt)
+    updateParticles(dt)
     controls.update(dt, player.dirX, player.dirY)
 end
 
@@ -90,17 +162,9 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-cam.x, -cam.y)
     
-    -- C++ частицы
-    local count = native.count()
-    for i = 1, count do
-        local x, y, size, alpha, r, g, b = native.get(i)
-        love.graphics.setColor(r, g, b, alpha)
-        love.graphics.circle("fill", x, y, size * alpha)
-    end
-    
+    drawParticles()
     controls.drawWorld(player.x, player.y)
     
-    -- Игрок
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", player.x - player.size/2 + 4, player.y - player.size/2 + 4, 
         player.size, player.size, 10, 10)
@@ -121,14 +185,13 @@ function game.draw()
     love.graphics.print("FPS: " .. love.timer.getFPS(), w - 80, 10)
 end
 
--- Частицы выстрела через C++
 local origTouchReleased = controls.touchreleased
 controls.touchreleased = function(id, x, y)
     local hadBullets = #controls.bullets
     origTouchReleased(id, x, y)
     if #controls.bullets > hadBullets then
         local b = controls.bullets[#controls.bullets]
-        native.burst(b.x, b.y, 12, 40, 0.15, 6, 1, 0.9, 0.3)
+        burstParticles(b.x, b.y, 12, 40, 0.15, 6, 1, 0.9, 0.3)
     end
 end
 
