@@ -2,18 +2,17 @@ local lobby = require("lobby")
 local game = require("game")
 
 GameState = { current = "lobby" }
-
 local isMobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
 local lastTap = 0
 
 function love.load()
-    love.graphics.setDefaultFilter("linear", "linear", 4)  -- linear + анизотропка
+    love.graphics.setDefaultFilter("linear", "linear", 2)
     lobby.load()
     game.load()
 end
 
 function love.update(dt)
-    if dt > 0.05 then dt = 0.05 end
+    if dt > 0.033 then dt = 0.033 end
     local s = GameState.current
     if s == "lobby" then lobby.update(dt)
     elseif s == "game" then game.update(dt) end
@@ -38,7 +37,7 @@ end
 
 function love.touchpressed(id, x, y)
     local now = love.timer.getTime()
-    if now - lastTap < 0.05 then return end
+    if now - lastTap < 0.03 then return end
     lastTap = now
     dispatch("touchpressed", id, x, y)
 end
