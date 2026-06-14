@@ -22,8 +22,8 @@ function game.load()
     cube.x = w / 2
     cube.y = h / 2
 
-    -- Джойстик ВНИЗУ СЛЕВА
-    joystick.load(150, h - 150)
+    -- Джойстик левее и ниже
+    joystick.load(90, h - 90)
 end
 
 function game.update(dt)
@@ -40,7 +40,6 @@ end
 function game.draw()
     local w, h = love.graphics.getDimensions()
 
-    -- Тёмный фон
     love.graphics.clear(0.08, 0.06, 0.15, 1)
 
     -- Сетка
@@ -82,7 +81,6 @@ function game.draw()
     love.graphics.setFont(love.graphics.newFont(18))
     love.graphics.print("BACK", backButton.x + 25, backButton.y + 13)
 
-    -- Джойстик
     joystick.draw()
 
     -- FPS
