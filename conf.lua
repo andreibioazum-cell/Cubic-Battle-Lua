@@ -5,7 +5,7 @@ function love.conf(t)
     t.window.fullscreen = true
     t.window.borderless = true
     t.window.vsync = 1
-    t.window.msaa = 2           -- 2 для скорости (было 4)
+    t.window.msaa = 2
     t.window.resizable = true
     t.modules.physics = false
     t.modules.video = false
