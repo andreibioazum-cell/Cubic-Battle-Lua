@@ -4,7 +4,7 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # 15 минут макс
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,7 +17,6 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      # NDK кеш
       - uses: actions/cache@v4
         with:
           path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
@@ -34,7 +33,6 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      # love-android кеш
       - uses: actions/cache@v4
         with:
           path: love-android
@@ -47,7 +45,6 @@ jobs:
             chmod +x love-android/gradlew
           fi
 
-      # Gradle кеш
       - uses: actions/cache@v4
         with:
           path: |
@@ -55,7 +52,6 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-fast-v1
 
-      # Native build кеш
       - uses: actions/cache@v4
         with:
           path: |
@@ -65,7 +61,6 @@ jobs:
             love-android/app/build/intermediates/merged_native_libs
           key: native-fast-v1
 
-      # Build intermediates кеш
       - uses: actions/cache@v4
         with:
           path: |
@@ -74,31 +69,32 @@ jobs:
             love-android/app/build/tmp
           key: intermediates-fast-v1
 
-      # Пакетируем .love файл
       - name: Package game.love
         run: |
           cd mygame
-          zip -9 -q -r ../game.love . -i "*.lua" "*.png" 2>/dev/null
-          echo "Game size: $(du -h ../game.love | cut -f1)"
+          echo "=== Файлы в проекте ==="
+          ls -la
+          zip -9 -r ../game.love *.lua sand.png native_particles.cpp 2>/dev/null || zip -9 -r ../game.love *.lua sand.png
+          echo "=== Содержимое .love ==="
+          unzip -l ../game.love
 
       - name: Embed game.love
         run: |
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
+          echo "game.love скопирован!"
 
-      # Только arm64 для скорости
-      - name: Force arm64-v8a
+      - name: Force arm64-v8a only
         run: |
           cd love-android
           sed -i '/abiFilters/d' app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' app/build.gradle
 
-      # Супер-оптимизация Gradle
-      - name: Speed up Gradle
+      - name: Gradle properties
         run: |
           cd love-android
           cat > gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx6g -Xms2g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError
+          org.gradle.jvmargs=-Xmx6g -Xms2g -XX:MaxMetaspaceSize=1g
           org.gradle.parallel=true
           org.gradle.daemon=false
           org.gradle.caching=true
@@ -106,13 +102,12 @@ jobs:
           android.useAndroidX=true
           android.enableJetifier=false
           android.enableR8.fullMode=false
-          android.enableResourceOptimizations=false
           EOF
 
-      # БЫСТРАЯ сборка
-      - name: Build APK FAST
+      - name: Build APK
         working-directory: love-android
         run: |
+          echo "=== НАЧИНАЕМ СБОРКУ ==="
           ./gradlew assembleEmbedNoRecordDebug \
             --no-daemon \
             --max-workers=4 \
@@ -121,16 +116,28 @@ jobs:
             -x lint \
             -x test \
             -x lintVitalEmbedNoRecordDebug \
-            -Dorg.gradle.internal.http.socketTimeout=30000 \
-            -Dorg.gradle.internal.http.connectionTimeout=30000 \
-            2>&1 | grep -E "(BUILD SUCCESS|BUILD FAILED)" 
+            2>&1 | tee build.log
+          echo "=== РЕЗУЛЬТАТ СБОРКИ ==="
+          tail -20 build.log
 
-      # Загружаем APK
+      - name: Find APK
+        if: always()
+        run: |
+          echo "=== ИЩЕМ APK ==="
+          find love-android -name "*.apk" -type f 2>/dev/null || echo "APK НЕ НАЙДЕН"
+          echo "=== ВСЕ ФАЙЛЫ В OUTPUTS ==="
+          find love-android/app/build/outputs -type f 2>/dev/null || echo "Нет outputs"
+          echo "=== ПРОВЕРКА СБОРКИ ==="
+          ls -la love-android/app/build/outputs/apk/embedNoRecord/debug/ 2>/dev/null || echo "Нет debug папки"
+
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: CubicBattle_APK
-          path: love-android/app/build/outputs/apk/embedNoRecord/debug/*.apk
+          path: |
+            love-android/app/build/outputs/apk/**/*.apk
+            build.log
           if-no-files-found: warn
           retention-days: 30
           compression-level: 0
