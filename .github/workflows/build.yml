@@ -4,29 +4,27 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout my game
         uses: actions/checkout@v4
         with:
           path: mygame
 
-      - name: Clone love-android (official build template)
+      - name: Clone love-android
         run: |
-          git clone --recursive https://github.com/love2d/love-android.git
+          git clone --recursive --depth 1 https://github.com/love2d/love-android.git
           cd love-android
-          echo "=== love-android files ==="
+          echo "=== love-android ready ==="
           ls -la
 
-      - name: Package game into .love file
+      - name: Package game into .love
         run: |
+          mkdir -p game-temp
           cd mygame
-          # Удаляем workflow и readme из .love (не нужны в игре)
-          mkdir -p ../game-temp
-          # Копируем только .lua файлы и conf
           for f in *.lua; do
             [ -f "$f" ] && cp "$f" ../game-temp/
           done
-          # Если есть assets — копируем тоже
           [ -d "assets" ] && cp -r assets ../game-temp/
           [ -d "images" ] && cp -r images ../game-temp/
           [ -d "sounds" ] && cp -r sounds ../game-temp/
@@ -34,19 +32,36 @@ jobs:
           cd ../game-temp
           echo "=== Files inside .love ==="
           ls -la
-
-          # Создаём .love (это zip)
           zip -9 -r ../game.love .
           cd ..
           ls -la game.love
 
-      - name: Embed game.love into love-android assets
+      - name: Embed game.love
         run: |
-          # love-android умеет встраивать игру через assets/game.love
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
-          echo "Embedded game.love into love-android"
           ls -la love-android/app/src/embed/assets/
+
+      - name: Restrict to arm64-v8a only (faster build)
+        run: |
+          cd love-android
+          # Найдём app/build.gradle и ограничим архитектуры
+          if [ -f "app/build.gradle" ]; then
+            BUILD_FILE="app/build.gradle"
+          elif [ -f "app/build.gradle.kts" ]; then
+            BUILD_FILE="app/build.gradle.kts"
+          fi
+          echo "Build file: $BUILD_FILE"
+
+          # Добавляем abiFilters если нет
+          if ! grep -q "abiFilters" "$BUILD_FILE"; then
+            echo "Adding abiFilters..."
+            # Вставляем в defaultConfig
+            sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' "$BUILD_FILE"
+          fi
+
+          echo "=== Modified build.gradle ==="
+          grep -A 2 "abiFilters\|defaultConfig" "$BUILD_FILE" | head -20
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -60,41 +75,53 @@ jobs:
       - name: Install NDK
         run: |
           NDK_VER="25.2.9519653"
-          yes | sdkmanager --install "ndk;$NDK_VER" 2>&1 | tail -5
+          yes | sdkmanager --install "ndk;$NDK_VER" 2>&1 | tail -3
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VER" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VER" >> $GITHUB_ENV
-          ls $ANDROID_HOME/ndk/
+
+      - name: Configure Gradle (more memory)
+        run: |
+          cd love-android
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
+          org.gradle.parallel=true
+          org.gradle.daemon=false
+          org.gradle.caching=true
+          android.useAndroidX=true
+          android.enableJetifier=false
+          EOF
+          cat gradle.properties
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build embed APK (with game inside)
+      - name: Build EmbedNoRecord Debug APK (arm64 only)
         working-directory: love-android
+        timeout-minutes: 22
         run: |
           chmod +x gradlew
-          echo "=== Available tasks ==="
-          ./gradlew tasks --no-daemon 2>&1 | grep -i "assemble" | head -20
-          echo ""
-          echo "=== Building embed-debug ==="
-          ./gradlew assembleEmbedNoRecordDebug --no-daemon --stacktrace 2>&1 | tail -100 || \
-          ./gradlew assembleEmbedDebug --no-daemon --stacktrace 2>&1 | tail -100 || \
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -100
+          echo "=== Starting build (arm64-v8a only) ==="
+          ./gradlew assembleEmbedNoRecordDebug \
+            --no-daemon \
+            --no-configuration-cache \
+            -PdisableCheckLicense \
+            --max-workers=2 \
+            2>&1 | grep -v "^>" | tail -150
 
       - name: Find APK files
         if: always()
         run: |
-          echo "=== All APK files ==="
+          echo "=== APK files ==="
           find love-android -name "*.apk" -type f 2>/dev/null
           echo ""
-          echo "=== Outputs structure ==="
-          ls -laR love-android/app/build/outputs/ 2>/dev/null || echo "no outputs"
+          echo "=== Outputs ==="
+          ls -laR love-android/app/build/outputs/ 2>/dev/null | head -50
 
       - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: MyLuaGame_APK
-          path: |
-            love-android/app/build/outputs/apk/**/*.apk
+          path: love-android/app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
           retention-days: 30
