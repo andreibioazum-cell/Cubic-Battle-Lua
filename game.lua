@@ -6,12 +6,18 @@ local cube = {
     x = 400,
     y = 300,
     size = 60,
-    speed = 450,         -- было 150, теперь 450 (в 3 раза быстрее)
+    speed = 450,
     color = {1, 0.5, 0.3},
-    -- Сглаживание движения (lerp)
     velX = 0,
     velY = 0,
-    accel = 12           -- скорость разгона/торможения
+    accel = 18           -- увеличил для более резкого разгона
+}
+
+-- Камера
+local camera = {
+    x = 0,
+    y = 0,
+    smoothness = 5       -- чем больше — тем быстрее камера догоняет игрока
 }
 
 local backButton = {
@@ -21,50 +27,88 @@ local backButton = {
     h = 50
 }
 
+-- Фон
+local sandImage = nil
+local sandQuad = nil
+local sandW, sandH = 0, 0
+
 function game.load()
     local w, h = love.graphics.getDimensions()
-    cube.x = w / 2
-    cube.y = h / 2
+    cube.x = 0
+    cube.y = 0
     cube.velX = 0
     cube.velY = 0
+    camera.x = 0
+    camera.y = 0
     joystick.load(90, h - 90)
+
+    -- Загружаем фоновую текстуру
+    if not sandImage then
+        local ok, img = pcall(love.graphics.newImage, "sand.png")
+        if ok then
+            sandImage = img
+            sandImage:setWrap("repeat", "repeat")
+            sandImage:setFilter("nearest", "nearest")
+            sandW = sandImage:getWidth()
+            sandH = sandImage:getHeight()
+        end
+    end
 end
 
 function game.update(dt)
     local w, h = love.graphics.getDimensions()
 
-    -- Получаем целевую скорость от джойстика
     local dx, dy = joystick.getDirection()
     local targetVelX = dx * cube.speed
     local targetVelY = dy * cube.speed
 
-    -- Плавно интерполируем текущую скорость к целевой (анти-рывки)
-    cube.velX = cube.velX + (targetVelX - cube.velX) * cube.accel * dt
-    cube.velY = cube.velY + (targetVelY - cube.velY) * cube.accel * dt
+    -- РЕЗКАЯ остановка, плавный разгон
+    if dx == 0 and dy == 0 then
+        cube.velX = 0
+        cube.velY = 0
+    else
+        cube.velX = cube.velX + (targetVelX - cube.velX) * cube.accel * dt
+        cube.velY = cube.velY + (targetVelY - cube.velY) * cube.accel * dt
+    end
 
-    -- Двигаем кубик
     cube.x = cube.x + cube.velX * dt
     cube.y = cube.y + cube.velY * dt
 
-    -- Границы
-    cube.x = math.max(cube.size/2, math.min(w - cube.size/2, cube.x))
-    cube.y = math.max(cube.size/2, math.min(h - cube.size/2, cube.y))
+    -- Плавная камера (lerp к позиции игрока)
+    local targetCamX = cube.x - w / 2
+    local targetCamY = cube.y - h / 2
+    camera.x = camera.x + (targetCamX - camera.x) * camera.smoothness * dt
+    camera.y = camera.y + (targetCamY - camera.y) * camera.smoothness * dt
 end
 
 function game.draw()
     local w, h = love.graphics.getDimensions()
 
-    love.graphics.clear(0.08, 0.06, 0.15, 1)
+    -- Фон через mesh с повтором (если есть картинка)
+    if sandImage then
+        -- Делаем UV-координаты так чтобы текстура повторялась через всю камеру
+        local uOff = camera.x / sandW
+        local vOff = camera.y / sandH
+        local uMax = uOff + w / sandW
+        local vMax = vOff + h / sandH
 
-    -- Сетка
-    love.graphics.setColor(1, 1, 1, 0.05)
-    love.graphics.setLineWidth(1)
-    for i = 0, w, 50 do
-        love.graphics.line(i, 0, i, h)
+        local mesh = love.graphics.newMesh({
+            {0, 0, uOff, vOff, 1, 1, 1, 1},
+            {w, 0, uMax, vOff, 1, 1, 1, 1},
+            {w, h, uMax, vMax, 1, 1, 1, 1},
+            {0, h, uOff, vMax, 1, 1, 1, 1},
+        }, "fan", "static")
+        mesh:setTexture(sandImage)
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(mesh, 0, 0)
+    else
+        -- Запасной фон если sand.png нет
+        love.graphics.clear(0.4, 0.3, 0.15, 1)
     end
-    for i = 0, h, 50 do
-        love.graphics.line(0, i, w, i)
-    end
+
+    -- Применяем смещение камеры для игровых объектов
+    love.graphics.push()
+    love.graphics.translate(-camera.x, -camera.y)
 
     -- Кубик с тенью
     love.graphics.setColor(0, 0, 0, 0.4)
@@ -79,14 +123,16 @@ function game.draw()
         cube.y - cube.size/2,
         cube.size, cube.size, 10, 10)
 
-    love.graphics.setColor(1, 1, 1, 0.8)
+    love.graphics.setColor(1, 1, 1, 0.9)
     love.graphics.setLineWidth(3)
     love.graphics.rectangle("line",
         cube.x - cube.size/2,
         cube.y - cube.size/2,
         cube.size, cube.size, 10, 10)
 
-    -- BACK
+    love.graphics.pop()
+
+    -- UI поверх (BACK, джойстик, FPS) — НЕ зависит от камеры
     love.graphics.setColor(0.4, 0.2, 0.5, 0.85)
     love.graphics.rectangle("fill", backButton.x, backButton.y, backButton.w, backButton.h, 10, 10)
     love.graphics.setColor(1, 1, 1, 1)
@@ -97,7 +143,6 @@ function game.draw()
 
     joystick.draw()
 
-    -- FPS
     love.graphics.setColor(1, 1, 1, 0.5)
     love.graphics.setFont(love.graphics.newFont(12))
     love.graphics.print("FPS: " .. love.timer.getFPS(), w - 80, 10)
