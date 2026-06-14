@@ -14,23 +14,21 @@ function joystick.load(cx, cy)
 end
 
 function joystick.draw()
-    -- Только внешняя база (БЕЗ внутреннего круга)
-    love.graphics.setColor(0.6, 0.3, 0.9, 0.15)
+    -- База — ЧЁРНАЯ полупрозрачная
+    love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.circle("fill", centerX, centerY, radius)
 
-    -- Обводка
-    love.graphics.setColor(1, 1, 1, 0.35)
+    -- Обводка — чёрная
+    love.graphics.setColor(0, 0, 0, 0.8)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", centerX, centerY, radius)
 
-    -- Стик с тенью
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.circle("fill", stickX + 2, stickY + 2, stickRadius)
-
-    love.graphics.setColor(0.6, 0.3, 0.9, 0.95)
+    -- Стик — ЧЁРНЫЙ
+    love.graphics.setColor(0, 0, 0, 1)
     love.graphics.circle("fill", stickX, stickY, stickRadius)
 
-    love.graphics.setColor(1, 1, 1, 0.9)
+    -- Обводка стика — чёрная
+    love.graphics.setColor(0, 0, 0, 1)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", stickX, stickY, stickRadius)
 end
