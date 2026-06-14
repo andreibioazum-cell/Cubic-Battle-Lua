@@ -29,6 +29,8 @@ jobs:
       - name: Clone love-android
         run: |
           git clone --recursive --depth 1 https://github.com/love2d/love-android.git
+          echo "=== Cloned ==="
+          ls -la love-android/
 
       - name: Remove SDL gradle wrappers
         run: |
@@ -39,7 +41,7 @@ jobs:
           mkdir -p game-temp
           cd mygame
           for f in *.lua; do
-            [ -f "$f" ] && cp "$f" ../game-temp/
+            [ -f "$f" ] && cp "$f" ../game-temp/ && echo "Added: $f"
           done
           cd ../game-temp
           ls -la
@@ -53,21 +55,15 @@ jobs:
           cp game.love love-android/app/src/embed/assets/game.love
           ls -la love-android/app/src/embed/assets/
 
-      - name: Force arm64 + force APK output
+      - name: Force arm64-v8a only
         run: |
           cd love-android
           BUILD_FILE="app/build.gradle"
           [ -f "app/build.gradle.kts" ] && BUILD_FILE="app/build.gradle.kts"
-
-          # arm64 only
           sed -i '/abiFilters/d' "$BUILD_FILE"
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' "$BUILD_FILE"
 
-          echo ""
-          echo "=== Final build.gradle ==="
-          cat "$BUILD_FILE"
-
-      - name: Gradle config
+      - name: Gradle properties
         run: |
           cd love-android
           cat > gradle.properties << 'EOF'
@@ -79,66 +75,102 @@ jobs:
           android.enableJetifier=false
           EOF
 
-      - name: Build APK
+      - name: Build APK (with FULL log saved)
         working-directory: love-android
         timeout-minutes: 22
+        continue-on-error: true
         run: |
           chmod +x gradlew
-          # Сначала пробуем EmbedNoRecord
+
+          echo "=== Trying assembleEmbedNoRecordDebug ==="
           ./gradlew assembleEmbedNoRecordDebug \
-            --no-daemon --max-workers=4 -PdisableCheckLicense 2>&1 | tail -80 || true
+            --no-daemon --max-workers=4 -PdisableCheckLicense \
+            --stacktrace 2>&1 | tee build-1.log | tail -50
 
-          # Если не вышло — пробуем просто Embed
-          if ! find . -name "*.apk" -type f | grep -q apk; then
-            echo "=== Trying assembleEmbedDebug ==="
-            ./gradlew assembleEmbedDebug \
-              --no-daemon --max-workers=4 -PdisableCheckLicense 2>&1 | tail -80 || true
+          if find . -name "*.apk" -type f | grep -q apk; then
+            echo "✅ APK created on attempt 1"
+            exit 0
           fi
 
-          # Если опять не вышло — простой assembleDebug
-          if ! find . -name "*.apk" -type f | grep -q apk; then
-            echo "=== Trying assembleDebug ==="
-            ./gradlew assembleDebug \
-              --no-daemon --max-workers=4 -PdisableCheckLicense 2>&1 | tail -80 || true
+          echo ""
+          echo "=== Attempt 2: assembleEmbedDebug ==="
+          ./gradlew assembleEmbedDebug \
+            --no-daemon --max-workers=4 -PdisableCheckLicense \
+            --stacktrace 2>&1 | tee build-2.log | tail -50
+
+          if find . -name "*.apk" -type f | grep -q apk; then
+            echo "✅ APK created on attempt 2"
+            exit 0
           fi
 
-      - name: Inspect outputs
-        if: always()
-        run: |
-          echo "=== ALL APK/AAB files ==="
-          find love-android -type f \( -name "*.apk" -o -name "*.aab" \) 2>/dev/null
           echo ""
-          echo "=== outputs tree (full) ==="
-          find love-android/app/build/outputs -type f 2>/dev/null
-          echo ""
-          echo "=== outputs structure ==="
-          ls -laR love-android/app/build/outputs/ 2>/dev/null | head -100
+          echo "=== Attempt 3: assembleDebug ==="
+          ./gradlew assembleDebug \
+            --no-daemon --max-workers=4 -PdisableCheckLicense \
+            --stacktrace 2>&1 | tee build-3.log | tail -50
 
-      - name: Copy APK to root
+          if find . -name "*.apk" -type f | grep -q apk; then
+            echo "✅ APK created on attempt 3"
+            exit 0
+          fi
+
+          echo ""
+          echo "❌ All attempts failed"
+
+      - name: Show critical errors from logs
+        if: always()
+        working-directory: love-android
+        run: |
+          for log in build-1.log build-2.log build-3.log; do
+            if [ -f "$log" ]; then
+              echo ""
+              echo "=============================="
+              echo "=== $log ==="
+              echo "=============================="
+              echo ""
+              echo "--- LAST 30 LINES ---"
+              tail -30 "$log"
+              echo ""
+              echo "--- ERROR LINES ---"
+              grep -iE "error:|FAILED|exception|cannot find|undefined reference" "$log" | head -20 || echo "(no error lines)"
+            fi
+          done
+
+      - name: Hunt for APK everywhere
         if: always()
         run: |
-          APK_PATH=$(find love-android -name "*.apk" -type f | head -1)
-          if [ -n "$APK_PATH" ]; then
-            echo "✅ Found: $APK_PATH"
-            ls -la "$APK_PATH"
-            cp "$APK_PATH" "$GITHUB_WORKSPACE/CubicBattle.apk"
+          echo "=== Searching whole workspace ==="
+          find . -name "*.apk" -type f 2>/dev/null
+          echo ""
+          echo "=== build/outputs full tree ==="
+          find love-android/app/build -type f 2>/dev/null | head -50
+
+          APK=$(find love-android -name "*.apk" -type f 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            echo ""
+            echo "✅✅✅ FOUND APK: $APK"
+            cp "$APK" "$GITHUB_WORKSPACE/CubicBattle.apk"
             ls -la "$GITHUB_WORKSPACE/CubicBattle.apk"
           else
-            echo "❌ No APK. Trying AAB..."
-            AAB_PATH=$(find love-android -name "*.aab" -type f | head -1)
-            if [ -n "$AAB_PATH" ]; then
-              echo "Found AAB instead: $AAB_PATH"
-              cp "$AAB_PATH" "$GITHUB_WORKSPACE/CubicBattle.aab"
-            fi
+            echo ""
+            echo "❌ No APK anywhere"
           fi
 
-      - name: Upload artifact
+      - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: CubicBattle_Build
-          path: |
-            CubicBattle.apk
-            CubicBattle.aab
+          name: CubicBattle_APK
+          path: CubicBattle.apk
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Upload ALL build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build_logs
+          path: |
+            love-android/build-*.log
+          if-no-files-found: ignore
+          retention-days: 7
