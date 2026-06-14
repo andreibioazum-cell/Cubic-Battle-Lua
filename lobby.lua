@@ -15,9 +15,16 @@ local function createGradient(w, h)
     return love.graphics.newMesh(vertices, "fan", "static")
 end
 
-function lobby.load()
+local function recalcButton()
+    local w, h = love.graphics.getDimensions()
     buttonW = 180
     buttonH = 65
+    buttonX = w/2 - buttonW/2
+    buttonY = h/2 + 40
+end
+
+function lobby.load()
+    recalcButton()   -- инициализируем сразу (фикс nil ошибки)
 end
 
 function lobby.update(dt)
@@ -27,17 +34,15 @@ end
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
 
-    -- Пересоздаём градиент если изменился размер
     if not gradientMesh or w ~= lastW or h ~= lastH then
         gradientMesh = createGradient(w, h)
         lastW, lastH = w, h
+        recalcButton()
     end
 
-    -- Градиент на весь экран
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.draw(gradientMesh, 0, 0)
 
-    -- CUBIC BATTLE
     local titleFont = love.graphics.newFont(56)
     love.graphics.setFont(titleFont)
     local title = "CUBIC BATTLE"
@@ -57,10 +62,7 @@ function lobby.draw()
     local sw = subFont:getWidth(sub)
     love.graphics.print(sub, w/2 - sw/2, h/4 + 75)
 
-    -- Кнопка PLAY
-    buttonX = w/2 - buttonW/2
-    buttonY = h/2 + 40
-
+    -- Кнопка
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", buttonX + 3, buttonY + 4, buttonW, buttonH, 14, 14)
 
@@ -77,6 +79,7 @@ function lobby.draw()
 end
 
 function lobby.touchpressed(id, x, y)
+    if not buttonX then recalcButton() end   -- двойная защита
     if x >= buttonX and x <= buttonX + buttonW and
        y >= buttonY and y <= buttonY + buttonH then
         GameState.current = "game"
@@ -85,6 +88,7 @@ end
 
 function lobby.resize(w, h)
     gradientMesh = nil
+    recalcButton()
 end
 
 return lobby
