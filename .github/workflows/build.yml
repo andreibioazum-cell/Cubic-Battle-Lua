@@ -1,0 +1,91 @@
+name: Build_Game_APK
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package .love file
+        run: |
+          # LÖVE игра = это zip с расширением .love
+          mkdir -p build
+          # Берём все .lua файлы из корня и упаковываем
+          zip -9 -r build/game.love . -x "*.git*" "*.github*" "*.md" "build/*"
+          ls -la build/
+
+      - name: Download LÖVE Android APK
+        run: |
+          # Скачиваем готовый LÖVE Android player
+          LOVE_VERSION="11.5"
+          wget -q "https://github.com/love2d/love-android/releases/download/${LOVE_VERSION}/love-${LOVE_VERSION}-android-embed.apk" \
+               -O build/love-base.apk || \
+          wget -q "https://github.com/love2d/love/releases/download/${LOVE_VERSION}/love-${LOVE_VERSION}-android.apk" \
+               -O build/love-base.apk
+          ls -la build/
+
+      - name: Setup tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip unzip openjdk-17-jdk-headless apksigner zipalign
+          # Установим Android build tools
+          ANDROID_HOME=$HOME/android-sdk
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmd.zip
+          unzip -q cmd.zip
+          mv cmdline-tools latest
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" > /dev/null
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+
+      - name: Embed game into LÖVE APK
+        run: |
+          cd build
+          # Распаковываем APK
+          mkdir -p apk-extract
+          cd apk-extract
+          unzip -q ../love-base.apk
+          # Кладём .love файл внутрь
+          mkdir -p assets
+          cp ../game.love assets/game.love
+          # Удаляем старую подпись
+          rm -rf META-INF
+          # Запаковываем обратно
+          zip -9 -r ../game-unsigned.apk .
+          cd ..
+          ls -la
+
+      - name: Sign APK
+        run: |
+          cd build
+          # Генерируем debug keystore
+          keytool -genkey -v -keystore debug.keystore \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+          # Выравниваем
+          $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 game-unsigned.apk game-aligned.apk
+
+          # Подписываем
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+            --ks debug.keystore \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out my-game.apk \
+            game-aligned.apk
+
+          ls -la *.apk
+
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyGame_APK
+          path: build/my-game.apk
+          if-no-files-found: warn
+          retention-days: 30
