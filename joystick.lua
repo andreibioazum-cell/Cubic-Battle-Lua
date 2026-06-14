@@ -3,8 +3,8 @@ local joystick = {}
 local touchId = nil
 local centerX, centerY = 0, 0
 local stickX, stickY = 0, 0
-local radius = 90         -- средний размер
-local stickRadius = 38
+local radius = 60         -- маленький
+local stickRadius = 26
 
 function joystick.load(cx, cy)
     centerX = cx
@@ -19,23 +19,17 @@ function joystick.draw()
     love.graphics.circle("fill", centerX, centerY, radius)
 
     -- Внутренний круг
-    love.graphics.setColor(1, 1, 1, 0.1)
+    love.graphics.setColor(1, 1, 1, 0.08)
     love.graphics.circle("fill", centerX, centerY, radius * 0.7)
 
     -- Обводка
-    love.graphics.setColor(1, 1, 1, 0.4)
-    love.graphics.setLineWidth(3)
-    love.graphics.circle("line", centerX, centerY, radius)
-
-    -- Перекрестье
-    love.graphics.setColor(1, 1, 1, 0.2)
+    love.graphics.setColor(1, 1, 1, 0.35)
     love.graphics.setLineWidth(2)
-    love.graphics.line(centerX - 12, centerY, centerX + 12, centerY)
-    love.graphics.line(centerX, centerY - 12, centerX, centerY + 12)
+    love.graphics.circle("line", centerX, centerY, radius)
 
     -- Стик с тенью
     love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.circle("fill", stickX + 2, stickY + 3, stickRadius)
+    love.graphics.circle("fill", stickX + 2, stickY + 2, stickRadius)
 
     love.graphics.setColor(0.6, 0.3, 0.9, 0.95)
     love.graphics.circle("fill", stickX, stickY, stickRadius)
@@ -50,7 +44,7 @@ function joystick.touchpressed(id, x, y)
     local dy = y - centerY
     local dist = math.sqrt(dx*dx + dy*dy)
 
-    if dist < radius * 1.5 and touchId == nil then
+    if dist < radius * 1.6 and touchId == nil then
         touchId = id
         joystick.touchmoved(id, x, y)
     end
