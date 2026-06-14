@@ -1,78 +1,43 @@
-local joystick = {}
+local j = {}
+local id, cx, cy, sx, sy = nil, 0, 0, 0, 0
+local R, sR = 60, 26
 
-local touchId = nil
-local centerX, centerY = 0, 0
-local stickX, stickY = 0, 0
-local radius = 60
-local stickRadius = 26
+function j.load(x, y) cx, cy, sx, sy = x, y, x, y end
 
-function joystick.load(cx, cy)
-    centerX = cx
-    centerY = cy
-    stickX = cx
-    stickY = cy
+function j.draw()
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.circle("fill", cx, cy, R)
+    love.graphics.setColor(0,0,0,0.8)
+    love.graphics.setLineWidth(2)
+    love.graphics.circle("line", cx, cy, R)
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.circle("fill", sx, sy, sR)
 end
 
-function joystick.draw()
-    -- База — ЧЁРНАЯ полупрозрачная
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.circle("fill", centerX, centerY, radius)
-
-    -- Обводка — чёрная
-    love.graphics.setColor(0, 0, 0, 0.8)
-    love.graphics.setLineWidth(2)
-    love.graphics.circle("line", centerX, centerY, radius)
-
-    -- Стик — ЧЁРНЫЙ
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.circle("fill", stickX, stickY, stickRadius)
-
-    -- Обводка стика — чёрная
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.setLineWidth(2)
-    love.graphics.circle("line", stickX, stickY, stickRadius)
-end
-
-function joystick.touchpressed(id, x, y)
-    local dx = x - centerX
-    local dy = y - centerY
-    local dist = math.sqrt(dx*dx + dy*dy)
-
-    if dist < radius * 1.6 and touchId == nil then
-        touchId = id
-        joystick.touchmoved(id, x, y)
+function j.touchpressed(tid, x, y)
+    local dx, dy = x-cx, y-cy
+    if dx*dx + dy*dy < (R*1.6)^2 and not id then
+        id = tid
+        j.touchmoved(tid, x, y)
     end
 end
 
-function joystick.touchmoved(id, x, y)
-    if id ~= touchId then return end
-
-    local dx = x - centerX
-    local dy = y - centerY
-    local dist = math.sqrt(dx*dx + dy*dy)
-
-    if dist > radius then
-        local angle = math.atan2(dy, dx)
-        stickX = centerX + math.cos(angle) * radius
-        stickY = centerY + math.sin(angle) * radius
+function j.touchmoved(tid, x, y)
+    if tid ~= id then return end
+    local dx, dy = x-cx, y-cy
+    local d = math.sqrt(dx*dx + dy*dy)
+    if d > R then
+        local a = math.atan2(dy, dx)
+        sx, sy = cx + math.cos(a)*R, cy + math.sin(a)*R
     else
-        stickX = x
-        stickY = y
+        sx, sy = x, y
     end
 end
 
-function joystick.touchreleased(id, x, y)
-    if id == touchId then
-        touchId = nil
-        stickX = centerX
-        stickY = centerY
-    end
+function j.touchreleased(tid)
+    if tid == id then id = nil; sx, sy = cx, cy end
 end
 
-function joystick.getDirection()
-    local dx = (stickX - centerX) / radius
-    local dy = (stickY - centerY) / radius
-    return dx, dy
-end
+function j.dir() return (sx-cx)/R, (sy-cy)/R end
 
-return joystick
+return j
