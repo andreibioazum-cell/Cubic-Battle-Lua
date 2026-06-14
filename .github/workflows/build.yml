@@ -29,12 +29,18 @@ jobs:
       - name: Clone love-android
         run: |
           git clone --recursive --depth 1 https://github.com/love2d/love-android.git
-          echo "=== Cloned ==="
-          ls -la love-android/
 
       - name: Remove SDL gradle wrappers
         run: |
           find love-android/app/src/main/cpp -name "gradle-wrapper.jar" -delete 2>/dev/null || true
+
+      - name: Inspect ORIGINAL gradle.properties
+        run: |
+          echo "=== ORIGINAL gradle.properties ==="
+          cat love-android/gradle.properties
+          echo ""
+          echo "=== ORIGINAL app/build.gradle (lines around line 14) ==="
+          sed -n '1,30p' love-android/app/build.gradle
 
       - name: Package game
         run: |
@@ -53,42 +59,43 @@ jobs:
         run: |
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
-          ls -la love-android/app/src/embed/assets/
 
-      - name: Force arm64-v8a only
+      - name: Force arm64 only
         run: |
           cd love-android
           BUILD_FILE="app/build.gradle"
-          [ -f "app/build.gradle.kts" ] && BUILD_FILE="app/build.gradle.kts"
           sed -i '/abiFilters/d' "$BUILD_FILE"
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' "$BUILD_FILE"
 
-      - name: Gradle properties
+      - name: APPEND speed settings to gradle.properties (NOT overwrite!)
         run: |
           cd love-android
-          cat > gradle.properties << 'EOF'
+          # Добавляем НАШИ настройки В КОНЕЦ существующего файла
+          cat >> gradle.properties << 'EOF'
+
+          # === Our speed additions ===
           org.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g
           org.gradle.parallel=true
           org.gradle.daemon=false
           org.gradle.caching=true
-          android.useAndroidX=true
-          android.enableJetifier=false
           EOF
+          echo "=== FINAL gradle.properties ==="
+          cat gradle.properties
 
-      - name: Build APK (with FULL log saved)
+      - name: Build APK
         working-directory: love-android
         timeout-minutes: 22
         continue-on-error: true
         run: |
           chmod +x gradlew
 
-          echo "=== Trying assembleEmbedNoRecordDebug ==="
+          echo "=== Attempt 1: assembleEmbedNoRecordDebug ==="
           ./gradlew assembleEmbedNoRecordDebug \
             --no-daemon --max-workers=4 -PdisableCheckLicense \
-            --stacktrace 2>&1 | tee build-1.log | tail -50
+            --stacktrace 2>&1 | tee build-1.log | tail -60
 
           if find . -name "*.apk" -type f | grep -q apk; then
-            echo "✅ APK created on attempt 1"
+            echo "✅ APK from attempt 1"
             exit 0
           fi
 
@@ -96,10 +103,10 @@ jobs:
           echo "=== Attempt 2: assembleEmbedDebug ==="
           ./gradlew assembleEmbedDebug \
             --no-daemon --max-workers=4 -PdisableCheckLicense \
-            --stacktrace 2>&1 | tee build-2.log | tail -50
+            --stacktrace 2>&1 | tee build-2.log | tail -60
 
           if find . -name "*.apk" -type f | grep -q apk; then
-            echo "✅ APK created on attempt 2"
+            echo "✅ APK from attempt 2"
             exit 0
           fi
 
@@ -107,53 +114,24 @@ jobs:
           echo "=== Attempt 3: assembleDebug ==="
           ./gradlew assembleDebug \
             --no-daemon --max-workers=4 -PdisableCheckLicense \
-            --stacktrace 2>&1 | tee build-3.log | tail -50
+            --stacktrace 2>&1 | tee build-3.log | tail -60
 
-          if find . -name "*.apk" -type f | grep -q apk; then
-            echo "✅ APK created on attempt 3"
-            exit 0
-          fi
-
-          echo ""
-          echo "❌ All attempts failed"
-
-      - name: Show critical errors from logs
-        if: always()
-        working-directory: love-android
-        run: |
-          for log in build-1.log build-2.log build-3.log; do
-            if [ -f "$log" ]; then
-              echo ""
-              echo "=============================="
-              echo "=== $log ==="
-              echo "=============================="
-              echo ""
-              echo "--- LAST 30 LINES ---"
-              tail -30 "$log"
-              echo ""
-              echo "--- ERROR LINES ---"
-              grep -iE "error:|FAILED|exception|cannot find|undefined reference" "$log" | head -20 || echo "(no error lines)"
-            fi
-          done
-
-      - name: Hunt for APK everywhere
+      - name: Hunt for APK
         if: always()
         run: |
-          echo "=== Searching whole workspace ==="
+          echo "=== ALL APK files ==="
           find . -name "*.apk" -type f 2>/dev/null
           echo ""
-          echo "=== build/outputs full tree ==="
-          find love-android/app/build -type f 2>/dev/null | head -50
+          echo "=== outputs structure ==="
+          find love-android/app/build/outputs -type f 2>/dev/null | head -30
 
           APK=$(find love-android -name "*.apk" -type f 2>/dev/null | head -1)
           if [ -n "$APK" ]; then
-            echo ""
-            echo "✅✅✅ FOUND APK: $APK"
+            echo "✅ FOUND: $APK"
             cp "$APK" "$GITHUB_WORKSPACE/CubicBattle.apk"
             ls -la "$GITHUB_WORKSPACE/CubicBattle.apk"
           else
-            echo ""
-            echo "❌ No APK anywhere"
+            echo "❌ No APK"
           fi
 
       - name: Upload APK
@@ -165,12 +143,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload ALL build logs
+      - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build_logs
-          path: |
-            love-android/build-*.log
+          path: love-android/build-*.log
           if-no-files-found: ignore
           retention-days: 7
