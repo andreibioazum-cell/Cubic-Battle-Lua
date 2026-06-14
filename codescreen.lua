@@ -2,16 +2,18 @@ local codescreen = {}
 
 local CORRECT_CODE = "3827"
 local enteredCode = ""
-local wrongFlash = 0   -- таймер красной вспышки при неверном коде
-local buttons = {}     -- кнопки цифр
+local wrongFlash = 0
+local buttons = {}
 
--- Геометрия
 local btnSize = 80
 local gridGap = 12
 
+-- Защита от дубля + блокировка после верного кода
+local btnCooldown = 0
+local accepted = false
+
 local function rebuildButtons(w, h)
     buttons = {}
-    -- Раскладка 3x4 (1-9, *, 0, ←)
     local labels = {
         "1", "2", "3",
         "4", "5", "6",
@@ -39,6 +41,8 @@ end
 function codescreen.load()
     enteredCode = ""
     wrongFlash = 0
+    btnCooldown = 0
+    accepted = false
     rebuildButtons(love.graphics.getWidth(), love.graphics.getHeight())
 end
 
@@ -50,12 +54,14 @@ function codescreen.update(dt)
     if wrongFlash > 0 then
         wrongFlash = wrongFlash - dt
     end
+    if btnCooldown > 0 then
+        btnCooldown = btnCooldown - dt
+    end
 end
 
 function codescreen.draw()
     local w, h = love.graphics.getDimensions()
 
-    -- Фон (тёмный с лёгким красным при ошибке)
     if wrongFlash > 0 then
         local r = 0.15 + wrongFlash * 0.3
         love.graphics.clear(r, 0.05, 0.08, 1)
@@ -63,7 +69,6 @@ function codescreen.draw()
         love.graphics.clear(0.08, 0.08, 0.12, 1)
     end
 
-    -- Заголовок
     love.graphics.setColor(1, 1, 1, 1)
     local titleFont = love.graphics.newFont(36)
     love.graphics.setFont(titleFont)
@@ -71,7 +76,7 @@ function codescreen.draw()
     local tw = titleFont:getWidth(title)
     love.graphics.print(title, w/2 - tw/2, h/2 - 280)
 
-    -- Поле с введённым кодом (точки)
+    -- Точки
     local dotSize = 18
     local dotGap = 22
     local totalDotsW = 4 * dotSize + 3 * dotGap
@@ -95,17 +100,13 @@ function codescreen.draw()
     love.graphics.setFont(btnFont)
 
     for _, btn in ipairs(buttons) do
-        -- Тень
         love.graphics.setColor(0, 0, 0, 0.3)
         love.graphics.rectangle("fill", btn.x + 2, btn.y + 3, btn.w, btn.h, 12, 12)
-        -- Кнопка
         love.graphics.setColor(0.2, 0.2, 0.28, 1)
         love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 12, 12)
-        -- Обводка
         love.graphics.setColor(1, 1, 1, 0.15)
         love.graphics.setLineWidth(1)
         love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 12, 12)
-        -- Текст
         love.graphics.setColor(1, 1, 1, 0.95)
         local lw = btnFont:getWidth(btn.label)
         local lh = btnFont:getHeight()
@@ -114,25 +115,29 @@ function codescreen.draw()
 end
 
 function codescreen.touchpressed(id, x, y)
+    -- Защита от дубля
+    if btnCooldown > 0 then return end
+    if accepted then return end
+
     for _, btn in ipairs(buttons) do
         if x >= btn.x and x <= btn.x + btn.w and
            y >= btn.y and y <= btn.y + btn.h then
+
+            btnCooldown = 0.15   -- следующий тап только через 150 мс
+
             if btn.label == "<" then
-                -- Backspace
                 if #enteredCode > 0 then
                     enteredCode = enteredCode:sub(1, #enteredCode - 1)
                 end
             elseif btn.label == "C" then
-                -- Clear
                 enteredCode = ""
             else
-                -- Цифра
                 if #enteredCode < 4 then
                     enteredCode = enteredCode .. btn.label
                 end
-                -- Проверка после 4-й цифры
                 if #enteredCode == 4 then
                     if enteredCode == CORRECT_CODE then
+                        accepted = true
                         GameState.current = "lobby"
                         enteredCode = ""
                     else
