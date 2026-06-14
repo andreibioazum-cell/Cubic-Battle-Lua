@@ -20,7 +20,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ========== КЕШИ (всё что можно) ==========
+      # ========== КЕШИ ==========
 
       - name: Cache NDK
         id: ndk-cache
@@ -29,7 +29,7 @@ jobs:
           path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
           key: ndk-25.2.9519653-v1
 
-      - name: Install NDK (cache miss only)
+      - name: Install NDK
         if: steps.ndk-cache.outputs.cache-hit != 'true'
         run: yes | sdkmanager --install "ndk;25.2.9519653" 2>&1 | tail -3
 
@@ -38,48 +38,59 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      - name: Cache love-android source
+      - name: Cache love-android source (static)
         id: love-src-cache
         uses: actions/cache@v4
         with:
           path: love-android
-          key: love-android-src-v1
+          key: love-android-src-v2
 
-      - name: Clone love-android (cache miss only)
+      - name: Clone love-android
         if: steps.love-src-cache.outputs.cache-hit != 'true'
         run: |
           git clone --recursive --depth 1 https://github.com/love2d/love-android.git
           find love-android/app/src/main/cpp -name "gradle-wrapper.jar" -delete 2>/dev/null || true
 
-      - name: Cache Gradle dependencies
+      - name: Cache Gradle (Maven deps + wrapper)
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-deps-${{ hashFiles('love-android/**/*.gradle*', 'love-android/**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-deps-
+          key: gradle-v2
 
-      - name: Cache native build (.cxx + build folders)
+      - name: Cache native build (.cxx folder = compiled C++)
         uses: actions/cache@v4
         with:
           path: |
             love-android/app/.cxx
-            love-android/app/build
-          key: native-build-arm64-v1
+            love-android/app/build/intermediates/cxx
+            love-android/app/build/intermediates/cmake
+            love-android/app/build/intermediates/merged_native_libs
+            love-android/app/build/intermediates/stripped_native_libs
+          key: native-arm64-v2
+
+      - name: Cache other build intermediates
+        uses: actions/cache@v4
+        with:
+          path: |
+            love-android/app/build/intermediates
+            love-android/app/build/generated
+            love-android/app/build/tmp
+          key: build-intermediates-${{ hashFiles('love-android/app/build.gradle') }}
           restore-keys: |
-            native-build-arm64-
+            build-intermediates-
 
       # ========== СБОРКА ==========
 
-      - name: Package game
+      - name: Package game (.love)
         run: |
           mkdir -p game-temp
           cd mygame
           for f in *.lua; do
             [ -f "$f" ] && cp "$f" ../game-temp/ && echo "Added: $f"
           done
+          [ -f "sand.png" ] && cp sand.png ../game-temp/ && echo "Added: sand.png"
           cd ../game-temp
           ls -la
           zip -9 -q -r ../game.love .
@@ -96,7 +107,7 @@ jobs:
           sed -i '/abiFilters/d' app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' app/build.gradle
 
-      - name: Append speed settings
+      - name: Append gradle.properties
         run: |
           cd love-android
           sed -i '/=== Our speed additions ===/,$d' gradle.properties
@@ -112,9 +123,9 @@ jobs:
           android.enableJetifier=false
           EOF
 
-      - name: Build APK (with full cache)
+      - name: Build APK
         working-directory: love-android
-        timeout-minutes: 20
+        timeout-minutes: 18
         continue-on-error: true
         run: |
           chmod +x gradlew
@@ -124,7 +135,7 @@ jobs:
             --build-cache \
             --parallel \
             -PdisableCheckLicense \
-            2>&1 | tail -40
+            2>&1 | tail -30
 
       - name: Find APK
         if: always()
