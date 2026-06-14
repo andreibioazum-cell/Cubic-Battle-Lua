@@ -1,21 +1,29 @@
--- Главный файл игры
 local lobby = require("lobby")
 local game = require("game")
 
--- Глобальное состояние: какой экран показывать
 GameState = {
-    current = "lobby"  -- "lobby" или "game"
+    current = "lobby"
 }
 
 function love.load()
-    love.window.setMode(0, 0, {fullscreen = true})
-    love.graphics.setDefaultFilter("nearest", "nearest")
-    
+    love.window.setMode(0, 0, {
+        fullscreen = true,
+        borderless = true,
+        vsync = 0,
+        msaa = 0,
+        resizable = true
+    })
+    love.graphics.setDefaultFilter("linear", "linear")
+
+    -- Ограничиваем dt чтобы не было прыжков при лагах
     lobby.load()
     game.load()
 end
 
 function love.update(dt)
+    -- Ограничиваем максимальный dt (антирывки)
+    if dt > 0.05 then dt = 0.05 end
+
     if GameState.current == "lobby" then
         lobby.update(dt)
     elseif GameState.current == "game" then
@@ -29,6 +37,11 @@ function love.draw()
     elseif GameState.current == "game" then
         game.draw()
     end
+end
+
+function love.resize(w, h)
+    if lobby.resize then lobby.resize(w, h) end
+    if game.load then game.load() end
 end
 
 function love.touchpressed(id, x, y, dx, dy, pressure)
@@ -51,7 +64,6 @@ function love.touchreleased(id, x, y, dx, dy, pressure)
     end
 end
 
--- Для тестов на ПК (мышь = тач)
 function love.mousepressed(x, y, button)
     love.touchpressed(1, x, y)
 end
