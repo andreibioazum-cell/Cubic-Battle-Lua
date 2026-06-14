@@ -1,91 +1,100 @@
-name: Build_Game_APK
+name: Build_Lua_Game_APK
 on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout my game
         uses: actions/checkout@v4
+        with:
+          path: mygame
 
-      - name: Package .love file
+      - name: Clone love-android (official build template)
         run: |
-          # LÖVE игра = это zip с расширением .love
-          mkdir -p build
-          # Берём все .lua файлы из корня и упаковываем
-          zip -9 -r build/game.love . -x "*.git*" "*.github*" "*.md" "build/*"
-          ls -la build/
-
-      - name: Download LÖVE Android APK
-        run: |
-          # Скачиваем готовый LÖVE Android player
-          LOVE_VERSION="11.5"
-          wget -q "https://github.com/love2d/love-android/releases/download/${LOVE_VERSION}/love-${LOVE_VERSION}-android-embed.apk" \
-               -O build/love-base.apk || \
-          wget -q "https://github.com/love2d/love/releases/download/${LOVE_VERSION}/love-${LOVE_VERSION}-android.apk" \
-               -O build/love-base.apk
-          ls -la build/
-
-      - name: Setup tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y zip unzip openjdk-17-jdk-headless apksigner zipalign
-          # Установим Android build tools
-          ANDROID_HOME=$HOME/android-sdk
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          cd $ANDROID_HOME/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmd.zip
-          unzip -q cmd.zip
-          mv cmdline-tools latest
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" > /dev/null
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-
-      - name: Embed game into LÖVE APK
-        run: |
-          cd build
-          # Распаковываем APK
-          mkdir -p apk-extract
-          cd apk-extract
-          unzip -q ../love-base.apk
-          # Кладём .love файл внутрь
-          mkdir -p assets
-          cp ../game.love assets/game.love
-          # Удаляем старую подпись
-          rm -rf META-INF
-          # Запаковываем обратно
-          zip -9 -r ../game-unsigned.apk .
-          cd ..
+          git clone --recursive https://github.com/love2d/love-android.git
+          cd love-android
+          echo "=== love-android files ==="
           ls -la
 
-      - name: Sign APK
+      - name: Package game into .love file
         run: |
-          cd build
-          # Генерируем debug keystore
-          keytool -genkey -v -keystore debug.keystore \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US"
+          cd mygame
+          # Удаляем workflow и readme из .love (не нужны в игре)
+          mkdir -p ../game-temp
+          # Копируем только .lua файлы и conf
+          for f in *.lua; do
+            [ -f "$f" ] && cp "$f" ../game-temp/
+          done
+          # Если есть assets — копируем тоже
+          [ -d "assets" ] && cp -r assets ../game-temp/
+          [ -d "images" ] && cp -r images ../game-temp/
+          [ -d "sounds" ] && cp -r sounds ../game-temp/
 
-          # Выравниваем
-          $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 game-unsigned.apk game-aligned.apk
+          cd ../game-temp
+          echo "=== Files inside .love ==="
+          ls -la
 
-          # Подписываем
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
-            --ks debug.keystore \
-            --ks-key-alias androiddebugkey \
-            --ks-pass pass:android \
-            --key-pass pass:android \
-            --out my-game.apk \
-            game-aligned.apk
+          # Создаём .love (это zip)
+          zip -9 -r ../game.love .
+          cd ..
+          ls -la game.love
 
-          ls -la *.apk
+      - name: Embed game.love into love-android assets
+        run: |
+          # love-android умеет встраивать игру через assets/game.love
+          mkdir -p love-android/app/src/embed/assets
+          cp game.love love-android/app/src/embed/assets/game.love
+          echo "Embedded game.love into love-android"
+          ls -la love-android/app/src/embed/assets/
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: |
+          NDK_VER="25.2.9519653"
+          yes | sdkmanager --install "ndk;$NDK_VER" 2>&1 | tail -5
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VER" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VER" >> $GITHUB_ENV
+          ls $ANDROID_HOME/ndk/
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build embed APK (with game inside)
+        working-directory: love-android
+        run: |
+          chmod +x gradlew
+          echo "=== Available tasks ==="
+          ./gradlew tasks --no-daemon 2>&1 | grep -i "assemble" | head -20
+          echo ""
+          echo "=== Building embed-debug ==="
+          ./gradlew assembleEmbedNoRecordDebug --no-daemon --stacktrace 2>&1 | tail -100 || \
+          ./gradlew assembleEmbedDebug --no-daemon --stacktrace 2>&1 | tail -100 || \
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -100
+
+      - name: Find APK files
+        if: always()
+        run: |
+          echo "=== All APK files ==="
+          find love-android -name "*.apk" -type f 2>/dev/null
+          echo ""
+          echo "=== Outputs structure ==="
+          ls -laR love-android/app/build/outputs/ 2>/dev/null || echo "no outputs"
 
       - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: MyGame_APK
-          path: build/my-game.apk
+          name: MyLuaGame_APK
+          path: |
+            love-android/app/build/outputs/apk/**/*.apk
           if-no-files-found: warn
           retention-days: 30
