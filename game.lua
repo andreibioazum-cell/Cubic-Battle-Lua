@@ -6,8 +6,12 @@ local cube = {
     x = 400,
     y = 300,
     size = 60,
-    speed = 150,
-    color = {1, 0.5, 0.3}
+    speed = 450,         -- было 150, теперь 450 (в 3 раза быстрее)
+    color = {1, 0.5, 0.3},
+    -- Сглаживание движения (lerp)
+    velX = 0,
+    velY = 0,
+    accel = 12           -- скорость разгона/торможения
 }
 
 local backButton = {
@@ -21,18 +25,28 @@ function game.load()
     local w, h = love.graphics.getDimensions()
     cube.x = w / 2
     cube.y = h / 2
-
-    -- Джойстик левее и ниже
+    cube.velX = 0
+    cube.velY = 0
     joystick.load(90, h - 90)
 end
 
 function game.update(dt)
     local w, h = love.graphics.getDimensions()
 
+    -- Получаем целевую скорость от джойстика
     local dx, dy = joystick.getDirection()
-    cube.x = cube.x + dx * cube.speed * dt
-    cube.y = cube.y + dy * cube.speed * dt
+    local targetVelX = dx * cube.speed
+    local targetVelY = dy * cube.speed
 
+    -- Плавно интерполируем текущую скорость к целевой (анти-рывки)
+    cube.velX = cube.velX + (targetVelX - cube.velX) * cube.accel * dt
+    cube.velY = cube.velY + (targetVelY - cube.velY) * cube.accel * dt
+
+    -- Двигаем кубик
+    cube.x = cube.x + cube.velX * dt
+    cube.y = cube.y + cube.velY * dt
+
+    -- Границы
     cube.x = math.max(cube.size/2, math.min(w - cube.size/2, cube.x))
     cube.y = math.max(cube.size/2, math.min(h - cube.size/2, cube.y))
 end
@@ -72,7 +86,7 @@ function game.draw()
         cube.y - cube.size/2,
         cube.size, cube.size, 10, 10)
 
-    -- Кнопка "Назад"
+    -- BACK
     love.graphics.setColor(0.4, 0.2, 0.5, 0.85)
     love.graphics.rectangle("fill", backButton.x, backButton.y, backButton.w, backButton.h, 10, 10)
     love.graphics.setColor(1, 1, 1, 1)
