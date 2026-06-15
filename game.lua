@@ -10,17 +10,17 @@ local cam = { x=0,y=0 }
 local function spawnBullet(x,y,dx,dy)
     table.insert(bullets,{
         x=x,y=y,
-        vx=dx*420,
-        vy=dy*420,
+        vx=dx*360,
+        vy=dy*360,
         life=3
     })
 end
 
 function game.load()
     local w,h = love.graphics.getDimensions()
-    cube.x=w/2
-    cube.y=h/2
-    bg=love.graphics.newImage("grass.png")
+    cube.x,w = w/2,w
+    cube.y = h/2
+    bg = love.graphics.newImage("grass.png")
     bg:setWrap("repeat","repeat")
     controls.load()
 end
@@ -35,8 +35,11 @@ function game.update(dt)
     cube.x = cube.x + dx*cube.speed*dt
     cube.y = cube.y + dy*cube.speed*dt
 
-    cam.x = cam.x + (cube.x - cam.x - love.graphics.getWidth()/2)*dt*5
-    cam.y = cam.y + (cube.y - cam.y - love.graphics.getHeight()/2)*dt*5
+    local targetX = cube.x - love.graphics.getWidth()/2
+    local targetY = cube.y - love.graphics.getHeight()/2
+
+    cam.x = cam.x + (targetX - cam.x)*dt*10
+    cam.y = cam.y + (targetY - cam.y)*dt*10
 
     for i=#bullets,1,-1 do
         local b=bullets[i]
@@ -53,10 +56,11 @@ function game.draw()
     love.graphics.translate(-cam.x,-cam.y)
 
     local w,h = love.graphics.getDimensions()
+
     love.graphics.setColor(1,1,1,1)
-    love.graphics.draw(bg,cam.x,cam.y,0,
-        w/bg:getWidth(),
-        h/bg:getHeight()
+    love.graphics.draw(bg,
+        math.floor(cam.x/bg:getWidth())*bg:getWidth(),
+        math.floor(cam.y/bg:getHeight())*bg:getHeight()
     )
 
     love.graphics.setColor(cube.color)
@@ -72,7 +76,7 @@ function game.draw()
 
     love.graphics.pop()
 
-    controls.draw()
+    controls.draw(cube.x,cube.y)
 end
 
 function game.touchpressed(id,x,y)
