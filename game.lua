@@ -1,4 +1,5 @@
 local controls = require("controls")
+local online = require("online")
 
 local game = {}
 
@@ -27,6 +28,8 @@ local score = 0
 local mode = "normal"
 local bossTimer = 0
 local spawnTimer = 0
+local enemyPlayer = nil
+local enemyBullets = {}
 
 local fpsFont
 
@@ -122,6 +125,13 @@ end
 function game.setMode(m)
     mode = m
     game.reset()
+    if m == "online" then
+        online.init()
+        local found = online.findRoom()
+        if not found then
+            online.createRoom()
+        end
+    end
 end
 
 function game.reset()
@@ -135,8 +145,13 @@ function game.reset()
     score = 0
     bossTimer = 0
     spawnTimer = 0
+    enemyPlayer = nil
+    enemyBullets = {}
     particles = {}
     pool = {}
+    if mode == "online" then
+        online.leaveRoom()
+    end
 end
 
 function game.load()
@@ -200,6 +215,24 @@ function game.update(dt)
     cam.x = cam.x + (player.x - w / 2 - cam.x) * cam.smooth * dt
     cam.y = cam.y + (player.y - h / 2 - cam.y) * cam.smooth * dt
 
+    if mode == "online" then
+        online.sendPlayer(player.x, player.y, player.hp, player.dirX, player.dirY)
+        online.sendBullets(controls.bullets)
+        enemyPlayer = online.getEnemy()
+        enemyBullets = online.getEnemyBullets() or {}
+
+        if enemyPlayer then
+            for _, b in pairs(enemyBullets) do
+                local dx = player.x - b.x
+                local dy = player.y - b.y
+                if dx * dx + dy * dy < (player.size / 2) ^ 2 then
+                    player.hp = player.hp - 1
+                    burstParticles(player.x, player.y, 15, 40, 0.4, 6, 1, 0.2, 0.2)
+                end
+            end
+        end
+    end
+
     if mode == "normal" then
         spawnTimer = spawnTimer + dt
         if spawnTimer > 1.5 and #enemies < 5 + wave then
@@ -213,10 +246,6 @@ function game.update(dt)
                 spawnBoss()
                 bossTimer = 0
             end
-        end
-    elseif mode == "bossrush" then
-        if not boss then
-            spawnBoss()
         end
     end
 
@@ -279,10 +308,17 @@ function game.update(dt)
                     score = score + 500
                     boss = nil
                     wave = wave + 1
-                    if mode == "bossrush" then
-                        spawnBoss()
-                    end
                 end
+            end
+        end
+
+        if mode == "online" and enemyPlayer and b.life > 0 then
+            local dx = b.x - enemyPlayer.x
+            local dy = b.y - enemyPlayer.y
+            if dx * dx + dy * dy < (30 + 6) ^ 2 then
+                burstParticles(enemyPlayer.x, enemyPlayer.y, 12, 40, 0.3, 6, 0.2, 0.5, 0.9)
+                score = score + 50
+                b.life = 0
             end
         end
     end
@@ -314,6 +350,21 @@ function game.draw()
 
     drawParticles()
     controls.drawWorld(player.x, player.y)
+
+    if mode == "online" and enemyPlayer then
+        love.graphics.setColor(0, 0, 0, 0.4)
+        love.graphics.rectangle("fill", enemyPlayer.x - 30 + 4, enemyPlayer.y - 30 + 4, 60, 60, 10, 10)
+        love.graphics.setColor(0.2, 0.5, 0.9)
+        love.graphics.rectangle("fill", enemyPlayer.x - 30, enemyPlayer.y - 30, 60, 60, 10, 10)
+        love.graphics.setColor(1, 1, 1, 0.9)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", enemyPlayer.x - 30, enemyPlayer.y - 30, 60, 60, 10, 10)
+
+        for _, b in pairs(enemyBullets) do
+            love.graphics.setColor(1, 0.3, 0.3, 1)
+            love.graphics.circle("fill", b.x, b.y, 6)
+        end
+    end
 
     for _, e in ipairs(enemies) do
         love.graphics.setColor(0, 0, 0, 0.4)
@@ -358,8 +409,12 @@ function game.draw()
     love.graphics.setColor(1, 1, 1, 0.7)
     love.graphics.setFont(fpsFont)
     love.graphics.print("Score: " .. score, 20, 70)
-    love.graphics.print("Wave: " .. wave, 20, 90)
-    love.graphics.print("HP: " .. string.rep("♥ ", player.hp), 20, 110)
+    love.graphics.print("HP: " .. string.rep("♥ ", player.hp), 20, 90)
+    if mode ~= "online" then
+        love.graphics.print("Wave: " .. wave, 20, 110)
+    else
+        love.graphics.print("Online", 20, 110)
+    end
     love.graphics.print("FPS: " .. love.timer.getFPS(), w - 80, 10)
 
     if player.hp <= 0 then
