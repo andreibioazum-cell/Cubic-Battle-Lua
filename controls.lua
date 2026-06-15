@@ -2,7 +2,7 @@ local controls = {}
 
 local joy = { id=nil, cx=0, cy=0, sx=0, sy=0, r=48, sr=20 }
 local atk = { id=nil, x=0, y=0, r=50, hold=false }
-local back = { w=180, h=65, x=0, y=0 }
+local back = { x=20, y=20, w=180, h=65 }
 
 local font
 local aimDx, aimDy = 0, -1
@@ -18,9 +18,6 @@ local function place()
 
     atk.x = w - 85
     atk.y = h - 85
-
-    back.x = w/2 - back.w/2
-    back.y = h/2 + 40
 end
 
 function controls.load()
@@ -124,12 +121,14 @@ function controls.draw(playerX,playerY)
         love.graphics.setLineWidth(2)
     end
 
-    love.graphics.setColor(0.55,0.2,0.85,1)
-    love.graphics.rectangle("fill",back.x,back.y,back.w,back.h,12,12)
+    -- стиль как в lobby
+    love.graphics.setColor(0,0,0,0.3)
+    love.graphics.rectangle("fill",back.x+4,back.y+6,back.w,back.h,16,16)
 
-    love.graphics.setColor(1,1,1,1)
-    love.graphics.rectangle("line",back.x,back.y,back.w,back.h,12,12)
+    love.graphics.setColor(0.92,0.92,0.95,1)
+    love.graphics.rectangle("fill",back.x,back.y,back.w,back.h,16,16)
 
+    love.graphics.setColor(0.3,0.2,0.6,1)
     love.graphics.setFont(font)
     love.graphics.printf("Back",back.x,back.y+18,back.w,"center")
 end
