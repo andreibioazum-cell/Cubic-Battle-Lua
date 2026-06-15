@@ -19,9 +19,9 @@ end
 local function placeBtns()
     local w, h = love.graphics.getDimensions()
     playBtn.x = w / 2 - playBtn.w / 2
-    playBtn.y = h / 2
+    playBtn.y = h / 2 + 10
     onlineBtn.x = w / 2 - onlineBtn.w / 2
-    onlineBtn.y = h / 2 + 70
+    onlineBtn.y = h / 2 + 80
 end
 
 function lobby.load()
@@ -58,14 +58,14 @@ function lobby.draw()
     local float = math.sin(time * 1.2) * 3
 
     love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.print(title, w / 2 - tw / 2 + 3, h / 4 - 40 + float + 3)
+    love.graphics.print(title, w / 2 - tw / 2 + 3, h / 4 - 60 + float + 3)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(title, w / 2 - tw / 2, h / 4 - 40 + float)
+    love.graphics.print(title, w / 2 - tw / 2, h / 4 - 60 + float)
 
     love.graphics.setFont(fontSub)
     love.graphics.setColor(1, 1, 1, 0.6)
     local sub = "Touch & dodge"
-    love.graphics.print(sub, w / 2 - fontSub:getWidth(sub) / 2, h / 4 + 20)
+    love.graphics.print(sub, w / 2 - fontSub:getWidth(sub) / 2, h / 4)
 
     -- Play
     love.graphics.setColor(0, 0, 0, 0.4)
@@ -98,6 +98,8 @@ function lobby.draw()
 end
 
 function lobby.touchpressed(id, x, y)
+    local game = require("game")
+    
     if x >= playBtn.x and x <= playBtn.x + playBtn.w and
        y >= playBtn.y and y <= playBtn.y + playBtn.h then
         game.setMode("normal")
