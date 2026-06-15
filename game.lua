@@ -21,13 +21,8 @@ local particles = {}
 local pool = {}
 local MAX = 3000
 
-local enemies = {}
-local boss = nil
-local wave = 1
 local score = 0
 local mode = "normal"
-local bossTimer = 0
-local spawnTimer = 0
 local enemyPlayer = nil
 local enemyBullets = {}
 
@@ -87,41 +82,6 @@ local function drawParticles()
     end
 end
 
-local function spawnEnemy()
-    local e = {
-        x = player.x + (math.random() - 0.5) * 800,
-        y = player.y + (math.random() - 0.5) * 800,
-        size = 40,
-        hp = 2 + wave,
-        speed = 80 + wave * 20,
-        damage = 1
-    }
-    enemies[#enemies + 1] = e
-end
-
-local function spawnBoss()
-    boss = {
-        x = player.x + 300,
-        y = player.y - 200,
-        size = 100,
-        hp = 20 + wave * 10,
-        speed = 50,
-        damage = 2,
-        timer = 0
-    }
-end
-
-local function hitEnemy(enemy, damage)
-    enemy.hp = enemy.hp - damage
-    burstParticles(enemy.x, enemy.y, 8, 30, 0.3, 5, 1, 0.6, 0.1)
-    if enemy.hp <= 0 then
-        burstParticles(enemy.x, enemy.y, 20, 60, 0.5, 8, 1, 0.3, 0)
-        score = score + 100
-        return true
-    end
-    return false
-end
-
 function game.setMode(m)
     mode = m
     game.reset()
@@ -135,12 +95,7 @@ function game.reset()
     player.vx, player.vy = 0, 0
     player.hp = 5
     cam.x, cam.y = 0, 0
-    enemies = {}
-    boss = nil
-    wave = 1
     score = 0
-    bossTimer = 0
-    spawnTimer = 0
     enemyPlayer = nil
     enemyBullets = {}
     particles = {}
@@ -154,8 +109,6 @@ function game.load()
     player.x, player.y = 0, 0
     player.vx, player.vy = 0, 0
     cam.x, cam.y = 0, 0
-    enemies = {}
-    boss = nil
     particles = {}
     pool = {}
 
@@ -229,85 +182,7 @@ function game.update(dt)
         end
     end
 
-    if mode == "normal" then
-        spawnTimer = spawnTimer + dt
-        if spawnTimer > 1.5 and #enemies < 5 + wave then
-            spawnTimer = 0
-            spawnEnemy()
-        end
-
-        if #enemies == 0 and not boss then
-            bossTimer = bossTimer + dt
-            if bossTimer > 2 then
-                spawnBoss()
-                bossTimer = 0
-            end
-        end
-    end
-
-    for _, e in ipairs(enemies) do
-        local dx = player.x - e.x
-        local dy = player.y - e.y
-        local d = math.sqrt(dx * dx + dy * dy)
-        if d > 0 then
-            e.x = e.x + (dx / d) * e.speed * dt
-            e.y = e.y + (dy / d) * e.speed * dt
-        end
-        if d < player.size / 2 + e.size / 2 then
-            player.hp = player.hp - e.damage
-            burstParticles(player.x, player.y, 15, 40, 0.4, 6, 1, 0.2, 0.2)
-            e.hp = 0
-        end
-    end
-
-    if boss then
-        local dx = player.x - boss.x
-        local dy = player.y - boss.y
-        local d = math.sqrt(dx * dx + dy * dy)
-        if d > 0 then
-            boss.x = boss.x + (dx / d) * boss.speed * dt
-            boss.y = boss.y + (dy / d) * boss.speed * dt
-        end
-        boss.timer = boss.timer + dt
-        if boss.timer > 2 then
-            boss.timer = 0
-            burstParticles(boss.x, boss.y, 10, 50, 0.5, 8, 0.8, 0.2, 0.8)
-        end
-        if d < player.size / 2 + boss.size / 2 then
-            player.hp = player.hp - boss.damage
-            burstParticles(player.x, player.y, 20, 50, 0.5, 8, 1, 0.1, 0.1)
-        end
-    end
-
     for _, b in ipairs(controls.bullets) do
-        for i = #enemies, 1, -1 do
-            local dx = b.x - enemies[i].x
-            local dy = b.y - enemies[i].y
-            if dx * dx + dy * dy < (6 + enemies[i].size / 2) ^ 2 then
-                if hitEnemy(enemies[i], 1) then
-                    table.remove(enemies, i)
-                end
-                b.life = 0
-                break
-            end
-        end
-
-        if boss and b.life > 0 then
-            local dx = b.x - boss.x
-            local dy = b.y - boss.y
-            if dx * dx + dy * dy < (6 + boss.size / 2) ^ 2 then
-                boss.hp = boss.hp - 1
-                burstParticles(boss.x, boss.y, 6, 30, 0.3, 5, 1, 0.6, 0.1)
-                b.life = 0
-                if boss.hp <= 0 then
-                    burstParticles(boss.x, boss.y, 40, 100, 0.8, 12, 1, 0.2, 0)
-                    score = score + 500
-                    boss = nil
-                    wave = wave + 1
-                end
-            end
-        end
-
         if mode == "online" and enemyPlayer and b.life > 0 then
             local dx = b.x - (enemyPlayer.x or 0)
             local dy = b.y - (enemyPlayer.y or 0)
@@ -362,29 +237,6 @@ function game.draw()
         end
     end
 
-    for _, e in ipairs(enemies) do
-        love.graphics.setColor(0, 0, 0, 0.4)
-        love.graphics.rectangle("fill", e.x - e.size/2 + 3, e.y - e.size/2 + 3, e.size, e.size, 8, 8)
-        love.graphics.setColor(1, 0.2, 0.2)
-        love.graphics.rectangle("fill", e.x - e.size/2, e.y - e.size/2, e.size, e.size, 8, 8)
-        love.graphics.setColor(1, 1, 1, 0.8)
-        love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", e.x - e.size/2, e.y - e.size/2, e.size, e.size, 8, 8)
-    end
-
-    if boss then
-        love.graphics.setColor(0, 0, 0, 0.5)
-        love.graphics.rectangle("fill", boss.x - boss.size/2 + 4, boss.y - boss.size/2 + 4,
-            boss.size, boss.size, 14, 14)
-        love.graphics.setColor(0.8, 0.1, 0.3)
-        love.graphics.rectangle("fill", boss.x - boss.size/2, boss.y - boss.size/2,
-            boss.size, boss.size, 14, 14)
-        love.graphics.setColor(1, 1, 1, 0.9)
-        love.graphics.setLineWidth(3)
-        love.graphics.rectangle("line", boss.x - boss.size/2, boss.y - boss.size/2,
-            boss.size, boss.size, 14, 14)
-    end
-
     if player.hp > 0 then
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.rectangle("fill", player.x - player.size/2 + 4, player.y - player.size/2 + 4,
@@ -406,11 +258,7 @@ function game.draw()
     love.graphics.setFont(fpsFont)
     love.graphics.print("Score: " .. score, 20, 70)
     love.graphics.print("HP: " .. string.rep("♥ ", player.hp), 20, 90)
-    if mode ~= "online" then
-        love.graphics.print("Wave: " .. wave, 20, 110)
-    else
-        love.graphics.print("Online PvP", 20, 110)
-    end
+    love.graphics.print("Online PvP", 20, 110)
     love.graphics.print("FPS: " .. love.timer.getFPS(), w - 80, 10)
 
     if player.hp <= 0 then
