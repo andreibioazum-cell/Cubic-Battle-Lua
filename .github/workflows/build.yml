@@ -72,8 +72,6 @@ jobs:
         run: |
           cd mygame
           zip -9 -q -r ../game.love *.lua sand.png 2>/dev/null || zip -9 -q -r ../game.love *.lua
-          echo "=== .love files ==="
-          unzip -l ../game.love | tail -20
 
       - name: Embed game.love
         run: |
@@ -114,16 +112,9 @@ jobs:
 
       - name: Find and Copy APK
         run: |
-          echo "=== ИЩЕМ APK ==="
-          find love-android -name "*.apk" -type f
-          echo "=== КОПИРУЕМ В КОРЕНЬ ==="
-          APK=$(find love-android/app/build -name "*.apk" -type f | head -1)
+          APK=$(find love-android -name "*.apk" -type f | head -1)
           if [ -n "$APK" ]; then
             cp "$APK" ./CubicBattle.apk
-            echo "✅ APK скопирован: $(du -h ./CubicBattle.apk | cut -f1)"
-          else
-            echo "❌ APK не найден в:"
-            find love-android/app/build -type d
           fi
 
       - name: Upload APK
