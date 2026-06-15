@@ -1,8 +1,8 @@
 local controls = {}
 
 local joy  = { id=nil, cx=0, cy=0, sx=0, sy=0, r=45, sr=18 }
-local atk  = { id=nil, x=0, y=0, r=48, hold=false, press=0 }
-local back = { x=20, y=20, w=130, h=50 }
+local atk  = { id=nil, x=0, y=0, r=52, hold=false, press=0 }
+local back = { x=20, y=20, w=140, h=55 }
 
 local font
 local aimDx, aimDy = 0, -1
@@ -18,8 +18,21 @@ local function place()
     atk.y = h - 80
 end
 
+local function drawOutlineText(text, x, y, w, align)
+    love.graphics.setColor(0,0,0,1)
+    for dx=-2,2,2 do
+        for dy=-2,2,2 do
+            if dx ~= 0 or dy ~= 0 then
+                love.graphics.printf(text, x+dx, y+dy, w, align)
+            end
+        end
+    end
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.printf(text, x, y, w, align)
+end
+
 function controls.load()
-    font = love.graphics.newFont(20)
+    font = love.graphics.newFont("Fredoka-Bold.ttf", 24)
     place()
 end
 
@@ -95,7 +108,7 @@ function controls.touchreleased(id)
 end
 
 function controls.draw()
-    love.graphics.setLineWidth(2)
+    love.graphics.setLineWidth(3)
 
     love.graphics.setColor(0,0,0,0.35)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
@@ -105,30 +118,46 @@ function controls.draw()
 
     local scale = 1 - atk.press * 0.12
     local r = atk.r * scale
-    local textScale = 1 - atk.press * 0.2
+    local textScale = 1 - atk.press * 0.18
     local textAlpha = 1 - atk.press * 0.45
 
-    love.graphics.setColor(0.8 - atk.press*0.35, 0.1, 0.1, 0.95)
+    love.graphics.setColor(0.55 - atk.press*0.2, 0.2, 0.85 - atk.press*0.3, 1)
     love.graphics.circle("fill", atk.x, atk.y, r)
     love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(4)
     love.graphics.circle("line", atk.x, atk.y, r)
 
     love.graphics.setFont(font)
-    love.graphics.setColor(1,1,1,textAlpha)
     love.graphics.push()
     love.graphics.translate(atk.x, atk.y)
     love.graphics.scale(textScale, textScale)
-    love.graphics.printf("Shot", -atk.r, -10, atk.r*2, "center")
+    love.graphics.setColor(1,1,1,textAlpha)
+
+    local label = "Shot"
+    love.graphics.setColor(0,0,0,textAlpha)
+    for dx=-2,2,2 do
+        for dy=-2,2,2 do
+            if dx ~= 0 or dy ~= 0 then
+                love.graphics.printf(label, -atk.r+dx, -12+dy, atk.r*2, "center")
+            end
+        end
+    end
+    love.graphics.setColor(1,1,1,textAlpha)
+    love.graphics.printf(label, -atk.r, -12, atk.r*2, "center")
     love.graphics.pop()
 
-    love.graphics.setColor(0,0,0,0.35)
-    love.graphics.rectangle("fill", back.x+4, back.y+5, back.w, back.h, 12, 12)
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.rectangle("fill", back.x+4, back.y+5, back.w, back.h, 14, 14)
 
-    love.graphics.setColor(0.92,0.92,0.95,1)
-    love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 12, 12)
+    love.graphics.setColor(0.55, 0.20, 0.85, 1)
+    love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 14, 14)
 
-    love.graphics.setColor(0.3,0.2,0.6,1)
-    love.graphics.printf("Back", back.x, back.y+12, back.w, "center")
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(4)
+    love.graphics.rectangle("line", back.x, back.y, back.w, back.h, 14, 14)
+
+    love.graphics.setFont(font)
+    drawOutlineText("Back", back.x, back.y+14, back.w, "center")
 
     love.graphics.setColor(1,1,1,1)
 end
