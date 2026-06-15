@@ -1,20 +1,16 @@
 local controls = require("controls")
+local enemy = require("enemy")
 
 local game = {}
 
-local cube = {
-    x=0, y=0, size=60, speed=260,
-    color={1,0.5,0.3},
-    angle=0
-}
-
+local cube = { x=0, y=0, size=60, speed=260, color={1,0.5,0.3}, angle=0 }
 local bullets = {}
 local bg
 local cam = { x=0, y=0 }
 
 local BULLET_SPEED = 340 * 1.15
 
-local function spawnBullet(x,y,dx,dy)
+local function spawnBullet(x, y, dx, dy)
     table.insert(bullets, {
         x=x, y=y,
         vx=dx*BULLET_SPEED,
@@ -29,6 +25,7 @@ function game.load()
     bg = love.graphics.newImage("grass.png")
     bg:setWrap("repeat","repeat")
     controls.load()
+    enemy.reset()
 end
 
 function game.resize()
@@ -59,6 +56,8 @@ function game.update(dt)
         b.life = b.life - dt
         if b.life <= 0 then table.remove(bullets,i) end
     end
+
+    enemy.update(dt, cube.x, cube.y, bullets)
 end
 
 function game.draw()
@@ -85,15 +84,17 @@ function game.draw()
 
     if controls.isAiming() then
         local ax, ay = controls.getAim()
-        love.graphics.setColor(0,0,0,0.5)
-        love.graphics.setLineWidth(6)
+        love.graphics.setColor(0,0,0,0.55)
+        love.graphics.setLineWidth(12)
         love.graphics.line(
             cube.x, cube.y,
-            cube.x + ax*140,
-            cube.y + ay*140
+            cube.x + ax*180,
+            cube.y + ay*180
         )
         love.graphics.setLineWidth(2)
     end
+
+    enemy.draw()
 
     love.graphics.push()
     love.graphics.translate(cube.x, cube.y)
