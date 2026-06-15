@@ -1,6 +1,7 @@
 local lobby = {}
 
-local btn = { w = 180, h = 65, x = 0, y = 0 }
+local playBtn = { w = 180, h = 50, x = 0, y = 0 }
+local onlineBtn = { w = 180, h = 50, x = 0, y = 0 }
 local time = 0
 local mesh
 local lastW, lastH = 0, 0
@@ -15,22 +16,24 @@ local function makeMesh(w, h)
     }, "fan", "static")
 end
 
-local function placeBtn()
+local function placeBtns()
     local w, h = love.graphics.getDimensions()
-    btn.x = w / 2 - btn.w / 2
-    btn.y = h / 2 + 40
+    playBtn.x = w / 2 - playBtn.w / 2
+    playBtn.y = h / 2
+    onlineBtn.x = w / 2 - onlineBtn.w / 2
+    onlineBtn.y = h / 2 + 70
 end
 
 function lobby.load()
     fontTitle = fontTitle or love.graphics.newFont(48)
     fontSub = fontSub or love.graphics.newFont(18)
-    fontBtn = fontBtn or love.graphics.newFont(24)
-    placeBtn()
+    fontBtn = fontBtn or love.graphics.newFont(22)
+    placeBtns()
 end
 
 function lobby.resize()
     mesh = nil
-    placeBtn()
+    placeBtns()
 end
 
 function lobby.update(dt)
@@ -43,7 +46,7 @@ function lobby.draw()
     if not mesh or w ~= lastW or h ~= lastH then
         mesh = makeMesh(w, h)
         lastW, lastH = w, h
-        placeBtn()
+        placeBtns()
     end
 
     love.graphics.setColor(1, 1, 1, 1)
@@ -55,30 +58,55 @@ function lobby.draw()
     local float = math.sin(time * 1.2) * 3
 
     love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.print(title, w / 2 - tw / 2 + 3, h / 4 + float + 3)
+    love.graphics.print(title, w / 2 - tw / 2 + 3, h / 4 - 40 + float + 3)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(title, w / 2 - tw / 2, h / 4 + float)
+    love.graphics.print(title, w / 2 - tw / 2, h / 4 - 40 + float)
 
     love.graphics.setFont(fontSub)
     love.graphics.setColor(1, 1, 1, 0.6)
     local sub = "Touch & dodge"
-    love.graphics.print(sub, w / 2 - fontSub:getWidth(sub) / 2, h / 4 + 70)
+    love.graphics.print(sub, w / 2 - fontSub:getWidth(sub) / 2, h / 4 + 20)
 
+    -- Play (оффлайн)
     love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", btn.x + 3, btn.y + 4, btn.w, btn.h, 14, 14)
-    love.graphics.setColor(1, 1, 1, 0.95)
-    love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 14, 14)
-
-    love.graphics.setColor(0.3, 0.1, 0.5, 1)
+    love.graphics.rectangle("fill", playBtn.x + 3, playBtn.y + 4, playBtn.w, playBtn.h, 14, 14)
+    love.graphics.setColor(0.5, 0.15, 0.7, 0.95)
+    love.graphics.rectangle("fill", playBtn.x, playBtn.y, playBtn.w, playBtn.h, 14, 14)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", playBtn.x, playBtn.y, playBtn.w, playBtn.h, 14, 14)
+    
     love.graphics.setFont(fontBtn)
-    local text = "Play"
-    love.graphics.print(text,
-        btn.x + btn.w / 2 - fontBtn:getWidth(text) / 2,
-        btn.y + btn.h / 2 - fontBtn:getHeight() / 2)
+    love.graphics.setColor(0, 0, 0, 0.8)
+    love.graphics.print("Play", playBtn.x + 72, playBtn.y + 16)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Play", playBtn.x + 71, playBtn.y + 15)
+
+    -- Online
+    love.graphics.setColor(0, 0, 0, 0.4)
+    love.graphics.rectangle("fill", onlineBtn.x + 3, onlineBtn.y + 4, onlineBtn.w, onlineBtn.h, 14, 14)
+    love.graphics.setColor(0.2, 0.5, 0.9, 0.95)
+    love.graphics.rectangle("fill", onlineBtn.x, onlineBtn.y, onlineBtn.w, onlineBtn.h, 14, 14)
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", onlineBtn.x, onlineBtn.y, onlineBtn.w, onlineBtn.h, 14, 14)
+    
+    love.graphics.setColor(0, 0, 0, 0.8)
+    love.graphics.print("Online", onlineBtn.x + 62, onlineBtn.y + 16)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("Online", onlineBtn.x + 61, onlineBtn.y + 15)
 end
 
 function lobby.touchpressed(id, x, y)
-    if x >= btn.x and x <= btn.x + btn.w and y >= btn.y and y <= btn.y + btn.h then
+    if x >= playBtn.x and x <= playBtn.x + playBtn.w and
+       y >= playBtn.y and y <= playBtn.y + playBtn.h then
+        game.setMode("normal")
+        GameState.current = "game"
+    end
+    
+    if x >= onlineBtn.x and x <= onlineBtn.x + onlineBtn.w and
+       y >= onlineBtn.y and y <= onlineBtn.y + onlineBtn.h then
+        game.setMode("online")
         GameState.current = "game"
     end
 end
