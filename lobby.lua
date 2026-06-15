@@ -1,114 +1,71 @@
 local lobby = {}
 
-local playBtn = { w = 180, h = 50, x = 0, y = 0 }
-local onlineBtn = { w = 180, h = 50, x = 0, y = 0 }
-local time = 0
-local mesh
-local lastW, lastH = 0, 0
+local btn = {w=180, h=65, x=0, y=0}
+local t = 0
+local grad, lastW, lastH = nil, 0, 0
 local fontTitle, fontSub, fontBtn
 
-local function makeMesh(w, h)
+local function mkGrad(w, h)
     return love.graphics.newMesh({
-        { 0, 0, 0, 0, 0.55, 0.20, 0.85, 1 },
-        { w, 0, 1, 0, 0.85, 0.25, 0.65, 1 },
-        { w, h, 1, 1, 0.10, 0.02, 0.25, 1 },
-        { 0, h, 0, 1, 0.18, 0.05, 0.35, 1 },
+        {0,0, 0,0, 0.55,0.20,0.85,1},
+        {w,0, 1,0, 0.85,0.25,0.65,1},
+        {w,h, 1,1, 0.10,0.02,0.25,1},
+        {0,h, 0,1, 0.18,0.05,0.35,1},
     }, "fan", "static")
 end
 
-local function placeBtns()
+local function recalc()
     local w, h = love.graphics.getDimensions()
-    playBtn.x = w / 2 - playBtn.w / 2
-    playBtn.y = h / 2 + 10
-    onlineBtn.x = w / 2 - onlineBtn.w / 2
-    onlineBtn.y = h / 2 + 80
+    btn.x = w/2 - btn.w/2
+    btn.y = h/2 + 40
 end
 
 function lobby.load()
-    fontTitle = fontTitle or love.graphics.newFont(48)
-    fontSub = fontSub or love.graphics.newFont(18)
-    fontBtn = fontBtn or love.graphics.newFont(22)
-    placeBtns()
+    fontTitle = love.graphics.newFont(48)
+    fontSub = love.graphics.newFont(18)
+    fontBtn = love.graphics.newFont(24)
+    recalc()
 end
 
-function lobby.resize()
-    mesh = nil
-    placeBtns()
-end
-
-function lobby.update(dt)
-    time = time + dt
-end
+function lobby.resize() grad = nil; recalc() end
+function lobby.update(dt) t = t + dt end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
-
-    if not mesh or w ~= lastW or h ~= lastH then
-        mesh = makeMesh(w, h)
-        lastW, lastH = w, h
-        placeBtns()
+    if not grad or w ~= lastW or h ~= lastH then
+        grad = mkGrad(w, h); lastW, lastH = w, h; recalc()
     end
-
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(mesh, 0, 0)
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.draw(grad, 0, 0)
 
     love.graphics.setFont(fontTitle)
     local title = "Cubic Battle"
     local tw = fontTitle:getWidth(title)
-    local float = math.sin(time * 1.2) * 3
-
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.print(title, w / 2 - tw / 2 + 3, h / 4 - 60 + float + 3)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(title, w / 2 - tw / 2, h / 4 - 60 + float)
+    local oy = math.sin(t * 1.2) * 3
+    love.graphics.setColor(0,0,0,0.5)
+    love.graphics.print(title, w/2 - tw/2 + 3, h/4 + oy + 3)
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.print(title, w/2 - tw/2, h/4 + oy)
 
     love.graphics.setFont(fontSub)
-    love.graphics.setColor(1, 1, 1, 0.6)
+    love.graphics.setColor(1,1,1,0.6)
     local sub = "Touch & dodge"
-    love.graphics.print(sub, w / 2 - fontSub:getWidth(sub) / 2, h / 4)
+    love.graphics.print(sub, w/2 - fontSub:getWidth(sub)/2, h/4 + 70)
 
-    -- Play
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", playBtn.x + 3, playBtn.y + 4, playBtn.w, playBtn.h, 14, 14)
-    love.graphics.setColor(0.5, 0.15, 0.7, 0.95)
-    love.graphics.rectangle("fill", playBtn.x, playBtn.y, playBtn.w, playBtn.h, 14, 14)
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", playBtn.x, playBtn.y, playBtn.w, playBtn.h, 14, 14)
-    
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.rectangle("fill", btn.x+3, btn.y+4, btn.w, btn.h, 14, 14)
+    love.graphics.setColor(1,1,1,0.95)
+    love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 14, 14)
+    love.graphics.setColor(0.3, 0.1, 0.5, 1)
     love.graphics.setFont(fontBtn)
-    love.graphics.setColor(0, 0, 0, 0.8)
-    love.graphics.print("Play", playBtn.x + 72, playBtn.y + 16)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("Play", playBtn.x + 71, playBtn.y + 15)
-
-    -- Online
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", onlineBtn.x + 3, onlineBtn.y + 4, onlineBtn.w, onlineBtn.h, 14, 14)
-    love.graphics.setColor(0.2, 0.5, 0.9, 0.95)
-    love.graphics.rectangle("fill", onlineBtn.x, onlineBtn.y, onlineBtn.w, onlineBtn.h, 14, 14)
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", onlineBtn.x, onlineBtn.y, onlineBtn.w, onlineBtn.h, 14, 14)
-    
-    love.graphics.setColor(0, 0, 0, 0.8)
-    love.graphics.print("Online", onlineBtn.x + 62, onlineBtn.y + 16)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("Online", onlineBtn.x + 61, onlineBtn.y + 15)
+    local bt = "Play"
+    love.graphics.print(bt,
+        btn.x + btn.w/2 - fontBtn:getWidth(bt)/2,
+        btn.y + btn.h/2 - fontBtn:getHeight()/2)
 end
 
 function lobby.touchpressed(id, x, y)
-    local game = require("game")
-    
-    if x >= playBtn.x and x <= playBtn.x + playBtn.w and
-       y >= playBtn.y and y <= playBtn.y + playBtn.h then
-        game.setMode("normal")
-        GameState.current = "game"
-    end
-    
-    if x >= onlineBtn.x and x <= onlineBtn.x + onlineBtn.w and
-       y >= onlineBtn.y and y <= onlineBtn.y + onlineBtn.h then
-        game.setMode("online")
+    if x >= btn.x and x <= btn.x+btn.w and y >= btn.y and y <= btn.y+btn.h then
         GameState.current = "game"
     end
 end
