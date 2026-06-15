@@ -126,11 +126,7 @@ function game.setMode(m)
     mode = m
     game.reset()
     if m == "online" then
-        online.init()
-        local found = online.findRoom()
-        if not found then
-            online.createRoom()
-        end
+        online.joinGame()
     end
 end
 
@@ -219,12 +215,12 @@ function game.update(dt)
         online.sendPlayer(player.x, player.y, player.hp, player.dirX, player.dirY)
         online.sendBullets(controls.bullets)
         enemyPlayer = online.getEnemy()
-        enemyBullets = online.getEnemyBullets() or {}
+        enemyBullets = online.getEnemyBullets()
 
         if enemyPlayer then
-            for _, b in pairs(enemyBullets) do
-                local dx = player.x - b.x
-                local dy = player.y - b.y
+            for _, b in pairs(enemyBullets or {}) do
+                local dx = player.x - (b.x or 0)
+                local dy = player.y - (b.y or 0)
                 if dx * dx + dy * dy < (player.size / 2) ^ 2 then
                     player.hp = player.hp - 1
                     burstParticles(player.x, player.y, 15, 40, 0.4, 6, 1, 0.2, 0.2)
@@ -313,10 +309,10 @@ function game.update(dt)
         end
 
         if mode == "online" and enemyPlayer and b.life > 0 then
-            local dx = b.x - enemyPlayer.x
-            local dy = b.y - enemyPlayer.y
-            if dx * dx + dy * dy < (30 + 6) ^ 2 then
-                burstParticles(enemyPlayer.x, enemyPlayer.y, 12, 40, 0.3, 6, 0.2, 0.5, 0.9)
+            local dx = b.x - (enemyPlayer.x or 0)
+            local dy = b.y - (enemyPlayer.y or 0)
+            if dx * dx + dy * dy < 900 then
+                burstParticles(enemyPlayer.x or 0, enemyPlayer.y or 0, 12, 40, 0.3, 6, 0.2, 0.5, 0.9)
                 score = score + 50
                 b.life = 0
             end
@@ -360,9 +356,9 @@ function game.draw()
         love.graphics.setLineWidth(2)
         love.graphics.rectangle("line", enemyPlayer.x - 30, enemyPlayer.y - 30, 60, 60, 10, 10)
 
-        for _, b in pairs(enemyBullets) do
+        for _, b in pairs(enemyBullets or {}) do
             love.graphics.setColor(1, 0.3, 0.3, 1)
-            love.graphics.circle("fill", b.x, b.y, 6)
+            love.graphics.circle("fill", b.x or 0, b.y or 0, 6)
         end
     end
 
@@ -413,7 +409,7 @@ function game.draw()
     if mode ~= "online" then
         love.graphics.print("Wave: " .. wave, 20, 110)
     else
-        love.graphics.print("Online", 20, 110)
+        love.graphics.print("Online PvP", 20, 110)
     end
     love.graphics.print("FPS: " .. love.timer.getFPS(), w - 80, 10)
 
