@@ -1,136 +1,76 @@
-local controls = {}
+name: Build_Cubic_Battle_FASTEST
 
-local joy = { id=nil, cx=0, cy=0, sx=0, sy=0, r=48, sr=20 }
-local atk = { id=nil, x=0, y=0, r=50, hold=false }
-local back = { x=20, y=20, w=180, h=65 }
+on:
+  push:
+  workflow_dispatch:
 
-local font
-local aimDx, aimDy = 0, -1
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-local function place()
-    local w, h = love.graphics.getDimensions()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: game
 
-    joy.cx = 85
-    joy.cy = h - 85
-    if not joy.id then
-        joy.sx, joy.sy = joy.cx, joy.cy
-    end
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-    atk.x = w - 85
-    atk.y = h - 85
-end
+      - name: Setup Android
+        uses: android-actions/setup-android@v3
 
-function controls.load()
-    font = love.graphics.newFont(24)
-    place()
-end
+      - name: Install NDK
+        run: yes | sdkmanager "ndk;25.2.9519653"
 
-function controls.resize()
-    place()
-end
+      - name: Export NDK
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-function controls.getMove()
-    if not joy.id then return 0,0 end
-    local dx = joy.sx - joy.cx
-    local dy = joy.sy - joy.cy
-    local len = math.sqrt(dx*dx + dy*dy)
-    if len == 0 then return 0,0 end
-    aimDx, aimDy = dx/len, dy/len
-    return aimDx, aimDy
-end
+      - name: Clone love-android
+        run: git clone --recursive --depth 1 https://github.com/love2d/love-android.git
 
-function controls.getAim()
-    return aimDx, aimDy, atk.hold
-end
+      - name: Package game.love
+        run: |
+          cd game
+          zip -9 -r ../game.love . -x "*.git*" -x ".github/*"
 
-function controls.touchpressed(id,x,y)
+      - name: Embed game
+        run: |
+          mkdir -p love-android/app/src/embed/assets
+          cp game.love love-android/app/src/embed/assets/game.love
 
-    if x>=back.x and x<=back.x+back.w and
-       y>=back.y and y<=back.y+back.h then
-        GameState.current = "lobby"
-        return
-    end
+      - name: Force arm64 only
+        run: |
+          sed -i '/abiFilters/d' love-android/app/build.gradle
+          sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' love-android/app/build.gradle
 
-    local dx = x-joy.cx
-    local dy = y-joy.cy
-    if dx*dx+dy*dy <= joy.r*joy.r then
-        joy.id=id
-        joy.sx,joy.sy=x,y
-        return
-    end
+      - name: Gradle turbo mode
+        run: |
+          cat >> love-android/gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx5g
+          org.gradle.parallel=true
+          org.gradle.caching=true
+          org.gradle.daemon=false
+          EOF
 
-    local ax = x-atk.x
-    local ay = y-atk.y
-    if ax*ax+ay*ay <= atk.r*atk.r then
-        atk.id=id
-        atk.hold=true
-    end
-end
+      - name: Build APK
+        working-directory: love-android
+        run: ./gradlew assembleEmbedNoRecordDebug --no-daemon --parallel --console=plain
 
-function controls.touchmoved(id,x,y)
-    if joy.id==id then
-        local dx = x-joy.cx
-        local dy = y-joy.cy
-        local len = math.sqrt(dx*dx+dy*dy)
-        if len>joy.r then
-            dx=dx/len*joy.r
-            dy=dy/len*joy.r
-        end
-        joy.sx=joy.cx+dx
-        joy.sy=joy.cy+dy
-    end
-end
+      - name: Collect APK
+        run: |
+          APK=$(find love-android -name "*.apk" | head -1)
+          cp "$APK" CubicBattle.apk
 
-function controls.touchreleased(id)
-    if joy.id==id then
-        joy.id=nil
-        joy.sx,joy.sy=joy.cx,joy.cy
-    end
-    if atk.id==id then
-        atk.id=nil
-        atk.hold=false
-        return true, aimDx, aimDy
-    end
-end
-
-function controls.draw(playerX,playerY)
-
-    love.graphics.setLineWidth(2)
-
-    love.graphics.setColor(0,0,0,0.35)
-    love.graphics.circle("fill",joy.cx,joy.cy,joy.r)
-
-    love.graphics.setColor(0,0,0,1)
-    love.graphics.circle("line",joy.cx,joy.cy,joy.r)
-    love.graphics.circle("fill",joy.sx,joy.sy,joy.sr)
-
-    love.graphics.setColor(0,0,0,0.35)
-    love.graphics.circle("fill",atk.x,atk.y,atk.r)
-
-    love.graphics.setColor(0,0,0,1)
-    love.graphics.circle("line",atk.x,atk.y,atk.r)
-
-    if atk.hold then
-        love.graphics.setColor(0,0,0,0.45)
-        love.graphics.setLineWidth(6)
-        love.graphics.line(
-            playerX,playerY,
-            playerX+aimDx*130,
-            playerY+aimDy*130
-        )
-        love.graphics.setLineWidth(2)
-    end
-
-    -- стиль как в lobby
-    love.graphics.setColor(0,0,0,0.3)
-    love.graphics.rectangle("fill",back.x+4,back.y+6,back.w,back.h,16,16)
-
-    love.graphics.setColor(0.92,0.92,0.95,1)
-    love.graphics.rectangle("fill",back.x,back.y,back.w,back.h,16,16)
-
-    love.graphics.setColor(0.3,0.2,0.6,1)
-    love.graphics.setFont(font)
-    love.graphics.printf("Back",back.x,back.y+18,back.w,"center")
-end
-
-return controls
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: CubicBattle_APK
+          path: CubicBattle.apk
+          compression-level: 0
