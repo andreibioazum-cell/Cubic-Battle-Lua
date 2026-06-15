@@ -105,18 +105,28 @@ function controls.draw()
 
     local scale = 1 - atk.press * 0.12
     local r = atk.r * scale
+    local textScale = 1 - atk.press * 0.2
+    local textAlpha = 1 - atk.press * 0.45
 
-    love.graphics.setColor(0.8 - atk.press*0.3, 0.1, 0.1, 0.95)
+    love.graphics.setColor(0.8 - atk.press*0.35, 0.1, 0.1, 0.95)
     love.graphics.circle("fill", atk.x, atk.y, r)
     love.graphics.setColor(0,0,0,1)
     love.graphics.circle("line", atk.x, atk.y, r)
 
     love.graphics.setFont(font)
-    love.graphics.setColor(1,1,1,1)
-    love.graphics.printf("Shot", atk.x - r, atk.y - 10, r*2, "center")
+    love.graphics.setColor(1,1,1,textAlpha)
+    love.graphics.push()
+    love.graphics.translate(atk.x, atk.y)
+    love.graphics.scale(textScale, textScale)
+    love.graphics.printf("Shot", -atk.r, -10, atk.r*2, "center")
+    love.graphics.pop()
 
-    love.graphics.setColor(0.9,0.9,0.95,1)
+    love.graphics.setColor(0,0,0,0.35)
+    love.graphics.rectangle("fill", back.x+4, back.y+5, back.w, back.h, 12, 12)
+
+    love.graphics.setColor(0.92,0.92,0.95,1)
     love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 12, 12)
+
     love.graphics.setColor(0.3,0.2,0.6,1)
     love.graphics.printf("Back", back.x, back.y+12, back.w, "center")
 
