@@ -5,7 +5,6 @@ GameState = { current = "lobby" }
 
 local mobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
 local lastTap = 0
-
 function love.load()
     love.graphics.setDefaultFilter("linear", "linear", 2)
     lobby.load()
