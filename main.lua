@@ -50,10 +50,12 @@ function love.mousepressed(x, y)
     if isMobile then return end
     love.touchpressed(1, x, y)
 end
+
 function love.mousemoved(x, y)
     if isMobile then return end
     if love.mouse.isDown(1) then love.touchmoved(1, x, y) end
 end
+
 function love.mousereleased(x, y)
     if isMobile then return end
     love.touchreleased(1, x, y)
