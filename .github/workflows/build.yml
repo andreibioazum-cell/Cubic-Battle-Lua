@@ -1,129 +1,136 @@
-name: Build_Cubic_Battle_ULTRA_FAST
+local controls = {}
 
-on:
-  push:
-  workflow_dispatch:
+local joy = { id=nil, cx=0, cy=0, sx=0, sy=0, r=48, sr=20 }
+local atk = { id=nil, x=0, y=0, r=50, hold=false }
+local back = { x=20, y=20, w=180, h=65 }
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+local font
+local aimDx, aimDy = 0, -1
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          path: game
+local function place()
+    local w, h = love.graphics.getDimensions()
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
+    joy.cx = 85
+    joy.cy = h - 85
+    if not joy.id then
+        joy.sx, joy.sy = joy.cx, joy.cy
+    end
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+    atk.x = w - 85
+    atk.y = h - 85
+end
 
-      # ✅ Cache NDK
-      - name: Cache NDK
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-25.2.9519653
+function controls.load()
+    font = love.graphics.newFont(24)
+    place()
+end
 
-      - name: Install NDK if missing
-        run: |
-          if [ ! -d "$ANDROID_HOME/ndk/25.2.9519653" ]; then
-            yes | sdkmanager --install "ndk;25.2.9519653"
-          fi
+function controls.resize()
+    place()
+end
 
-      - name: Export NDK vars
-        run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+function controls.getMove()
+    if not joy.id then return 0,0 end
+    local dx = joy.sx - joy.cx
+    local dy = joy.sy - joy.cy
+    local len = math.sqrt(dx*dx + dy*dy)
+    if len == 0 then return 0,0 end
+    aimDx, aimDy = dx/len, dy/len
+    return aimDx, aimDy
+end
 
-      # ✅ Cache love-android
-      - name: Cache love-android
-        uses: actions/cache@v4
-        with:
-          path: love-android
-          key: love-android-v4
+function controls.getAim()
+    return aimDx, aimDy, atk.hold
+end
 
-      - name: Clone love-android if needed
-        run: |
-          if [ ! -f "love-android/gradlew" ]; then
-            git clone --recursive --depth 1 https://github.com/love2d/love-android.git
-          fi
+function controls.touchpressed(id,x,y)
 
-      # ✅ Cache Gradle
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-v4
+    if x>=back.x and x<=back.x+back.w and
+       y>=back.y and y<=back.y+back.h then
+        GameState.current = "lobby"
+        return
+    end
 
-      # ✅ Cache native build
-      - name: Cache native
-        uses: actions/cache@v4
-        with:
-          path: |
-            love-android/app/.cxx
-            love-android/app/build
-          key: native-arm64-v4
+    local dx = x-joy.cx
+    local dy = y-joy.cy
+    if dx*dx+dy*dy <= joy.r*joy.r then
+        joy.id=id
+        joy.sx,joy.sy=x,y
+        return
+    end
 
-      # ✅ Package .love
-      - name: Package game.love
-        run: |
-          cd game
-          zip -9 -r ../game.love . -x "*.git*" -x ".github/*"
+    local ax = x-atk.x
+    local ay = y-atk.y
+    if ax*ax+ay*ay <= atk.r*atk.r then
+        atk.id=id
+        atk.hold=true
+    end
+end
 
-      - name: Embed game.love
-        run: |
-          mkdir -p love-android/app/src/embed/assets
-          cp game.love love-android/app/src/embed/assets/game.love
+function controls.touchmoved(id,x,y)
+    if joy.id==id then
+        local dx = x-joy.cx
+        local dy = y-joy.cy
+        local len = math.sqrt(dx*dx+dy*dy)
+        if len>joy.r then
+            dx=dx/len*joy.r
+            dy=dy/len*joy.r
+        end
+        joy.sx=joy.cx+dx
+        joy.sy=joy.cy+dy
+    end
+end
 
-      # ✅ Force arm64 only (сильно ускоряет)
-      - name: Force arm64
-        run: |
-          cd love-android
-          sed -i '/abiFilters/d' app/build.gradle
-          sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' app/build.gradle
+function controls.touchreleased(id)
+    if joy.id==id then
+        joy.id=nil
+        joy.sx,joy.sy=joy.cx,joy.cy
+    end
+    if atk.id==id then
+        atk.id=nil
+        atk.hold=false
+        return true, aimDx, aimDy
+    end
+end
 
-      # ✅ Turbo Gradle
-      - name: Optimize Gradle
-        run: |
-          cd love-android
-          cat >> gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g
-          org.gradle.parallel=true
-          org.gradle.caching=true
-          org.gradle.daemon=false
-          org.gradle.configureondemand=true
-          android.useAndroidX=true
-          EOF
+function controls.draw(playerX,playerY)
 
-      # ✅ BUILD
-      - name: Build APK
-        working-directory: love-android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleEmbedNoRecordDebug \
-            --no-daemon \
-            --build-cache \
-            --parallel \
-            --console=plain
+    love.graphics.setLineWidth(2)
 
-      # ✅ Collect APK
-      - name: Collect APK
-        run: |
-          APK=$(find love-android -name "*.apk" | head -1)
-          cp "$APK" CubicBattle.apk
+    love.graphics.setColor(0,0,0,0.35)
+    love.graphics.circle("fill",joy.cx,joy.cy,joy.r)
 
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: CubicBattle_APK
-          path: CubicBattle.apk
-          compression-level: 0
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.circle("line",joy.cx,joy.cy,joy.r)
+    love.graphics.circle("fill",joy.sx,joy.sy,joy.sr)
+
+    love.graphics.setColor(0,0,0,0.35)
+    love.graphics.circle("fill",atk.x,atk.y,atk.r)
+
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.circle("line",atk.x,atk.y,atk.r)
+
+    if atk.hold then
+        love.graphics.setColor(0,0,0,0.45)
+        love.graphics.setLineWidth(6)
+        love.graphics.line(
+            playerX,playerY,
+            playerX+aimDx*130,
+            playerY+aimDy*130
+        )
+        love.graphics.setLineWidth(2)
+    end
+
+    -- стиль как в lobby
+    love.graphics.setColor(0,0,0,0.3)
+    love.graphics.rectangle("fill",back.x+4,back.y+6,back.w,back.h,16,16)
+
+    love.graphics.setColor(0.92,0.92,0.95,1)
+    love.graphics.rectangle("fill",back.x,back.y,back.w,back.h,16,16)
+
+    love.graphics.setColor(0.3,0.2,0.6,1)
+    love.graphics.setFont(font)
+    love.graphics.printf("Back",back.x,back.y+18,back.w,"center")
+end
+
+return controls
