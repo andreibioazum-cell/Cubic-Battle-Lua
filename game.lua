@@ -17,9 +17,8 @@ local function spawnBullet(x,y,dx,dy)
 end
 
 function game.load()
-    local w,h = love.graphics.getDimensions()
-    cube.x,w = w/2,w
-    cube.y = h/2
+    cube.x=0
+    cube.y=0
     bg = love.graphics.newImage("grass.png")
     bg:setWrap("repeat","repeat")
     controls.load()
@@ -35,11 +34,8 @@ function game.update(dt)
     cube.x = cube.x + dx*cube.speed*dt
     cube.y = cube.y + dy*cube.speed*dt
 
-    local targetX = cube.x - love.graphics.getWidth()/2
-    local targetY = cube.y - love.graphics.getHeight()/2
-
-    cam.x = cam.x + (targetX - cam.x)*dt*10
-    cam.y = cam.y + (targetY - cam.y)*dt*10
+    cam.x = cube.x - love.graphics.getWidth()/2
+    cam.y = cube.y - love.graphics.getHeight()/2
 
     for i=#bullets,1,-1 do
         local b=bullets[i]
@@ -56,12 +52,16 @@ function game.draw()
     love.graphics.translate(-cam.x,-cam.y)
 
     local w,h = love.graphics.getDimensions()
+    local tw,th = bg:getWidth(), bg:getHeight()
 
-    love.graphics.setColor(1,1,1,1)
-    love.graphics.draw(bg,
-        math.floor(cam.x/bg:getWidth())*bg:getWidth(),
-        math.floor(cam.y/bg:getHeight())*bg:getHeight()
-    )
+    local startX = math.floor(cam.x/tw)*tw
+    local startY = math.floor(cam.y/th)*th
+
+    for x=startX,startX+w+tw,tw do
+        for y=startY,startY+h+th,th do
+            love.graphics.draw(bg,x,y)
+        end
+    end
 
     love.graphics.setColor(cube.color)
     love.graphics.rectangle("fill",
