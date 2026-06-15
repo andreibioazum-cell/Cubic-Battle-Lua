@@ -1,7 +1,7 @@
 local controls = {}
 
 local joy  = { id=nil, cx=0, cy=0, sx=0, sy=0, r=45, sr=18 }
-local atk  = { id=nil, x=0, y=0, r=48, hold=false }
+local atk  = { id=nil, x=0, y=0, r=48, hold=false, press=0 }
 local back = { x=20, y=20, w=130, h=50 }
 
 local font
@@ -27,6 +27,11 @@ function controls.resize()
     place()
 end
 
+function controls.update(dt)
+    local target = atk.hold and 1 or 0
+    atk.press = atk.press + (target - atk.press) * math.min(dt*12, 1)
+end
+
 function controls.getMove()
     if not joy.id then return 0, 0 end
     local dx = joy.sx - joy.cx
@@ -37,16 +42,10 @@ function controls.getMove()
     return aimDx, aimDy
 end
 
-function controls.isAiming()
-    return atk.hold
-end
-
-function controls.getAim()
-    return aimDx, aimDy
-end
+function controls.isAiming() return atk.hold end
+function controls.getAim() return aimDx, aimDy end
 
 function controls.touchpressed(id,x,y)
-
     if x>=back.x and x<=back.x+back.w and
        y>=back.y and y<=back.y+back.h then
         GameState.current = "lobby"
@@ -104,14 +103,17 @@ function controls.draw()
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
 
-    love.graphics.setColor(0.8, 0.1, 0.1, 0.9)
-    love.graphics.circle("fill", atk.x, atk.y, atk.r)
+    local scale = 1 - atk.press * 0.12
+    local r = atk.r * scale
+
+    love.graphics.setColor(0.8 - atk.press*0.3, 0.1, 0.1, 0.95)
+    love.graphics.circle("fill", atk.x, atk.y, r)
     love.graphics.setColor(0,0,0,1)
-    love.graphics.circle("line", atk.x, atk.y, atk.r)
+    love.graphics.circle("line", atk.x, atk.y, r)
 
     love.graphics.setFont(font)
     love.graphics.setColor(1,1,1,1)
-    love.graphics.printf("Shot", atk.x-atk.r, atk.y-10, atk.r*2, "center")
+    love.graphics.printf("Shot", atk.x - r, atk.y - 10, r*2, "center")
 
     love.graphics.setColor(0.9,0.9,0.95,1)
     love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 12, 12)
