@@ -67,7 +67,7 @@ function lobby.draw()
     local sub = "Touch & dodge"
     love.graphics.print(sub, w / 2 - fontSub:getWidth(sub) / 2, h / 4 + 20)
 
-    -- Play (оффлайн)
+    -- Play
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", playBtn.x + 3, playBtn.y + 4, playBtn.w, playBtn.h, 14, 14)
     love.graphics.setColor(0.5, 0.15, 0.7, 0.95)
