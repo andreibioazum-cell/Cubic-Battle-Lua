@@ -1,127 +1,129 @@
-name: Build_Cubic_Battle_FAST
-on: [push, workflow_dispatch]
+name: Build_Cubic_Battle_ULTRA_FAST
+
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          path: mygame
+          path: game
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - uses: actions/cache@v4
+      # ✅ Cache NDK
+      - name: Cache NDK
+        uses: actions/cache@v4
         with:
           path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-25.2.9519653-v2
+          key: ndk-25.2.9519653
 
-      - name: Install NDK
+      - name: Install NDK if missing
         run: |
           if [ ! -d "$ANDROID_HOME/ndk/25.2.9519653" ]; then
-            yes | sdkmanager --install "ndk;25.2.9519653" 2>&1 | tail -3
+            yes | sdkmanager --install "ndk;25.2.9519653"
           fi
 
-      - name: Set NDK env
+      - name: Export NDK vars
         run: |
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      # ✅ Cache love-android
+      - name: Cache love-android
+        uses: actions/cache@v4
         with:
           path: love-android
-          key: love-android-src-v3
+          key: love-android-v4
 
-      - name: Clone love-android
+      - name: Clone love-android if needed
         run: |
           if [ ! -f "love-android/gradlew" ]; then
             git clone --recursive --depth 1 https://github.com/love2d/love-android.git
           fi
 
-      - uses: actions/cache@v4
+      # ✅ Cache Gradle
+      - name: Cache Gradle
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-v3
+          key: gradle-v4
 
-      - uses: actions/cache@v4
+      # ✅ Cache native build
+      - name: Cache native
+        uses: actions/cache@v4
         with:
           path: |
             love-android/app/.cxx
-            love-android/app/build/intermediates/cxx
-            love-android/app/build/intermediates/cmake
-            love-android/app/build/intermediates/merged_native_libs
-          key: native-arm64-v3
+            love-android/app/build
+          key: native-arm64-v4
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            love-android/app/build/intermediates
-            love-android/app/build/generated
-            love-android/app/build/tmp
-          key: build-intermediates-v3
-
+      # ✅ Package .love
       - name: Package game.love
         run: |
-          cd mygame
-          zip -9 -q -r ../game.love *.lua sand.png 2>/dev/null || zip -9 -q -r ../game.love *.lua
+          cd game
+          zip -9 -r ../game.love . -x "*.git*" -x ".github/*"
 
       - name: Embed game.love
         run: |
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
 
-      - name: Force arm64-v8a
+      # ✅ Force arm64 only (сильно ускоряет)
+      - name: Force arm64
         run: |
           cd love-android
           sed -i '/abiFilters/d' app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' app/build.gradle
 
+      # ✅ Turbo Gradle
       - name: Optimize Gradle
         run: |
           cd love-android
           cat >> gradle.properties << 'EOF'
           org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g
           org.gradle.parallel=true
-          org.gradle.daemon=false
           org.gradle.caching=true
+          org.gradle.daemon=false
           org.gradle.configureondemand=true
           android.useAndroidX=true
-          android.enableJetifier=false
-          android.enableR8.fullMode=false
           EOF
 
+      # ✅ BUILD
       - name: Build APK
         working-directory: love-android
         run: |
           chmod +x gradlew
           ./gradlew assembleEmbedNoRecordDebug \
             --no-daemon \
-            --max-workers=4 \
             --build-cache \
             --parallel \
-            -Dorg.gradle.internal.http.socketTimeout=60000 \
-            2>&1 | grep -E "(BUILD|FAILED|Error)" | head -10
+            --console=plain
 
-      - name: Find and Copy APK
+      # ✅ Collect APK
+      - name: Collect APK
         run: |
-          APK=$(find love-android -name "*.apk" -type f | head -1)
-          if [ -n "$APK" ]; then
-            cp "$APK" ./CubicBattle.apk
-          fi
+          APK=$(find love-android -name "*.apk" | head -1)
+          cp "$APK" CubicBattle.apk
 
-      - name: Upload APK
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: CubicBattle_APK
-          path: ./CubicBattle.apk
-          if-no-files-found: error
-          retention-days: 30
+          path: CubicBattle.apk
           compression-level: 0
