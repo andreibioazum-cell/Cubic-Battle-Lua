@@ -1,71 +1,100 @@
-local controls = require("controls")
+local controls = {}
 
-local game = {}
-
-local cube = {
-    x = 400,
-    y = 300,
-    size = 60,
-    speed = 300,
-    color = {1, 0.5, 0.3}
+local joy = {
+    id = nil,
+    cx = 0, cy = 0,
+    sx = 0, sy = 0,
+    R = 70,
+    sR = 28
 }
 
-local fontFPS
+local back = { x = 20, y = 20, w = 110, h = 50 }
 
-function game.load()
+local font
+
+local function place()
     local w, h = love.graphics.getDimensions()
-    cube.x = w / 2
-    cube.y = h / 2
-
-    controls.load()
-
-    fontFPS = love.graphics.newFont(12)
+    joy.cx = 120
+    joy.cy = h - 120
+    if not joy.id then
+        joy.sx = joy.cx
+        joy.sy = joy.cy
+    end
 end
 
-function game.resize(w, h)
-    controls.resize(w, h)
+function controls.load()
+    font = love.graphics.newFont(18)
+    place()
 end
 
-function game.update(dt)
-    local w, h = love.graphics.getDimensions()
-
-    local dx, dy = controls.getDirection()
-    cube.x = cube.x + dx * cube.speed * dt
-    cube.y = cube.y + dy * cube.speed * dt
-
-    cube.x = math.max(cube.size/2, math.min(w - cube.size/2, cube.x))
-    cube.y = math.max(cube.size/2, math.min(h - cube.size/2, cube.y))
+function controls.resize()
+    place()
 end
 
-function game.draw()
-    local w, h = love.graphics.getDimensions()
-
-    love.graphics.clear(0.1, 0.1, 0.15, 1)
-
-    -- Куб
-    love.graphics.setColor(cube.color)
-    love.graphics.rectangle("fill",
-        cube.x - cube.size/2,
-        cube.y - cube.size/2,
-        cube.size, cube.size, 10, 10)
-
-    controls.draw()
-
-    love.graphics.setColor(1,1,1,0.5)
-    love.graphics.setFont(fontFPS)
-    love.graphics.print("FPS: " .. love.timer.getFPS(), w - 90, 10)
+function controls.getDirection()
+    if not joy.id then return 0, 0 end
+    local dx = joy.sx - joy.cx
+    local dy = joy.sy - joy.cy
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len == 0 then return 0, 0 end
+    return dx / len, dy / len
 end
 
-function game.touchpressed(id, x, y)
-    controls.touchpressed(id, x, y)
+function controls.touchpressed(id, x, y)
+    if x >= back.x and x <= back.x + back.w and
+       y >= back.y and y <= back.y + back.h then
+        GameState.current = "lobby"
+        return
+    end
+
+    local dx = x - joy.cx
+    local dy = y - joy.cy
+    if dx * dx + dy * dy <= joy.R * joy.R then
+        joy.id = id
+        joy.sx = x
+        joy.sy = y
+    end
 end
 
-function game.touchmoved(id, x, y)
-    controls.touchmoved(id, x, y)
+function controls.touchmoved(id, x, y)
+    if joy.id ~= id then return end
+    local dx = x - joy.cx
+    local dy = y - joy.cy
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len > joy.R then
+        dx = dx / len * joy.R
+        dy = dy / len * joy.R
+    end
+    joy.sx = joy.cx + dx
+    joy.sy = joy.cy + dy
 end
 
-function game.touchreleased(id, x, y)
-    controls.touchreleased(id, x, y)
+function controls.touchreleased(id)
+    if joy.id ~= id then return end
+    joy.id = nil
+    joy.sx = joy.cx
+    joy.sy = joy.cy
 end
 
-return game
+function controls.draw()
+    love.graphics.setColor(0, 0, 0, 0.35)
+    love.graphics.circle("fill", joy.cx, joy.cy, joy.R)
+
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.setLineWidth(3)
+    love.graphics.circle("line", joy.cx, joy.cy, joy.R)
+
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.circle("fill", joy.sx, joy.sy, joy.sR)
+
+    love.graphics.setColor(0.15, 0.15, 0.2, 0.85)
+    love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 10, 10)
+
+    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.rectangle("line", back.x, back.y, back.w, back.h, 10, 10)
+
+    love.graphics.setFont(font)
+    love.graphics.print("BACK", back.x + 25, back.y + 13)
+end
+
+return controls
