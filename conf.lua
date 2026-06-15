@@ -3,7 +3,7 @@ function love.conf(t)
     t.version = "11.5"
     t.window.title = "Cubic Battle"
     t.window.fullscreen = true
-    t.window.borderless = true
+    t.wdow.borderless = true
     t.window.vsync = 1
     t.window.msaa = 2
     t.window.resizable = true
