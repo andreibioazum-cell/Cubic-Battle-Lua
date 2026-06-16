@@ -78,18 +78,15 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
     if e.state == "chase" then
         e.x = e.x + nx * SPEED * dt
         e.y = e.y + ny * SPEED * dt
-
     elseif e.state == "retreat" then
         e.x = e.x - nx * SPEED * 0.8 * dt
         e.y = e.y - ny * SPEED * 0.8 * dt
-
     elseif e.state == "attack" then
         e.atkT = e.atkT - dt
         if e.atkT <= 0 then
             e.atkT = ATTACK_CD
             if onHitPlayer then onHitPlayer(DAMAGE) end
         end
-
     elseif e.state == "wander" then
         e.wanderT = e.wanderT - dt
         if e.wanderT <= 0 then
@@ -102,7 +99,7 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
         e.y = e.y + e.wanderDY * SPEED * 0.35 * dt
     end
 
-    e.angle = math.atan2(dy, dx)
+    e.angle = math.atan2(dy, dx) - math.pi/2
     e.hit = math.max(0, e.hit - dt*3)
 
     for i=#bullets,1,-1 do
@@ -125,14 +122,17 @@ function enemy.draw()
     if not e then return end
 
     love.graphics.setColor(0,0,0,0.35)
-    love.graphics.ellipse("fill", e.x, e.y + SIZE*0.35, SIZE*0.55, SIZE*0.20)
+    love.graphics.rectangle("fill",
+        e.x - SIZE*0.5,
+        e.y + SIZE*0.25,
+        SIZE, SIZE*0.25, 4, 4)
 
     love.graphics.push()
     love.graphics.translate(e.x, e.y)
     love.graphics.rotate(e.angle)
 
-    local tint = e.hit
-    love.graphics.setColor(1 - tint*0.2, 0.3 + tint*0.5, 0.3, 1)
+    local t = e.hit
+    love.graphics.setColor(1, 1 - t*0.5, 1 - t*0.5, 1)
     love.graphics.draw(img, -SIZE/2, -SIZE/2)
 
     love.graphics.pop()
