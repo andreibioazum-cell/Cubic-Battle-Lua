@@ -5,29 +5,39 @@ GameState = { current = "lobby" }
 
 local isMobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
 local lastTap = 0
+local lastState = nil
 
 function love.load()
-    love.graphics.setDefaultFilter("linear", "linear", 4)
-    lobby.load()
-    game.load()
+    love.graphics.setDefaultFilter("linear", "linear")
 end
 
 function love.update(dt)
     if dt > 0.05 then dt = 0.05 end
-    local s = GameState.current
-    if s == "lobby" then lobby.update(dt)
-    elseif s == "game" then game.update(dt) end
+
+    if GameState.current ~= lastState then
+        if GameState.current == "lobby" and lobby.load then lobby.load() end
+        if GameState.current == "game"  and game.load  then game.load()  end
+        lastState = GameState.current
+    end
+
+    if GameState.current == "lobby" then
+        lobby.update(dt)
+    elseif GameState.current == "game" then
+        game.update(dt)
+    end
 end
 
 function love.draw()
-    local s = GameState.current
-    if s == "lobby" then lobby.draw()
-    elseif s == "game" then game.draw() end
+    if GameState.current == "lobby" then
+        lobby.draw()
+    elseif GameState.current == "game" then
+        game.draw()
+    end
 end
 
 function love.resize(w, h)
     if lobby.resize then lobby.resize(w, h) end
-    if game.load then game.load() end
+    if game.resize  then game.resize(w, h)  end
 end
 
 local function dispatch(fn, id, x, y)
@@ -43,8 +53,13 @@ function love.touchpressed(id, x, y)
     dispatch("touchpressed", id, x, y)
 end
 
-function love.touchmoved(id, x, y) dispatch("touchmoved", id, x, y) end
-function love.touchreleased(id, x, y) dispatch("touchreleased", id, x, y) end
+function love.touchmoved(id, x, y)
+    dispatch("touchmoved", id, x, y)
+end
+
+function love.touchreleased(id, x, y)
+    dispatch("touchreleased", id, x, y)
+end
 
 function love.mousepressed(x, y)
     if isMobile then return end
