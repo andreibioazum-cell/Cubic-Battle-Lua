@@ -23,6 +23,7 @@ local function spawnBullet(x, y, dx, dy)
 end
 
 local function drawHPBar(x, y, w, h, hp, max, color)
+    if hp < 0 then hp = 0 end
     love.graphics.setColor(0,0,0,0.5)
     love.graphics.rectangle("fill", x-2, y-2, w+4, h+4, 6, 6)
     love.graphics.setColor(0.15,0.15,0.15,1)
@@ -39,6 +40,7 @@ local function onHitPlayer(dmg)
     cube.hp = cube.hp - dmg
     cube.hit = 1
     if cube.hp <= 0 then
+        cube.hp = 0
         dead = true
         GameState.current = "lobby"
     end
@@ -46,18 +48,20 @@ end
 
 function game.load()
     cube.x, cube.y = 0, 0
+    cube.angle = 0
     cube.hp = PLAYER_HP_MAX
     cube.hit = 0
     dead = false
     bullets = {}
+    cam.x, cam.y = -love.graphics.getWidth()/2, -love.graphics.getHeight()/2
 
-    bg = love.graphics.newImage("grass.png")
+    bg = bg or love.graphics.newImage("grass.png")
     bg:setWrap("repeat","repeat")
 
-    playerImg = love.graphics.newImage("player.png")
+    playerImg = playerImg or love.graphics.newImage("player.png")
     playerImg:setFilter("nearest","nearest")
 
-    font = love.graphics.newFont("Fredoka-Bold.ttf", 18)
+    font = font or love.graphics.newFont("Fredoka-Bold.ttf", 18)
 
     controls.load()
     enemy.load()
@@ -78,7 +82,7 @@ function game.update(dt)
     cube.y = cube.y + dy * cube.speed * dt
 
     if dx ~= 0 or dy ~= 0 then
-        cube.angle = math.atan2(dy, dx)
+        cube.angle = math.atan2(dy, dx) - math.pi/2
     end
 
     cube.hit = math.max(0, cube.hit - dt*3)
@@ -136,12 +140,14 @@ function game.draw()
 
     local e = enemy.get()
     if e then
-        local ex, ey = e.x, e.y - 45
-        drawHPBar(ex - 28, ey, 56, 8, e.hp, 5, {0.9,0.2,0.2})
+        drawHPBar(e.x - 28, e.y - 45, 56, 8, e.hp, 5, {0.9,0.2,0.2})
     end
 
     love.graphics.setColor(0,0,0,0.35)
-    love.graphics.ellipse("fill", cube.x, cube.y + PLAYER_SIZE*0.35, PLAYER_SIZE*0.55, PLAYER_SIZE*0.20)
+    love.graphics.rectangle("fill",
+        cube.x - PLAYER_SIZE*0.5,
+        cube.y + PLAYER_SIZE*0.25,
+        PLAYER_SIZE, PLAYER_SIZE*0.25, 4, 4)
 
     love.graphics.push()
     love.graphics.translate(cube.x, cube.y)
@@ -162,7 +168,7 @@ function game.draw()
     drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
 
     love.graphics.setColor(1,1,1,1)
-    love.graphics.printf("HP " .. cube.hp .. " / " .. PLAYER_HP_MAX,
+    love.graphics.printf("HP " .. math.max(0,cube.hp) .. " / " .. PLAYER_HP_MAX,
         px, py + 22, barW, "right")
 
     controls.draw()
