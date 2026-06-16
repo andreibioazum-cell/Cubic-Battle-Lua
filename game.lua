@@ -3,12 +3,15 @@ local enemy = require("enemy")
 
 local game = {}
 
-local cube = { x=0, y=0, size=60, speed=260, color={1,0.5,0.3}, angle=0 }
-local bullets = {}
-local bg
-local cam = { x=0, y=0 }
-
+local PLAYER_SIZE = 55
+local PLAYER_HP_MAX = 5
 local BULLET_SPEED = 340 * 1.15
+
+local cube = { x=0, y=0, speed=260, angle=0, hp=PLAYER_HP_MAX, hit=0 }
+local bullets = {}
+local bg, playerImg, font
+local cam = { x=0, y=0 }
+local dead = false
 
 local function spawnBullet(x, y, dx, dy)
     table.insert(bullets, {
@@ -19,12 +22,45 @@ local function spawnBullet(x, y, dx, dy)
     })
 end
 
+local function drawHPBar(x, y, w, h, hp, max, color)
+    love.graphics.setColor(0,0,0,0.5)
+    love.graphics.rectangle("fill", x-2, y-2, w+4, h+4, 6, 6)
+    love.graphics.setColor(0.15,0.15,0.15,1)
+    love.graphics.rectangle("fill", x, y, w, h, 4, 4)
+    love.graphics.setColor(color[1], color[2], color[3], 1)
+    love.graphics.rectangle("fill", x, y, w * (hp/max), h, 4, 4)
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", x, y, w, h, 4, 4)
+end
+
+local function onHitPlayer(dmg)
+    if dead then return end
+    cube.hp = cube.hp - dmg
+    cube.hit = 1
+    if cube.hp <= 0 then
+        dead = true
+        GameState.current = "lobby"
+    end
+end
+
 function game.load()
-    cube.x = 0
-    cube.y = 0
+    cube.x, cube.y = 0, 0
+    cube.hp = PLAYER_HP_MAX
+    cube.hit = 0
+    dead = false
+    bullets = {}
+
     bg = love.graphics.newImage("grass.png")
     bg:setWrap("repeat","repeat")
+
+    playerImg = love.graphics.newImage("player.png")
+    playerImg:setFilter("nearest","nearest")
+
+    font = love.graphics.newFont("Fredoka-Bold.ttf", 18)
+
     controls.load()
+    enemy.load()
     enemy.reset()
 end
 
@@ -33,6 +69,8 @@ function game.resize()
 end
 
 function game.update(dt)
+    if dead then return end
+
     controls.update(dt)
 
     local dx, dy = controls.getMove()
@@ -43,9 +81,11 @@ function game.update(dt)
         cube.angle = math.atan2(dy, dx)
     end
 
+    cube.hit = math.max(0, cube.hit - dt*3)
+
     local targetX = cube.x - love.graphics.getWidth()/2
     local targetY = cube.y - love.graphics.getHeight()/2
-    local k = 1 - math.exp(-dt * 6)
+    local k = 1 - math.exp(-dt * 7.3)
     cam.x = cam.x + (targetX - cam.x) * k
     cam.y = cam.y + (targetY - cam.y) * k
 
@@ -57,7 +97,7 @@ function game.update(dt)
         if b.life <= 0 then table.remove(bullets,i) end
     end
 
-    enemy.update(dt, cube.x, cube.y, bullets)
+    enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
 end
 
 function game.draw()
@@ -68,11 +108,10 @@ function game.draw()
 
     local w,h = love.graphics.getDimensions()
     local tw,th = bg:getWidth(), bg:getHeight()
-    local startX = math.floor(cam.x/tw)*tw
-    local startY = math.floor(cam.y/th)*th
-
-    for x=startX, startX+w+tw, tw do
-        for y=startY, startY+h+th, th do
+    local sX = math.floor(cam.x/tw)*tw
+    local sY = math.floor(cam.y/th)*th
+    for x=sX, sX+w+tw, tw do
+        for y=sY, sY+h+th, th do
             love.graphics.draw(bg, x, y)
         end
     end
@@ -85,34 +124,47 @@ function game.draw()
     if controls.isAiming() then
         local ax, ay = controls.getAim()
         love.graphics.setColor(0,0,0,0.55)
-        love.graphics.setLineWidth(12)
+        love.graphics.setLineWidth(16)
         love.graphics.line(
             cube.x, cube.y,
             cube.x + ax*180,
             cube.y + ay*180
         )
-        love.graphics.setLineWidth(2)
     end
 
     enemy.draw()
 
+    local e = enemy.get()
+    if e then
+        local ex, ey = e.x, e.y - 45
+        drawHPBar(ex - 28, ey, 56, 8, e.hp, 5, {0.9,0.2,0.2})
+    end
+
+    love.graphics.setColor(0,0,0,0.35)
+    love.graphics.ellipse("fill", cube.x, cube.y + PLAYER_SIZE*0.35, PLAYER_SIZE*0.55, PLAYER_SIZE*0.20)
+
     love.graphics.push()
     love.graphics.translate(cube.x, cube.y)
     love.graphics.rotate(cube.angle)
-    love.graphics.setColor(cube.color)
-    love.graphics.rectangle("fill",
-        -cube.size/2, -cube.size/2,
-        cube.size, cube.size, 10, 10)
-    love.graphics.setColor(0,0,0,1)
-    love.graphics.setLineWidth(3)
-    love.graphics.rectangle("line",
-        -cube.size/2, -cube.size/2,
-        cube.size, cube.size, 10, 10)
+    local t = cube.hit
+    love.graphics.setColor(1, 1 - t*0.6, 1 - t*0.6, 1)
+    love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
     love.graphics.pop()
 
     love.graphics.pop()
 
     love.graphics.setColor(1,1,1,1)
+    love.graphics.setFont(font)
+
+    local barW, barH = 200, 18
+    local px = love.graphics.getWidth() - barW - 20
+    local py = 20
+    drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
+
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.printf("HP " .. cube.hp .. " / " .. PLAYER_HP_MAX,
+        px, py + 22, barW, "right")
+
     controls.draw()
 end
 
