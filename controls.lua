@@ -18,17 +18,45 @@ local function place()
     atk.y = h - 80
 end
 
-local function drawOutlineText(text, x, y, w, align)
-    love.graphics.setColor(0,0,0,1)
-    for dx=-2,2,2 do
-        for dy=-2,2,2 do
-            if dx ~= 0 or dy ~= 0 then
-                love.graphics.printf(text, x+dx, y+dy, w, align)
+local function drawSpacedText(text, x, y, w, align, font, spacing, alpha)
+    alpha = alpha or 1
+    spacing = spacing or 0
+    love.graphics.setFont(font)
+
+    local totalW = 0
+    local widths = {}
+    for i=1, #text do
+        local ch = text:sub(i,i)
+        local cw = font:getWidth(ch)
+        widths[i] = cw
+        totalW = totalW + cw
+    end
+    totalW = totalW + spacing * (#text - 1)
+
+    local startX = x + (w - totalW)/2
+    local outline = 2
+
+    love.graphics.setColor(0,0,0,alpha)
+    local cx = startX
+    for i=1, #text do
+        local ch = text:sub(i,i)
+        for dx=-outline, outline, outline do
+            for dy=-outline, outline, outline do
+                if dx ~= 0 or dy ~= 0 then
+                    love.graphics.print(ch, cx+dx, y+dy)
+                end
             end
         end
+        cx = cx + widths[i] + spacing
     end
-    love.graphics.setColor(1,1,1,1)
-    love.graphics.printf(text, x, y, w, align)
+
+    love.graphics.setColor(1,1,1,alpha)
+    cx = startX
+    for i=1, #text do
+        local ch = text:sub(i,i)
+        love.graphics.print(ch, cx, y)
+        cx = cx + widths[i] + spacing
+    end
 end
 
 function controls.load()
@@ -108,9 +136,9 @@ function controls.touchreleased(id)
 end
 
 function controls.draw()
-    love.graphics.setLineWidth(3)
+    love.graphics.setLineWidth(2.55)
 
-    love.graphics.setColor(0,0,0,0.35)
+    love.graphics.setColor(0,0,0,0.20)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
     love.graphics.setColor(0,0,0,1)
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
@@ -121,43 +149,29 @@ function controls.draw()
     local textScale = 1 - atk.press * 0.18
     local textAlpha = 1 - atk.press * 0.45
 
-    love.graphics.setColor(0.55 - atk.press*0.2, 0.2, 0.85 - atk.press*0.3, 1)
+    love.graphics.setColor(0.55 - atk.press*0.2, 0.20, 0.85 - atk.press*0.3, 1)
     love.graphics.circle("fill", atk.x, atk.y, r)
     love.graphics.setColor(0,0,0,1)
-    love.graphics.setLineWidth(4)
+    love.graphics.setLineWidth(3.4)
     love.graphics.circle("line", atk.x, atk.y, r)
 
-    love.graphics.setFont(font)
     love.graphics.push()
     love.graphics.translate(atk.x, atk.y)
     love.graphics.scale(textScale, textScale)
-    love.graphics.setColor(1,1,1,textAlpha)
-
-    local label = "Shot"
-    love.graphics.setColor(0,0,0,textAlpha)
-    for dx=-2,2,2 do
-        for dy=-2,2,2 do
-            if dx ~= 0 or dy ~= 0 then
-                love.graphics.printf(label, -atk.r+dx, -12+dy, atk.r*2, "center")
-            end
-        end
-    end
-    love.graphics.setColor(1,1,1,textAlpha)
-    love.graphics.printf(label, -atk.r, -12, atk.r*2, "center")
+    drawSpacedText("Shot", -atk.r, -14, atk.r*2, "center", font, font:getWidth("A")*0.05, textAlpha)
     love.graphics.pop()
 
-    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.setColor(0,0,0,0.20)
     love.graphics.rectangle("fill", back.x+4, back.y+5, back.w, back.h, 14, 14)
 
     love.graphics.setColor(0.55, 0.20, 0.85, 1)
     love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 14, 14)
 
     love.graphics.setColor(0,0,0,1)
-    love.graphics.setLineWidth(4)
+    love.graphics.setLineWidth(3.4)
     love.graphics.rectangle("line", back.x, back.y, back.w, back.h, 14, 14)
 
-    love.graphics.setFont(font)
-    drawOutlineText("Back", back.x, back.y+14, back.w, "center")
+    drawSpacedText("Back", back.x, back.y+14, back.w, "center", font, font:getWidth("A")*0.05, 1)
 
     love.graphics.setColor(1,1,1,1)
 end
