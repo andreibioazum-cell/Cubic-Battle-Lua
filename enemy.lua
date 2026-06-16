@@ -2,20 +2,23 @@ local enemy = {}
 
 local SIZE = 50
 local SPEED = 130
-local SIGHT = 500
+local SIGHT = 600
 local ATTACK_RANGE = 60
 local MAX_HP = 3
 local RESPAWN = 2
-local SPAWN_DIST = 700
 
 local e
 local timer = 0
 
 local function spawn(px, py)
+    local w, h = love.graphics.getDimensions()
+    local minR = math.min(w, h) * 0.25
+    local maxR = math.min(w, h) * 0.45
     local a = math.random() * math.pi * 2
+    local dist = minR + math.random() * (maxR - minR)
     e = {
-        x = px + math.cos(a) * SPAWN_DIST,
-        y = py + math.sin(a) * SPAWN_DIST,
+        x = px + math.cos(a) * dist,
+        y = py + math.sin(a) * dist,
         hp = MAX_HP,
         hit = 0,
         angle = 0
@@ -76,14 +79,11 @@ function enemy.draw()
     love.graphics.rotate(e.angle)
 
     local r = 0.15 + e.hit*0.85
-    local g = 0.15
-    local b = 0.15
-
-    love.graphics.setColor(r, g, b, 1)
+    love.graphics.setColor(r, 0.15, 0.15, 1)
     love.graphics.rectangle("fill", -SIZE/2, -SIZE/2, SIZE, SIZE, 8, 8)
 
     love.graphics.setColor(0,0,0,1)
-    love.graphics.setLineWidth(3)
+    love.graphics.setLineWidth(2.55)
     love.graphics.rectangle("line", -SIZE/2, -SIZE/2, SIZE, SIZE, 8, 8)
 
     love.graphics.pop()
