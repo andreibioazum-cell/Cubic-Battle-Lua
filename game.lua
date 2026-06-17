@@ -82,7 +82,7 @@ function game.update(dt)
     cube.y = cube.y + dy * cube.speed * dt
 
     if dx ~= 0 or dy ~= 0 then
-        cube.angle = math.atan2(dy, dx) - math.pi/2
+        cube.angle = math.atan2(dy, dx) + math.pi/2
     end
 
     cube.hit = math.max(0, cube.hit - dt*3)
@@ -143,11 +143,12 @@ function game.draw()
         drawHPBar(e.x - 28, e.y - 45, 56, 8, e.hp, 5, {0.9,0.2,0.2})
     end
 
-    love.graphics.setColor(0,0,0,0.35)
-    love.graphics.rectangle("fill",
-        cube.x - PLAYER_SIZE*0.5,
-        cube.y + PLAYER_SIZE*0.25,
-        PLAYER_SIZE, PLAYER_SIZE*0.25, 4, 4)
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.push()
+    love.graphics.translate(cube.x + 6, cube.y + 8)
+    love.graphics.rotate(cube.angle)
+    love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
+    love.graphics.pop()
 
     love.graphics.push()
     love.graphics.translate(cube.x, cube.y)
