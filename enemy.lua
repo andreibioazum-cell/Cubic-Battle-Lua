@@ -99,7 +99,7 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
         e.y = e.y + e.wanderDY * SPEED * 0.35 * dt
     end
 
-    e.angle = math.atan2(dy, dx) - math.pi/2
+    e.angle = math.atan2(dy, dx) + math.pi/2
     e.hit = math.max(0, e.hit - dt*3)
 
     for i=#bullets,1,-1 do
@@ -121,21 +121,21 @@ end
 function enemy.draw()
     if not e then return end
 
-    love.graphics.setColor(0,0,0,0.35)
-    love.graphics.rectangle("fill",
-        e.x - SIZE*0.5,
-        e.y + SIZE*0.25,
-        SIZE, SIZE*0.25, 4, 4)
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.push()
+    love.graphics.translate(e.x + 6, e.y + 8)
+    love.graphics.rotate(e.angle)
+    love.graphics.draw(img, -SIZE/2, -SIZE/2)
+    love.graphics.pop()
 
     love.graphics.push()
     love.graphics.translate(e.x, e.y)
     love.graphics.rotate(e.angle)
-
     local t = e.hit
     love.graphics.setColor(1, 1 - t*0.5, 1 - t*0.5, 1)
     love.graphics.draw(img, -SIZE/2, -SIZE/2)
-
     love.graphics.pop()
+
     love.graphics.setColor(1,1,1,1)
 end
 
