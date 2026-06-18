@@ -17,15 +17,39 @@ local timer = 0
 local img
 local enemyBullets = {}
 
+local function tryShoot(dt, dx, dy)
+    e.shootT = e.shootT - dt
+    if e.shootT <= 0 then
+        e.shootT = e.shootCooldown
+        
+        local spread = 0.08
+        local angle = math.atan2(dy, dx) + (math.random() - 0.5) * spread * 2
+        
+        local speed = BULLET_SPEED + math.random() * 30 - 15
+        table.insert(enemyBullets, {
+            x = e.x + math.cos(angle) * SIZE * 0.6,
+            y = e.y + math.sin(angle) * SIZE * 0.6,
+            vx = math.cos(angle) * speed,
+            vy = math.sin(angle) * speed,
+            life = 4,
+            size = BULLET_SIZE
+        })
+    end
+end
+
 local function spawn(px, py)
     local w, h = love.graphics.getDimensions()
     local minR = math.min(w, h) * 0.30
     local maxR = math.min(w, h) * 0.45
     local a = math.random() * math.pi * 2
     local dist = minR + math.random() * (maxR - minR)
+    
+    local spawnX = math.max(SIZE, math.min(w - SIZE, px + math.cos(a) * dist))
+    local spawnY = math.max(SIZE, math.min(h - SIZE, py + math.sin(a) * dist))
+    
     e = {
-        x = px + math.cos(a) * dist,
-        y = py + math.sin(a) * dist,
+        x = spawnX,
+        y = spawnY,
         hp = MAX_HP,
         hit = 0,
         angle = 0,
@@ -35,7 +59,7 @@ local function spawn(px, py)
         wanderDY = 0,
         atkT = 0,
         shootT = 0,
-        shootCooldown = 1.2
+        shootCooldown = ATTACK_CD
     }
     enemyBullets = {}
 end
@@ -51,8 +75,12 @@ function enemy.reset()
     enemyBullets = {}
 end
 
+function enemy.spawnNow(px, py)
+    spawn(px, py)
+end
+
 function enemy.get()
-    return e, SIZE, MAX_HP
+    return e
 end
 
 function enemy.getBullets()
@@ -74,16 +102,15 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
     local dist = math.sqrt(dx*dx + dy*dy) + 0.0001
     local nx, ny = dx/dist, dy/dist
 
-    if dist < SIGHT then
-        if dist > ATTACK_RANGE then
-            e.state = "chase"
-        elseif dist < KEEP_DIST then
-            e.state = "retreat"
-        else
-            e.state = "attack"
-        end
-    else
+    if dist > SIGHT then
         e.state = "wander"
+    elseif dist > ATTACK_RANGE then
+        e.state = "chase"
+    elseif dist < KEEP_DIST * 0.7 then
+        e.state = "retreat"
+        tryShoot(dt, dx, dy)
+    else
+        e.state = "attack"
     end
 
     if e.state == "chase" then
@@ -93,28 +120,11 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
         e.x = e.x - nx * SPEED * 0.6 * dt
         e.y = e.y - ny * SPEED * 0.6 * dt
     elseif e.state == "attack" then
-        if dist < KEEP_DIST * 0.6 then
-            e.x = e.x - nx * SPEED * 0.4 * dt
-            e.y = e.y - ny * SPEED * 0.4 * dt
+        if dist < KEEP_DIST then
+            e.x = e.x - nx * SPEED * 0.3 * dt
+            e.y = e.y - ny * SPEED * 0.3 * dt
         end
-        
-        e.shootT = e.shootT - dt
-        if e.shootT <= 0 then
-            e.shootT = e.shootCooldown
-            
-            local spread = 0.08
-            local angle = math.atan2(dy, dx) + (math.random() - 0.5) * spread * 2
-            
-            local speed = BULLET_SPEED + math.random() * 30 - 15
-            table.insert(enemyBullets, {
-                x = e.x + math.cos(angle) * SIZE * 0.6,
-                y = e.y + math.sin(angle) * SIZE * 0.6,
-                vx = math.cos(angle) * speed,
-                vy = math.sin(angle) * speed,
-                life = 4,
-                size = BULLET_SIZE
-            })
-        end
+        tryShoot(dt, dx, dy)
     elseif e.state == "wander" then
         e.wanderT = e.wanderT - dt
         if e.wanderT <= 0 then
