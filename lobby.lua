@@ -1,6 +1,7 @@
 local lobby = {}
 
 local btn = { w=220, h=75, x=0, y=0 }
+local btnServer = { w=220, h=55, x=0, y=0 }
 local grad, lastW, lastH = nil, 0, 0
 local fontTitle, fontSub, fontBtn
 
@@ -17,6 +18,8 @@ local function place()
     local w, h = love.graphics.getDimensions()
     btn.x = w/2 - btn.w/2
     btn.y = h/2 + 50
+    btnServer.x = w/2 - btnServer.w/2
+    btnServer.y = btn.y + btn.h + 20
 end
 
 local function drawSpacedText(text, x, y, w, align, font, spacing)
@@ -92,7 +95,13 @@ function lobby.draw()
 
     drawSpacedText("Cubic Battle", 0, h/2 - 150, w, "center", fontTitle, fontTitle:getWidth("A")*0.05)
     drawSpacedText("Touch & Dodge", 0, h/2 - 60, w, "center", fontSub, fontSub:getWidth("A")*0.05)
+    
+    -- Информация о сервере
+    love.graphics.setColor(1,1,1,0.5)
+    love.graphics.setFont(fontSub)
+    love.graphics.printf("Press F1 to start server", 0, h/2 - 30, w, "center")
 
+    -- Кнопка Play
     love.graphics.setColor(0,0,0,0.20)
     love.graphics.rectangle("fill", btn.x+5, btn.y+6, btn.w, btn.h, 16, 16)
 
@@ -104,12 +113,35 @@ function lobby.draw()
     love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 16, 16)
 
     drawSpacedText("Play", btn.x, btn.y + 20, btn.w, "center", fontBtn, fontBtn:getWidth("A")*0.05)
+    
+    -- Кнопка Start Server
+    love.graphics.setColor(0,0,0,0.20)
+    love.graphics.rectangle("fill", btnServer.x+5, btnServer.y+6, btnServer.w, btnServer.h, 16, 16)
+
+    love.graphics.setColor(0.2, 0.7, 0.3, 1)
+    love.graphics.rectangle("fill", btnServer.x, btnServer.y, btnServer.w, btnServer.h, 16, 16)
+
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(3.4)
+    love.graphics.rectangle("line", btnServer.x, btnServer.y, btnServer.w, btnServer.h, 16, 16)
+
+    drawSpacedText("Start Server", btnServer.x, btnServer.y + 12, btnServer.w, "center", fontSub, fontSub:getWidth("A")*0.05)
 end
 
 function lobby.touchpressed(id, x, y)
-    if x>=btn.x and x<=btn.x+btn.w and
-       y>=btn.y and y<=btn.y+btn.h then
+    -- Кнопка Play
+    if x>=btn.x and x<=btn.x+btn.w and y>=btn.y and y<=btn.y+btn.h then
         GameState.current = "game"
+    end
+    
+    -- Кнопка Start Server
+    if x>=btnServer.x and x<=btnServer.x+btnServer.w and 
+       y>=btnServer.y and y<=btnServer.y+btnServer.h then
+        local main = require("main")
+        if main and main.startServer then
+            main.startServer()
+            print("Server started from lobby!")
+        end
     end
 end
 
