@@ -93,7 +93,6 @@ function game.update(dt)
     cam.x = cam.x + (targetX - cam.x) * k
     cam.y = cam.y + (targetY - cam.y) * k
 
-    -- Обновляем пули игрока
     for i=#bullets,1,-1 do
         local b = bullets[i]
         b.x = b.x + b.vx*dt
@@ -111,7 +110,6 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-cam.x, -cam.y)
 
-    -- Фон
     local w,h = love.graphics.getDimensions()
     local tw,th = bg:getWidth(), bg:getHeight()
     local sX = math.floor(cam.x/tw)*tw
@@ -122,16 +120,12 @@ function game.draw()
         end
     end
 
-    -- Пули игрока
-    love.graphics.setColor(0.3, 0.7, 1, 1)
+    -- Пули игрока (чёрные)
+    love.graphics.setColor(0, 0, 0, 1)
     for _,b in ipairs(bullets) do
-        love.graphics.circle("fill", b.x, b.y, 8)
-        love.graphics.setColor(0.5, 0.8, 1, 0.2)
-        love.graphics.circle("fill", b.x, b.y, 16)
-        love.graphics.setColor(0.3, 0.7, 1, 1)
+        love.graphics.circle("fill", b.x, b.y, 6)
     end
 
-    -- Линия прицела
     if controls.isAiming() then
         local ax, ay = controls.getAim()
         love.graphics.setColor(0,0,0,0.55)
@@ -150,40 +144,23 @@ function game.draw()
         )
     end
 
-    -- Враг и его пули
     enemy.draw()
     
-    -- Пули врага (дополнительная отрисовка поверх)
+    -- Пули врага (чёрные)
     local enemyBullets = enemy.getBullets()
     if enemyBullets then
+        love.graphics.setColor(0, 0, 0, 1)
         for _, b in ipairs(enemyBullets) do
-            -- Основная пуля
-            love.graphics.setColor(1, 0.15, 0.15, 1)
-            love.graphics.circle("fill", b.x, b.y, b.size or 10)
-            -- Свечение
-            love.graphics.setColor(1, 0.3, 0.3, 0.15)
-            love.graphics.circle("fill", b.x, b.y, (b.size or 10) * 2.5)
-            -- Ядро
-            love.graphics.setColor(1, 0.8, 0.3, 0.8)
-            love.graphics.circle("fill", b.x, b.y, (b.size or 10) * 0.4)
+            love.graphics.circle("fill", b.x, b.y, b.size or 8)
         end
         love.graphics.setColor(1, 1, 1, 1)
     end
 
-    -- HP бар врага
     local e = enemy.get()
     if e then
         drawHPBar(e.x - 28, e.y - 45, 56, 8, e.hp, 5, {0.9,0.2,0.2})
-        
-        -- Индикатор состояния врага
-        if e.state == "attack" then
-            love.graphics.setColor(1,0,0,0.15)
-            love.graphics.circle("fill", e.x, e.y, 80)
-            love.graphics.setColor(1,1,1,1)
-        end
     end
 
-    -- Игрок (тень)
     love.graphics.setColor(0,0,0,0.4)
     love.graphics.push()
     love.graphics.translate(cube.x + 6, cube.y + 8)
@@ -191,7 +168,6 @@ function game.draw()
     love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
     love.graphics.pop()
 
-    -- Игрок (основной)
     love.graphics.push()
     love.graphics.translate(cube.x, cube.y)
     love.graphics.rotate(cube.angle)
@@ -200,13 +176,11 @@ function game.draw()
     love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
     love.graphics.pop()
 
-    love.graphics.pop() -- конец camera
+    love.graphics.pop()
 
-    -- HUD
     love.graphics.setColor(1,1,1,1)
     love.graphics.setFont(font)
 
-    -- HP бар игрока
     local barW, barH = 200, 18
     local px = love.graphics.getWidth() - barW - 20
     local py = 20
@@ -216,12 +190,6 @@ function game.draw()
     love.graphics.printf("HP " .. math.max(0,cube.hp) .. " / " .. PLAYER_HP_MAX,
         px, py + 22, barW, "right")
 
-    -- Количество пуль (для информации)
-    love.graphics.setColor(1,1,1,0.5)
-    love.graphics.printf("Bullets: " .. #bullets,
-        px, py + 42, barW, "right")
-
-    -- Элементы управления
     controls.draw()
 end
 
