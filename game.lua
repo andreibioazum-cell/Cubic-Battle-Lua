@@ -1,178 +1,324 @@
-local lobby = require("lobby")
-local game = require("game")
+local controls = require("controls")
+local enemy = require("enemy")
 
-GameState = { current = "lobby" }
+local game = {}
 
-local isMobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
-local lastTap = 0
-local lastState = nil
+local PLAYER_SIZE = 55
+local PLAYER_HP_MAX = 5
+local BULLET_SPEED = 340 * 1.15
 
--- Сетевая часть для main
+local cube = { x=0, y=0, speed=260, angle=0, hp=PLAYER_HP_MAX, hit=0 }
+local bullets = {}
+local bg, playerImg, font
+local cam = { x=0, y=0 }
+local dead = false
+
+-- Сетевая часть для телефона
 local network = {
-    is_server = false,
-    server_thread = nil,
-    socket = nil
+    connected = false,
+    id = nil,
+    server_ip = "127.0.0.1",
+    server_port = 4080,
+    players = {},
+    enemies = {},
+    bullets = {},
+    name = "Player" .. math.random(1000, 9999)
 }
 
-function love.load()
-    love.graphics.setDefaultFilter("linear", "linear")
+-- Проверка на мобильное устройство
+local isMobile = love.system.getOS() == "Android" or love.system.getOS() == "iOS"
+local socketLib = nil
+
+-- Попытка загрузить socket только если не на мобильном
+if not isMobile then
+    local success, result = pcall(require, "socket")
+    if success then
+        socketLib = result
+    end
+end
+
+-- Подключение к серверу (только на ПК)
+function network.connect()
+    if isMobile then
+        print("Network disabled on mobile")
+        return
+    end
     
-    -- Проверка аргументов командной строки
-    local args = {...}
-    for i, arg in ipairs(args) do
-        if arg == "--server" then
-            network.is_server = true
-            print("Starting in SERVER mode...")
-            start_server()
+    if not socketLib then
+        print("Socket library not available")
+        return
+    end
+    
+    network.socket = socketLib.tcp()
+    network.socket:settimeout(0)
+    local success, err = pcall(function()
+        network.socket:connect(network.server_ip, network.server_port)
+    end)
+    if success then
+        network.connected = true
+        print("Connecting to server...")
+    else
+        print("Failed to connect: " .. tostring(err))
+    end
+end
+
+-- Отправка данных
+function network.send(data)
+    if isMobile or not network.connected or not network.socket then return end
+    local success, err = pcall(function()
+        network.socket:send(data .. "\n")
+    end)
+    if not success then
+        network.connected = false
+    end
+end
+
+-- Получение данных
+function network.receive()
+    if isMobile or not network.connected or not network.socket then return end
+    local data, err = network.socket:receive("*l")
+    if data then
+        if string.sub(data, 1, 10) == "CONNECTED:" then
+            network.id = tonumber(string.sub(data, 11))
+            print("Connected! ID: " .. network.id)
+            network.send("NAME:" .. network.name)
+        elseif string.sub(data, 1, 6) == "STATE:" then
+            -- Игнорируем состояние на телефоне
+        elseif string.sub(data, 1, 5) == "CHAT:" then
+            print("[CHAT] " .. string.sub(data, 6))
         end
+    elseif err == "closed" then
+        network.connected = false
     end
 end
 
--- Запуск сервера
-function start_server()
-    local server = require("server")
-    love.thread.getChannel("server"):push(server)
+local function spawnBullet(x, y, dx, dy)
+    table.insert(bullets, {
+        x=x, y=y,
+        vx=dx*BULLET_SPEED,
+        vy=dy*BULLET_SPEED,
+        life=3
+    })
+end
+
+local function drawHPBar(x, y, w, h, hp, max, color)
+    if hp < 0 then hp = 0 end
+    love.graphics.setColor(0,0,0,0.5)
+    love.graphics.rectangle("fill", x-2, y-2, w+4, h+4, 6, 6)
+    love.graphics.setColor(0.15,0.15,0.15,1)
+    love.graphics.rectangle("fill", x, y, w, h, 4, 4)
+    love.graphics.setColor(color[1], color[2], color[3], 1)
+    love.graphics.rectangle("fill", x, y, w * (hp/max), h, 4, 4)
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", x, y, w, h, 4, 4)
+end
+
+local function onHitPlayer(dmg)
+    if dead then return end
+    cube.hp = cube.hp - dmg
+    cube.hit = 1
+    if cube.hp <= 0 then
+        cube.hp = 0
+        dead = true
+        GameState.current = "lobby"
+    end
+end
+
+function game.load()
+    cube.x, cube.y = 0, 0
+    cube.angle = 0
+    cube.hp = PLAYER_HP_MAX
+    cube.hit = 0
+    dead = false
+    bullets = {}
+    cam.x, cam.y = -love.graphics.getWidth()/2, -love.graphics.getHeight()/2
+
+    bg = bg or love.graphics.newImage("grass.png")
+    if bg then
+        bg:setWrap("repeat","repeat")
+    end
+
+    playerImg = playerImg or love.graphics.newImage("player.png")
+    if playerImg then
+        playerImg:setFilter("nearest","nearest")
+    end
+
+    font = font or love.graphics.newFont("Fredoka-Bold.ttf", 18)
+
+    controls.load()
+    enemy.load()
+    enemy.reset()
     
-    network.server_thread = love.thread.newThread([[
-        local channel = love.thread.getChannel("server")
-        local server = channel:pop()
-        if server then
-            server:start()
-        end
-    ]])
-    network.server_thread:start()
+    -- Подключение к серверу только на ПК
+    if not isMobile then
+        network.connect()
+    end
+end
+
+function game.resize()
+    controls.resize()
+end
+
+function game.update(dt)
+    if dead then return end
+
+    controls.update(dt)
+
+    local dx, dy = controls.getMove()
+    cube.x = cube.x + dx * cube.speed * dt
+    cube.y = cube.y + dy * cube.speed * dt
+
+    if dx ~= 0 or dy ~= 0 then
+        cube.angle = math.atan2(dy, dx) + math.pi/2
+    end
+
+    cube.hit = math.max(0, cube.hit - dt*3)
+
+    local targetX = cube.x - love.graphics.getWidth()/2
+    local targetY = cube.y - love.graphics.getHeight()/2
+    local k = 1 - math.exp(-dt * 7.3)
+    cam.x = cam.x + (targetX - cam.x) * k
+    cam.y = cam.y + (targetY - cam.y) * k
+
+    -- Обновляем пули игрока
+    for i=#bullets,1,-1 do
+        local b = bullets[i]
+        b.x = b.x + b.vx*dt
+        b.y = b.y + b.vy*dt
+        b.life = b.life - dt
+        if b.life <= 0 then table.remove(bullets,i) end
+    end
+
+    -- Локальный враг
+    enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
     
-    print("Server started on port 4080")
-    print("Press ESC to stop server")
-end
-
-function love.update(dt)
-    if dt > 0.05 then dt = 0.05 end
-
-    if GameState.current ~= lastState then
-        if GameState.current == "lobby" and lobby.load then lobby.load() end
-        if GameState.current == "game"  and game.load  then game.load()  end
-        lastState = GameState.current
-    end
-
-    if GameState.current == "lobby" then
-        lobby.update(dt)
-    elseif GameState.current == "game" then
-        game.update(dt)
+    -- Отправка данных на сервер (только ПК)
+    if not isMobile and network.connected then
+        network.send(string.format("MOVE:x:%.2f,y:%.2f,angle:%.2f", cube.x, cube.y, cube.angle))
+        network.receive()
     end
 end
 
-function love.draw()
-    if GameState.current == "lobby" then
-        lobby.draw()
-    elseif GameState.current == "game" then
-        game.draw()
-    end
-    
-    -- Отображение информации о сервере
-    if network.is_server and GameState.current == "lobby" then
-        love.graphics.setColor(0, 1, 0, 0.8)
-        love.graphics.setFont(love.graphics.newFont(14))
-        love.graphics.print("SERVER RUNNING ON PORT 4080", 10, love.graphics.getHeight() - 30)
-        love.graphics.print("Players online: " .. get_players_count(), 10, love.graphics.getHeight() - 50)
-        love.graphics.setColor(1, 1, 1, 1)
-    end
-end
+function game.draw()
+    love.graphics.setColor(1,1,1,1)
 
--- Получение количества игроков
-function get_players_count()
-    local server = require("server")
-    if server and server.clients then
-        return #server.clients
-    end
-    return 0
-end
+    love.graphics.push()
+    love.graphics.translate(-cam.x, -cam.y)
 
-function love.resize(w, h)
-    if lobby.resize then lobby.resize(w, h) end
-    if game.resize  then game.resize(w, h)  end
-end
-
-local function dispatch(fn, id, x, y)
-    local s = GameState.current
-    if s == "lobby" and lobby[fn] then lobby[fn](id, x, y)
-    elseif s == "game" and game[fn] then game[fn](id, x, y) end
-end
-
-function love.touchpressed(id, x, y)
-    local now = love.timer.getTime()
-    if now - lastTap < 0.05 then return end
-    lastTap = now
-    dispatch("touchpressed", id, x, y)
-end
-
-function love.touchmoved(id, x, y)
-    dispatch("touchmoved", id, x, y)
-end
-
-function love.touchreleased(id, x, y)
-    dispatch("touchreleased", id, x, y)
-end
-
-function love.mousepressed(x, y)
-    if isMobile then return end
-    love.touchpressed(1, x, y)
-end
-
-function love.mousemoved(x, y)
-    if isMobile then return end
-    if love.mouse.isDown(1) then love.touchmoved(1, x, y) end
-end
-
-function love.mousereleased(x, y)
-    if isMobile then return end
-    love.touchreleased(1, x, y)
-end
-
-function love.keypressed(key)
-    if key == "escape" then
-        if network.is_server then
-            print("Stopping server...")
-            if network.server_thread then
-                network.server_thread:terminate()
+    local w,h = love.graphics.getDimensions()
+    if bg then
+        local tw,th = bg:getWidth(), bg:getHeight()
+        local sX = math.floor(cam.x/tw)*tw
+        local sY = math.floor(cam.y/th)*th
+        for x=sX, sX+w+tw, tw do
+            for y=sY, sY+h+th, th do
+                love.graphics.draw(bg, x, y)
             end
-            love.event.quit()
         end
     end
+
+    -- Пули игрока
+    love.graphics.setColor(0, 0, 0, 1)
+    for _,b in ipairs(bullets) do
+        love.graphics.circle("fill", b.x, b.y, 6)
+    end
+
+    -- Линия прицела
+    if controls.isAiming() then
+        local ax, ay = controls.getAim()
+        love.graphics.setColor(0,0,0,0.55)
+        love.graphics.setLineWidth(16)
+        love.graphics.line(
+            cube.x, cube.y,
+            cube.x + ax*180,
+            cube.y + ay*180
+        )
+        love.graphics.setLineWidth(3)
+        love.graphics.setColor(1,1,1,0.3)
+        love.graphics.line(
+            cube.x, cube.y,
+            cube.x + ax*180,
+            cube.y + ay*180
+        )
+    end
+
+    -- Рисуем врагов
+    enemy.draw()
     
-    -- Переключение режима сервера по F1
-    if key == "f1" and not network.is_server then
-        print("Starting server...")
-        start_server()
-        network.is_server = true
+    -- Рисуем других игроков (только ПК)
+    if not isMobile then
+        for id, player in pairs(network.players) do
+            if id ~= network.id then
+                love.graphics.setColor(0.8, 0.8, 1, 1)
+                love.graphics.rectangle("fill", player.x - 20, player.y - 20, 40, 40)
+                love.graphics.setColor(1, 1, 1, 1)
+            end
+        end
     end
-    
-    -- Чат по Enter
-    if key == "return" or key == "enter" then
-        if GameState.current == "game" and game.chat_input then
-            game.chat_input = true
+
+    -- HP бар врага
+    local e = enemy.get()
+    if e then
+        drawHPBar(e.x - 28, e.y - 45, 56, 8, e.hp, 5, {0.9,0.2,0.2})
+    end
+
+    -- Игрок
+    if playerImg then
+        love.graphics.setColor(0,0,0,0.4)
+        love.graphics.push()
+        love.graphics.translate(cube.x + 6, cube.y + 8)
+        love.graphics.rotate(cube.angle)
+        love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
+        love.graphics.pop()
+
+        love.graphics.push()
+        love.graphics.translate(cube.x, cube.y)
+        love.graphics.rotate(cube.angle)
+        local t = cube.hit
+        love.graphics.setColor(1, 1 - t*0.6, 1 - t*0.6, 1)
+        love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
+        love.graphics.pop()
+    end
+
+    love.graphics.pop()
+
+    -- HUD
+    love.graphics.setColor(1,1,1,1)
+    if font then
+        love.graphics.setFont(font)
+    end
+
+    local barW, barH = 200, 18
+    local px = love.graphics.getWidth() - barW - 20
+    local py = 20
+    drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
+
+    love.graphics.setColor(1,1,1,1)
+    if font then
+        love.graphics.printf("HP " .. math.max(0,cube.hp) .. " / " .. PLAYER_HP_MAX,
+            px, py + 22, barW, "right")
+    end
+
+    controls.draw()
+end
+
+function game.touchpressed(id,x,y)
+    controls.touchpressed(id,x,y)
+end
+
+function game.touchmoved(id,x,y)
+    controls.touchmoved(id,x,y)
+end
+
+function game.touchreleased(id,x,y)
+    local shot, dx, dy = controls.touchreleased(id)
+    if shot then
+        spawnBullet(cube.x, cube.y, dx, dy)
+        if not isMobile and network.connected then
+            network.send(string.format("SHOOT:dx:%.2f,dy:%.2f", dx, dy))
         end
     end
 end
 
-function love.textinput(text)
-    if GameState.current == "game" and game.chat_input then
-        if not game.chat_message then game.chat_message = "" end
-        game.chat_message = game.chat_message .. text
-    end
-end
-
-function love.quit()
-    if network.is_server then
-        print("Shutting down server...")
-        if network.server_thread then
-            network.server_thread:terminate()
-        end
-    end
-    print("Goodbye!")
-end
-
-return {
-    isServer = network.is_server,
-    startServer = start_server
-}
+return game
