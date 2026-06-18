@@ -1,4 +1,4 @@
- function love.conf(t)
+function love.conf(t)
     t.identity = "cubicbattle"
     t.version = "11.5"
     t.window.title = "Cubic Battle"
