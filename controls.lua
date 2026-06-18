@@ -6,6 +6,7 @@ local back = { x=20, y=20, w=140, h=55 }
 
 local font
 local aimDx, aimDy = 0, -1
+local onBackCallback = nil
 
 local function place()
     local w,h = love.graphics.getDimensions()
@@ -33,7 +34,13 @@ local function drawSpacedText(text, x, y, w, align, font, spacing, alpha)
     end
     totalW = totalW + spacing * (#text - 1)
 
-    local startX = x + (w - totalW)/2
+    local startX
+    if align == "center" then
+        startX = x + (w - totalW) / 2
+    else
+        startX = x
+    end
+    
     local outline = 2
 
     love.graphics.setColor(0,0,0,alpha)
@@ -86,10 +93,16 @@ end
 function controls.isAiming() return atk.hold end
 function controls.getAim() return aimDx, aimDy end
 
+function controls.setOnBack(fn)
+    onBackCallback = fn
+end
+
 function controls.touchpressed(id,x,y)
     if x>=back.x and x<=back.x+back.w and
        y>=back.y and y<=back.y+back.h then
-        GameState.current = "lobby"
+        if onBackCallback then
+            onBackCallback()
+        end
         return
     end
 
@@ -133,6 +146,7 @@ function controls.touchreleased(id)
         atk.hold = false
         return true, aimDx, aimDy
     end
+    return false
 end
 
 function controls.draw()
