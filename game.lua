@@ -38,6 +38,7 @@ local bg, playerImg, diamondImg, font
 local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
+local shop_open = false
 
 -- ═══════════════════════════════════════════════════════════
 -- МАГАЗИН И ДЕНЬГИ
@@ -45,7 +46,6 @@ local onDeathCallback = nil
 
 local coins = 0
 local selected_skin = "default"
-local shop_open = false
 
 -- Скины
 local skins = {
@@ -79,39 +79,17 @@ local abilities = {
 }
 
 -- ═══════════════════════════════════════════════════════════
--- ОБЪЕКТЫ МИРА
+-- ЗАГРУЗКА РЕСУРСОВ
 -- ═══════════════════════════════════════════════════════════
 
-local world_objects = {}
-
-local function generateWorld()
-    world_objects = {}
-    
-    for i = 1, 80 do
-        table.insert(world_objects, {
-            type = "tree",
-            x = math.random(100, WORLD_WIDTH - 100),
-            y = math.random(100, WORLD_HEIGHT - 100),
-            size = math.random(30, 60)
-        })
-    end
-    
-    for i = 1, 40 do
-        table.insert(world_objects, {
-            type = "rock",
-            x = math.random(100, WORLD_WIDTH - 100),
-            y = math.random(100, WORLD_HEIGHT - 100),
-            size = math.random(15, 35)
-        })
-    end
-    
-    for i = 1, 60 do
-        table.insert(world_objects, {
-            type = "bush",
-            x = math.random(100, WORLD_WIDTH - 100),
-            y = math.random(100, WORLD_HEIGHT - 100),
-            size = math.random(10, 25)
-        })
+local function loadTexture(path)
+    local success, img = pcall(love.graphics.newImage, path)
+    if success then
+        return img
+    else
+        print("File not found: " .. path .. " (using fallback)")
+        local fallback = love.graphics.newImage(love.image.newImageData(64, 64))
+        return fallback
     end
 end
 
@@ -130,46 +108,6 @@ local function drawHPBar(x, y, w, h, hp, max, color)
     love.graphics.setColor(0, 0, 0, 1)
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", x, y, w, h, 4, 4)
-end
-
-local function drawWorldObjects()
-    for _, obj in ipairs(world_objects) do
-        if obj.type == "tree" then
-            love.graphics.setColor(0.4, 0.25, 0.1, 1)
-            love.graphics.rectangle("fill", obj.x - 4, obj.y - obj.size/2, 8, obj.size * 0.6)
-            love.graphics.setColor(0.1, 0.5, 0.1, 1)
-            love.graphics.circle("fill", obj.x, obj.y - obj.size * 0.3, obj.size * 0.5)
-            love.graphics.setColor(0.05, 0.4, 0.05, 1)
-            love.graphics.circle("fill", obj.x - obj.size * 0.2, obj.y - obj.size * 0.5, obj.size * 0.4)
-            love.graphics.circle("fill", obj.x + obj.size * 0.2, obj.y - obj.size * 0.5, obj.size * 0.4)
-        elseif obj.type == "rock" then
-            love.graphics.setColor(0.4, 0.4, 0.4, 1)
-            love.graphics.circle("fill", obj.x, obj.y, obj.size)
-            love.graphics.setColor(0.5, 0.5, 0.5, 0.5)
-            love.graphics.circle("fill", obj.x - obj.size * 0.2, obj.y - obj.size * 0.2, obj.size * 0.4)
-        elseif obj.type == "bush" then
-            love.graphics.setColor(0.2, 0.6, 0.1, 1)
-            love.graphics.circle("fill", obj.x, obj.y, obj.size)
-            love.graphics.setColor(0.15, 0.5, 0.08, 1)
-            love.graphics.circle("fill", obj.x - obj.size * 0.3, obj.y + obj.size * 0.1, obj.size * 0.6)
-            love.graphics.circle("fill", obj.x + obj.size * 0.3, obj.y + obj.size * 0.1, obj.size * 0.6)
-        end
-    end
-end
-
--- ═══════════════════════════════════════════════════════════
--- ЗАГРУЗКА РЕСУРСОВ (ПРЯМО ИЗ КОРНЯ)
--- ═══════════════════════════════════════════════════════════
-
-local function loadTexture(path)
-    local success, img = pcall(love.graphics.newImage, path)
-    if success then
-        return img
-    else
-        print("⚠️ File not found: " .. path .. " (using fallback)")
-        local fallback = love.graphics.newImage(love.image.newImageData(64, 64))
-        return fallback
-    end
 end
 
 -- ═══════════════════════════════════════════════════════════
@@ -196,7 +134,7 @@ local function onHitPlayer(dmg)
     if selected_skin == "diamond" and abilities.shield.timer > 0 then
         abilities.shield.active = true
         abilities.shield.timer = abilities.shield.timer - 1
-        print("🛡️ Shield blocked damage!")
+        print("Shield blocked damage!")
         return
     end
     
@@ -212,12 +150,12 @@ local function onHitPlayer(dmg)
 end
 
 -- ═══════════════════════════════════════════════════════════
--- ПОБЕДА НАД ВРАГОМ
+-- ПОБЕДА НАД БОССОМ
 -- ═══════════════════════════════════════════════════════════
 
 local function onEnemyDefeated()
-    coins = coins + 10
-    print("💰 +10 coins! Total: " .. coins)
+    coins = coins + 50
+    print("+50 Cubicoins! Total: " .. coins)
     GameState.current = "lobby"
 end
 
@@ -248,7 +186,7 @@ function game.load()
         skins.diamond.owned = true
     end
 
-    -- 🔥 ЗАГРУЗКА ИЗ КОРНЯ (БЕЗ assets/)
+    -- Загрузка текстур
     bg = loadTexture("grass.png")
     if bg then bg:setWrap("repeat", "repeat") end
 
@@ -264,8 +202,6 @@ function game.load()
     enemy.load()
     enemy.reset()
     enemy.spawnNow(cube.x, cube.y)
-    
-    generateWorld()
 
     enemy.setDeathCallback(onEnemyDefeated)
 
@@ -347,8 +283,6 @@ function game.draw()
         end
     end
 
-    drawWorldObjects()
-
     for _, b in ipairs(bullets) do
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
@@ -366,7 +300,7 @@ function game.draw()
 
     enemy.draw()
 
-    -- ОТРИСОВКА ИГРОКА
+    -- Отрисовка игрока
     if playerImg then
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.push()
@@ -407,7 +341,7 @@ function game.draw()
         if selected_skin == "diamond" then
             love.graphics.setColor(0.2, 0.8, 1, 0.8)
             love.graphics.setFont(font)
-            local shield_text = "🛡️ " .. math.floor(abilities.shield.timer) .. "s"
+            local shield_text = "Shield " .. math.floor(abilities.shield.timer) .. "s"
             love.graphics.print(shield_text, cube.x - 20, cube.y - 70)
         end
     end
@@ -425,23 +359,26 @@ function game.draw()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("HP " .. math.max(0, cube.hp), margin, margin + barH + 4)
 
+    -- Cubicoins
     love.graphics.setColor(1, 1, 0, 0.9)
-    love.graphics.print("💰 " .. coins, margin, margin + barH + 30)
+    love.graphics.print("Cubicoins: " .. coins, margin, margin + barH + 30)
 
+    -- HP босса
     local e_obj = enemy.get()
     if e_obj then
         local ex = love.graphics.getWidth() - barW - margin
         drawHPBar(ex, margin, barW, barH, e_obj.hp, 5, {0.9, 0.2, 0.2})
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.print("ENEMY " .. math.max(0, e_obj.hp), ex, margin + barH + 4)
+        love.graphics.print("BOSS " .. math.max(0, e_obj.hp), ex, margin + barH + 4)
     end
 
-    local shop_btn_x = love.graphics.getWidth() / 2 - 50
+    -- Кнопка SHOP
+    local shop_btn_x = love.graphics.getWidth() / 2 - 60
     local shop_btn_y = 10
     love.graphics.setColor(0.4, 0.2, 0.8, 0.9)
-    love.graphics.rectangle("fill", shop_btn_x, shop_btn_y, 100, 35, 8, 8)
+    love.graphics.rectangle("fill", shop_btn_x, shop_btn_y, 120, 35, 8, 8)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("🛒 SHOP", shop_btn_x + 15, shop_btn_y + 8)
+    love.graphics.print("SHOP", shop_btn_x + 35, shop_btn_y + 8)
 
     controls.draw()
 end
@@ -450,9 +387,10 @@ function game.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
     local h = love.graphics.getHeight()
     
-    local shop_btn_x = w/2 - 50
+    -- Кнопка SHOP
+    local shop_btn_x = w/2 - 60
     local shop_btn_y = 10
-    if x >= shop_btn_x and x <= shop_btn_x + 100 and y >= shop_btn_y and y <= shop_btn_y + 35 then
+    if x >= shop_btn_x and x <= shop_btn_x + 120 and y >= shop_btn_y and y <= shop_btn_y + 35 then
         shop_open = not shop_open
         return
     end
