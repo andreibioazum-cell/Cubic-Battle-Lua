@@ -1,5 +1,5 @@
 function love.conf(t)
-    t.identity = "com.CB3"
+    t.identity = "CubicBattle3"
     t.version = "12.0"
     t.window.title = "Cubic Battle 3"
     t.window.fullscreen = true
