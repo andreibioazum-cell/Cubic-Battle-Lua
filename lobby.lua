@@ -3,10 +3,8 @@ local lobby = {}
 local fontTitle, fontBtn, fontSmall
 local animTimer = 0
 local game = nil
-local connecting = false
 local connect_error = ""
-local input_ip = ""
-local input_port = "12345"
+local input_room = ""
 local show_join_menu = false
 local input_active = false
 local keyboard_visible = false
@@ -18,40 +16,40 @@ local function tryLoadGame()
     return game
 end
 
-local function connectToServer(ip, port)
-    if connecting then return end
-    
+local function hostGame()
     local g = tryLoadGame()
     if not g then return end
     
-    connecting = true
-    connect_error = ""
+    connect_error = "⏳ Создание комнаты..."
     
-    local success = g.connect(ip, tonumber(port) or 12345)
-    
-    if success then
-        g.setMode("client")
-        GameState.current = "game"
-    else
-        connect_error = g.getConnectError() or "❌ Не удалось подключиться"
-    end
-    
-    connecting = false
-end
-
-local function hostServer(port)
-    local g = tryLoadGame()
-    if not g then return end
-    
-    connect_error = "⏳ Запуск сервера..."
-    
-    local success = g.hostGame(tonumber(port) or 12345)
+    local success = g.hostGame()
     
     if success then
         connect_error = ""
         GameState.current = "game"
     else
-        connect_error = g.getConnectError() or "❌ Ошибка создания сервера"
+        connect_error = "❌ Ошибка создания комнаты"
+    end
+end
+
+local function joinRoom(room_id)
+    local g = tryLoadGame()
+    if not g then return end
+    
+    if room_id == "" then
+        connect_error = "❌ Введите ID комнаты"
+        return
+    end
+    
+    connect_error = "⏳ Подключение..."
+    
+    local success = g.joinRoom(room_id)
+    
+    if success then
+        connect_error = ""
+        GameState.current = "game"
+    else
+        connect_error = "❌ Комната не найдена"
     end
 end
 
@@ -73,22 +71,22 @@ local function updateButtons()
     makeButton("🏠 OFFLINE GAME", startY, function()
         local g = tryLoadGame()
         if g then
-            g.disconnect()
+            g.leaveRoom()
             g.setMode("offline")
             g.load()
             GameState.current = "game"
         end
     end, {0.2, 0.6, 0.8})
     
-    makeButton("👑 CREATE SERVER", startY + 65, function()
-        hostServer(12345)
-    end, {0.8, 0.5, 0.2})
+    makeButton("🔥 CREATE ROOM", startY + 65, function()
+        hostGame()
+    end, {0.8, 0.3, 0.1})
     
-    makeButton("🔗 JOIN GAME", startY + 130, function()
+    makeButton("🔗 JOIN ROOM", startY + 130, function()
         show_join_menu = true
+        input_room = ""
         input_active = true
         keyboard_visible = true
-        input_ip = ""
         connect_error = ""
     end, {0.2, 0.7, 0.4})
     
@@ -106,8 +104,7 @@ function lobby.load()
     updateButtons()
     animTimer = 0
     show_join_menu = false
-    input_ip = ""
-    input_port = "12345"
+    input_room = ""
     input_active = false
     keyboard_visible = false
     connect_error = ""
@@ -197,7 +194,11 @@ function lobby.draw()
         love.graphics.setFont(fontBtn)
         love.graphics.printf("🔗 ПОДКЛЮЧЕНИЕ", panel_x, panel_y + 15, panel_w, "center")
         
-        local input_y = panel_y + 60
+        love.graphics.setColor(0.2, 0.2, 0.3, 0.5)
+        love.graphics.setFont(fontSmall)
+        love.graphics.printf("Введите ID комнаты:", panel_x, panel_y + 55, panel_w, "center")
+        
+        local input_y = panel_y + 80
         love.graphics.setColor(0.05, 0.05, 0.1, 1)
         love.graphics.rectangle("fill", panel_x + 20, input_y, panel_w - 40, 45, 8, 8)
         love.graphics.setColor(0.3, 0.3, 0.6, 0.5)
@@ -206,9 +207,9 @@ function lobby.draw()
         
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setFont(fontSmall)
-        local display_text = input_ip
+        local display_text = input_room
         if display_text == "" then
-            display_text = "Введите IP (пример: 192.168.1.100)"
+            display_text = "Введите ID (например: room_1234)"
             love.graphics.setColor(0.5, 0.5, 0.5, 1)
         else
             love.graphics.setColor(0, 1, 0, 1)
@@ -232,12 +233,6 @@ function lobby.draw()
         drawKeyboard(panel_x, panel_y + panel_h + 10, panel_w)
     end
     
-    if connecting then
-        love.graphics.setColor(1, 0.9, 0, 0.7)
-        love.graphics.setFont(fontBtn)
-        love.graphics.printf("⏳ Подключение...", 0, h - 60, w, "center")
-    end
-    
     if connect_error ~= "" then
         love.graphics.setColor(1, 0.3, 0.3, 0.8)
         love.graphics.setFont(fontSmall)
@@ -254,12 +249,14 @@ function drawKeyboard(panel_x, panel_y, panel_w)
     
     local keys = {
         {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
-        {".", "⌫", "ОК"}
+        {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
+        {"k", "l", "m", "n", "o", "p", "q", "r", "s", "t"},
+        {"u", "v", "w", "x", "y", "z", "_", "-", "⌫", "ОК"}
     }
     
-    local key_w = 55
-    local key_h = 50
-    local spacing = 6
+    local key_w = 42
+    local key_h = 40
+    local spacing = 3
     
     for row, row_keys in ipairs(keys) do
         local row_w = #row_keys * (key_w + spacing) - spacing
@@ -277,15 +274,15 @@ function drawKeyboard(panel_x, panel_y, panel_w)
                 love.graphics.setColor(0.2, 0.2, 0.3, 0.9)
             end
             
-            love.graphics.rectangle("fill", bx, by, key_w, key_h, 8, 8)
+            love.graphics.rectangle("fill", bx, by, key_w, key_h, 6, 6)
             love.graphics.setColor(0.4, 0.4, 0.6, 0.3)
             love.graphics.setLineWidth(1)
-            love.graphics.rectangle("line", bx, by, key_w, key_h, 8, 8)
+            love.graphics.rectangle("line", bx, by, key_w, key_h, 6, 6)
             
             love.graphics.setColor(1, 1, 1, 1)
             love.graphics.setFont(fontSmall)
             local text_w = fontSmall:getWidth(k)
-            love.graphics.print(k, bx + key_w/2 - text_w/2, by + key_h/2 - 14)
+            love.graphics.print(k, bx + key_w/2 - text_w/2, by + key_h/2 - 12)
         end
     end
     
@@ -300,7 +297,6 @@ end
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    local h = love.graphics.getHeight()
     
     if show_join_menu then
         local panel_w = math.min(350, w - 40)
@@ -313,8 +309,8 @@ function lobby.touchpressed(id, x, y)
         
         if x >= panel_x + 15 and x <= panel_x + 15 + btn_w and 
            y >= btn_y and y <= btn_y + 40 then
-            if input_ip ~= "" then
-                connectToServer(input_ip, input_port)
+            if input_room ~= "" then
+                joinRoom(input_room)
                 show_join_menu = false
                 keyboard_visible = false
                 input_active = false
@@ -369,19 +365,17 @@ end
 
 function handleKeyPress(key)
     if key == "⌫" then
-        input_ip = input_ip:sub(1, -2)
+        input_room = input_room:sub(1, -2)
     elseif key == "ОК" then
-        if input_ip ~= "" then
-            connectToServer(input_ip, input_port)
+        if input_room ~= "" then
+            joinRoom(input_room)
             show_join_menu = false
             keyboard_visible = false
             input_active = false
         end
     else
-        if string.match(key, "[0-9.]") then
-            if #input_ip < 25 then
-                input_ip = input_ip .. key
-            end
+        if #input_room < 25 then
+            input_room = input_room .. key
         end
     end
 end
@@ -389,8 +383,8 @@ end
 function lobby.keypressed(key)
     if show_join_menu and input_active then
         if key == "return" or key == "enter" or key == "kpenter" then
-            if input_ip ~= "" then
-                connectToServer(input_ip, input_port)
+            if input_room ~= "" then
+                joinRoom(input_room)
                 show_join_menu = false
                 input_active = false
             end
@@ -404,15 +398,15 @@ function lobby.keypressed(key)
         end
         
         if key == "backspace" then
-            input_ip = input_ip:sub(1, -2)
+            input_room = input_room:sub(1, -2)
             return
         end
         
         if #key == 1 then
             local char = key
-            if string.match(char, "[0-9.]") then
-                if #input_ip < 25 then
-                    input_ip = input_ip .. char
+            if string.match(char, "[a-zA-Z0-9_-]") then
+                if #input_room < 25 then
+                    input_room = input_room .. char
                 end
             end
         end
