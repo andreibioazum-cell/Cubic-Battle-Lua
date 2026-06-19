@@ -250,9 +250,20 @@ function game.leaveRoom()
     game.setMode("offline")
 end
 
+-- ============================================================
+-- ⭐ ГЛАВНОЕ ИСПРАВЛЕНИЕ: УДАЛЯЕМ ВРАГА В ОНЛАЙНЕ
+-- ============================================================
+
 function game.setMode(new_mode)
     mode = new_mode
-    print("Mode: " .. mode)
+    
+    -- ✅ УДАЛЯЕМ ВРАГА ПРИ ПЕРЕХОДЕ В ОНЛАЙН
+    if mode == "firebase_host" or mode == "firebase_client" then
+        enemy.reset()
+        print("🗑️ Enemy removed for online mode")
+    end
+    
+    print("🎮 Mode: " .. mode)
 end
 
 function game.startListener()
@@ -392,10 +403,12 @@ function game.update(dt)
         end
     end
 
+    -- ✅ ОФФЛАЙН: враг есть
     if mode == "offline" then
         enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
     end
     
+    -- ✅ ОНЛАЙН: врага НЕТ!
     if mode == "firebase_host" or mode == "firebase_client" then
         last_send = last_send + dt
         if last_send >= send_interval then
@@ -447,10 +460,12 @@ function game.draw()
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
     end
 
+    -- ✅ ОФФЛАЙН: рисуем врага
     if mode == "offline" then
         enemy.draw()
     end
     
+    -- ✅ ОНЛАЙН: рисуем других игроков
     if mode == "firebase_host" or mode == "firebase_client" then
         for pid, p in pairs(players) do
             if pid ~= player_id and p.alive ~= false then
@@ -511,6 +526,7 @@ function game.draw()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("HP " .. math.max(0, cube.hp), margin, margin + barH + 4)
 
+    -- ✅ ОФФЛАЙН: HP врага
     if mode == "offline" then
         local e_obj = enemy.get()
         if e_obj then
