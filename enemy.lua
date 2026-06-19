@@ -64,8 +64,15 @@ local function spawn(px, py)
 end
 
 function enemy.load()
-    img = love.graphics.newImage("player.png")
-    img:setFilter("nearest", "nearest")
+    -- 🔥 ЗАГРУЗКА ИЗ КОРНЯ (БЕЗ assets/)
+    local success, loaded_img = pcall(love.graphics.newImage, "player.png")
+    if success then
+        img = loaded_img
+    else
+        print("⚠️ player.png not found, using fallback")
+        img = love.graphics.newImage(love.image.newImageData(55, 55))
+    end
+    if img then img:setFilter("nearest", "nearest") end
 end
 
 function enemy.reset()
@@ -181,20 +188,22 @@ function enemy.draw()
         love.graphics.circle("fill", b.x, b.y, b.size)
     end
 
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.push()
-    love.graphics.translate(e.x + 6, e.y + 8)
-    love.graphics.rotate(e.angle)
-    love.graphics.draw(img, -SIZE / 2, -SIZE / 2)
-    love.graphics.pop()
+    if img then
+        love.graphics.setColor(0, 0, 0, 0.4)
+        love.graphics.push()
+        love.graphics.translate(e.x + 6, e.y + 8)
+        love.graphics.rotate(e.angle)
+        love.graphics.draw(img, -SIZE / 2, -SIZE / 2)
+        love.graphics.pop()
 
-    love.graphics.push()
-    love.graphics.translate(e.x, e.y)
-    love.graphics.rotate(e.angle)
-    local t = e.hit
-    love.graphics.setColor(1, 1 - t * 0.5, 1 - t * 0.5, 1)
-    love.graphics.draw(img, -SIZE / 2, -SIZE / 2)
-    love.graphics.pop()
+        love.graphics.push()
+        love.graphics.translate(e.x, e.y)
+        love.graphics.rotate(e.angle)
+        local t = e.hit
+        love.graphics.setColor(1, 1 - t * 0.5, 1 - t * 0.5, 1)
+        love.graphics.draw(img, -SIZE / 2, -SIZE / 2)
+        love.graphics.pop()
+    end
 
     love.graphics.setColor(1, 1, 1, 1)
 end
