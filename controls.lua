@@ -1,10 +1,15 @@
 local controls = {}
 local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
 local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
-local font
+local font = nil
 
 function controls.load()
-    font = love.graphics.newFont("Fredoka-Bold.ttf", 20)
+    local success, err = pcall(function()
+        font = love.graphics.newFont("Fredoka-Bold.ttf", 20)
+    end)
+    if not success then
+        font = love.graphics.newFont(20)  -- fallback шрифт
+    end
     controls.resize()
 end
 
@@ -69,12 +74,16 @@ function controls.touchreleased(id)
         atk.hold = false
         shot = true
         dx, dy = controls.getAim()
-        if dx == 0 and dy == 0 then dy = -1 end -- Стрельба вверх по умолчанию
+        if dx == 0 and dy == 0 then dy = -1 end
     end
     return shot, dx, dy
 end
 
 function controls.draw()
+    if not font then
+        controls.load()  -- Если шрифт не загружен - загружаем
+    end
+    
     love.graphics.setColor(0,0,0,0.5)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
     love.graphics.setColor(1,1,1)
@@ -83,8 +92,10 @@ function controls.draw()
     love.graphics.setColor(0.5, 0, 1, 0.6)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
     love.graphics.setColor(1,1,1)
-    love.graphics.setFont(font)
-    love.graphics.printf("Shot", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
+    if font then
+        love.graphics.setFont(font)
+        love.graphics.printf("Shot", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
+    end
 end
 
 return controls
