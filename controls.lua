@@ -2,9 +2,9 @@ local controls = {}
 
 local joy  = { id = nil, cx = 0, cy = 0, sx = 0, sy = 0, r = 50, sr = 20 }
 local atk  = { id = nil, x = 0, y = 0, r = 55, hold = false, press = 0 }
-local back = { x = 20, y = 20, w = 120, h = 50 }
+local back = { x = 0, y = 0, w = 120, h = 44 }
 
-local font
+local font, fontBack
 local aimDx, aimDy = 0, -1
 local onBackCallback = nil
 
@@ -17,6 +17,8 @@ local function place()
     end
     atk.x = w - 90
     atk.y = h - 90
+    back.x = w/2 - back.w/2
+    back.y = 16
 end
 
 local function drawSpacedText(text, x, y, w, align, font, spacing, alpha)
@@ -67,6 +69,7 @@ end
 
 function controls.load()
     font = love.graphics.newFont("Fredoka-Bold.ttf", 22)
+    fontBack = love.graphics.newFont("Fredoka-Bold.ttf", 18)
     place()
 end
 
@@ -173,14 +176,26 @@ function controls.draw()
     drawSpacedText("Shot", -atk.r, -12, atk.r * 2, "center", font, font:getWidth("A") * 0.05, textAlpha)
     love.graphics.pop()
 
+    -- Back (ТОЧНО как кнопки в лобби: тень, заливка, блик, обводка)
+    local bw, bh = back.w, back.h
+    local bx, by = back.x, back.y
+    
     love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", back.x + 3, back.y + 3, back.w, back.h, 10, 10)
-    love.graphics.setColor(0.45, 0.15, 0.75, 0.8)
-    love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 10, 10)
-    love.graphics.setColor(0, 0, 0, 0.6)
-    love.graphics.setLineWidth(2.5)
-    love.graphics.rectangle("line", back.x, back.y, back.w, back.h, 10, 10)
-    drawSpacedText("Back", back.x, back.y + back.h/2 - 10, back.w, "center", font, font:getWidth("A") * 0.05, 1)
+    love.graphics.rectangle("fill", bx + 3, by + 3, bw, bh, 12, 12)
+    
+    love.graphics.setColor(0.45, 0.15, 0.75, 0.85)
+    love.graphics.rectangle("fill", bx, by, bw, bh, 12, 12)
+    
+    love.graphics.setColor(0.6, 0.3, 0.9, 0.4)
+    love.graphics.rectangle("fill", bx + 3, by + 2, bw - 6, bh/2, 12, 12)
+    
+    love.graphics.setColor(0.8, 0.7, 1, 0.6)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", bx, by, bw, bh, 12, 12)
+    
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setFont(fontBack)
+    love.graphics.printf("Back", bx, by + bh/2 - 10, bw, "center")
 
     love.graphics.setColor(1, 1, 1, 1)
 end
