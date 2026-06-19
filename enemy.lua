@@ -6,16 +6,15 @@ local SIGHT = 650
 local ATTACK_RANGE = 300
 local KEEP_DIST = 120
 local MAX_HP = 5
-local RESPAWN = 2
 local ATTACK_CD = 1.2
 local DAMAGE = 1
 local BULLET_SPEED = 250
 local BULLET_SIZE = 8
 
 local e
-local timer = 0
 local img
 local enemyBullets = {}
+local onEnemyDeath = nil
 
 local function tryShoot(dt, dx, dy)
     e.shootT = e.shootT - dt
@@ -71,7 +70,6 @@ end
 
 function enemy.reset()
     e = nil
-    timer = 0
     enemyBullets = {}
 end
 
@@ -83,19 +81,16 @@ function enemy.get()
     return e
 end
 
+function enemy.setDeathCallback(fn)
+    onEnemyDeath = fn
+end
+
 function enemy.getBullets()
     return enemyBullets
 end
 
 function enemy.update(dt, px, py, bullets, onHitPlayer)
-    if not e then
-        timer = timer + dt
-        if timer >= RESPAWN then
-            timer = 0
-            spawn(px, py)
-        end
-        return
-    end
+    if not e then return end
 
     local dx = px - e.x
     local dy = py - e.y
@@ -169,6 +164,9 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
             if e.hp <= 0 then
                 e = nil
                 enemyBullets = {}
+                if onEnemyDeath then
+                    onEnemyDeath()
+                end
                 return
             end
         end
@@ -178,19 +176,10 @@ end
 function enemy.draw()
     if not e then return end
 
+    -- Пули врага (ЧЁРНЫЕ)
     for _, b in ipairs(enemyBullets) do
-        love.graphics.setColor(1, 0.1, 0.1, 0.3)
-        love.graphics.circle("fill", b.x, b.y, b.size + 6)
-
-        love.graphics.setColor(1, 0.15, 0.15, 1)
-        love.graphics.circle("fill", b.x, b.y, b.size)
-
-        love.graphics.setColor(1, 0.7, 0.7, 0.8)
-        love.graphics.circle("fill", b.x - 1, b.y - 1, b.size * 0.4)
-
         love.graphics.setColor(0, 0, 0, 1)
-        love.graphics.setLineWidth(2)
-        love.graphics.circle("line", b.x, b.y, b.size)
+        love.graphics.circle("fill", b.x, b.y, b.size)
     end
 
     love.graphics.setColor(0, 0, 0, 0.4)
