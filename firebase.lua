@@ -1,26 +1,33 @@
 -- firebase.lua
--- ПОЛНОСТЬЮ РАБОЧАЯ ВЕРСИЯ ДЛЯ ТВОЕГО ПРОЕКТА!
+-- Работа с Firebase через HTTP (без SSL)
 
 local firebase = {}
 
 -- ============================================================
--- ТВОИ ДАННЫЕ ИЗ FIREBASE (ВСТАВЛЕНЫ!)
+-- ТВОИ ДАННЫЕ ИЗ FIREBASE
 -- ============================================================
 
 local CONFIG = {
     databaseURL = "https://kek22-985c7-default-rtdb.firebaseio.com/",
     apiKey = "AIzaSyBrZmISt8-VGB5krT1moaJ_8RyoASIwlts",
-    authDomain = "kek22-985c7.firebaseapp.com",
-    projectId = "kek22-985c7",
 }
 
 -- ============================================================
--- HTTP ЗАПРОСЫ (РАБОТАЮТ НА LÖVE)
+-- HTTP ЗАПРОСЫ (БЕЗ SSL!)
 -- ============================================================
 
 local function httpRequest(method, url, data, callback)
-    local http = require("socket.http")
+    -- Пытаемся загрузить socket.http
+    local success, http = pcall(require, "socket.http")
+    if not success then
+        print("❌ socket.http не найден")
+        return nil
+    end
+    
     local ltn12 = require("ltn12")
+    
+    -- Заменяем https на http (для теста)
+    url = url:gsub("https://", "http://")
     
     local response_body = {}
     local res, code, headers = http.request{
@@ -83,7 +90,7 @@ end
 -- КОМНАТЫ ДЛЯ МУЛЬТИПЛЕЕРА
 -- ============================================================
 
-function firebase.createRoom(roomId, hostData)
+function firebase.createRoom(roomId, hostData, callback)
     local room = {
         host = hostData.playerId,
         created = os.time(),
@@ -104,14 +111,16 @@ function firebase.createRoom(roomId, hostData)
         lastUpdate = os.time()
     }
     
-    return firebase.put("rooms/" .. roomId, room)
+    return firebase.put("rooms/" .. roomId, room, callback)
 end
 
-function firebase.joinRoom(roomId, playerData)
-    return firebase.get("rooms/" .. roomId, function(data)
-        if data then
+function firebase.joinRoom(roomId, playerData, callback)
+    -- Сначала проверяем, существует ли комната
+    return firebase.get("rooms/" .. roomId, function(data, code)
+        if data and code == 200 then
             local room = require("json").decode(data)
             if room then
+                -- Добавляем игрока
                 room.players[playerData.playerId] = {
                     x = playerData.x or 0,
                     y = playerData.y or 0,
@@ -124,30 +133,27 @@ function firebase.joinRoom(roomId, playerData)
                 }
                 room.lastUpdate = os.time()
                 
-                return firebase.put("rooms/" .. roomId .. "/players", room.players)
+                return firebase.put("rooms/" .. roomId .. "/players", room.players, callback)
             end
         end
+        if callback then callback(nil, code) end
         return nil
     end)
 end
 
-function firebase.leaveRoom(roomId, playerId)
-    return firebase.delete("rooms/" .. roomId .. "/players/" .. playerId)
+function firebase.leaveRoom(roomId, playerId, callback)
+    return firebase.delete("rooms/" .. roomId .. "/players/" .. playerId, callback)
 end
 
-function firebase.deleteRoom(roomId)
-    return firebase.delete("rooms/" .. roomId)
+function firebase.deleteRoom(roomId, callback)
+    return firebase.delete("rooms/" .. roomId, callback)
 end
 
 function firebase.getRoom(roomId, callback)
     return firebase.get("rooms/" .. roomId, callback)
 end
 
--- ============================================================
--- ОБНОВЛЕНИЕ ПОЗИЦИИ ИГРОКА
--- ============================================================
-
-function firebase.updatePlayer(roomId, playerId, data)
+function firebase.updatePlayer(roomId, playerId, data, callback)
     local playerData = {
         x = data.x or 0,
         y = data.y or 0,
@@ -158,14 +164,10 @@ function firebase.updatePlayer(roomId, playerId, data)
         lastUpdate = os.time()
     }
     
-    return firebase.put("rooms/" .. roomId .. "/players/" .. playerId, playerData)
+    return firebase.put("rooms/" .. roomId .. "/players/" .. playerId, playerData, callback)
 end
 
--- ============================================================
--- ПУЛИ
--- ============================================================
-
-function firebase.addBullet(roomId, bulletData)
+function firebase.addBullet(roomId, bulletData, callback)
     local bullet = {
         x = bulletData.x or 0,
         y = bulletData.y or 0,
@@ -176,11 +178,11 @@ function firebase.addBullet(roomId, bulletData)
         life = 3.0
     }
     
-    return firebase.post("rooms/" .. roomId .. "/bullets", bullet)
+    return firebase.post("rooms/" .. roomId .. "/bullets", bullet, callback)
 end
 
-function firebase.clearBullets(roomId)
-    return firebase.delete("rooms/" .. roomId .. "/bullets")
+function firebase.clearBullets(roomId, callback)
+    return firebase.delete("rooms/" .. roomId .. "/bullets", callback)
 end
 
 -- ============================================================
@@ -195,8 +197,8 @@ function firebase.listen(path, interval, callback)
         timer = timer + dt
         if timer >= interval then
             timer = 0
-            firebase.get(path, function(data)
-                if data and data ~= lastData then
+            firebase.get(path, function(data, code)
+                if data and code == 200 and data ~= lastData then
                     lastData = data
                     callback(data)
                 end
