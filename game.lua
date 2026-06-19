@@ -166,11 +166,13 @@ function game.hostGame()
         name = player_name
     }
     
-    firebase.createRoom(room_id, host_data, function(result)
-        if result then
+    firebase.createRoom(room_id, host_data, function(result, code)
+        if code == 200 then
             print("✅ Комната создана!")
             game.setMode("firebase_host")
             game.startListener()
+        else
+            print("❌ Ошибка создания комнаты: " .. tostring(code))
         end
     end)
     
@@ -193,9 +195,15 @@ function game.joinRoom(room_id_input)
         name = player_name
     }
     
-    firebase.joinRoom(room_id, player_data)
-    game.setMode("firebase_client")
-    game.startListener()
+    firebase.joinRoom(room_id, player_data, function(result, code)
+        if code == 200 then
+            print("✅ Подключено!")
+            game.setMode("firebase_client")
+            game.startListener()
+        else
+            print("❌ Ошибка подключения: " .. tostring(code))
+        end
+    end)
     
     return true
 end
@@ -229,7 +237,6 @@ function game.startListener()
         if data then
             local room = json.decode(data)
             if room then
-                -- Обновляем игроков
                 if room.players then
                     for pid, p in pairs(room.players) do
                         if pid ~= player_id then
@@ -238,7 +245,6 @@ function game.startListener()
                     end
                 end
                 
-                -- Обновляем пули
                 if room.bullets then
                     for _, b in ipairs(room.bullets) do
                         if b.player_id ~= player_id then
@@ -372,14 +378,12 @@ function game.update(dt)
     
     -- Firebase режим
     if mode == "firebase_host" or mode == "firebase_client" then
-        -- Отправляем позицию
         last_send = last_send + dt
         if last_send >= send_interval then
             last_send = 0
             game.updatePlayerInFirebase()
         end
         
-        -- Запускаем слушатель
         if listener then
             listener(dt)
         end
