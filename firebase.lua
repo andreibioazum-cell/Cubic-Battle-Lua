@@ -1,5 +1,5 @@
 -- firebase.lua
--- Firebase Realtime Database client for LOVE2D
+-- Использует встроенный love.net (работает на Android без SSL библиотек!)
 
 local firebase = {}
 
@@ -13,50 +13,52 @@ local CONFIG = {
 }
 
 -- ============================================================
--- HTTP REQUEST
+-- HTTP REQUEST через love.net
 -- ============================================================
 
 local function httpRequest(method, url, data, callback)
-    local success, http = pcall(require, "socket.http")
-    if not success then
-        print("ERROR: socket.http not found")
-        if callback then callback(nil, "no_http") end
+    -- Проверяем love.net
+    if not love.net then
+        print("ERROR: love.net not available!")
+        if callback then callback(nil, "no_net") end
         return nil
     end
     
-    local ltn12 = require("ltn12")
-    
     print(method .. " " .. url)
     
-    -- Try HTTPS first
-    local ssl_success, https = pcall(require, "ssl.https")
-    local http_lib = ssl_success and https or http
+    -- Создаём HTTP запрос
+    local request = love.net.newHTTPRequest(url, method)
     
-    local response_body = {}
-    local res, code, headers = http_lib.request{
-        url = url,
-        method = method,
-        headers = {
-            ["Content-Type"] = "application/json"
-        },
-        source = data and ltn12.source.string(data) or nil,
-        sink = ltn12.sink.table(response_body)
-    }
+    -- Заголовки
+    request:setHeader("Content-Type", "application/json")
     
-    local result = table.concat(response_body)
-    
-    if code == 200 then
-        print("SUCCESS: " .. code)
-    else
-        print("ERROR: " .. tostring(code))
-        print("RESPONSE: " .. result)
+    -- Тело запроса (для POST/PUT/PATCH)
+    if data then
+        request:setBody(data)
     end
     
-    if callback then
-        callback(result, code)
+    -- Отправляем асинхронно
+    local success, err = request:send(function(response)
+        local body = response:getBody()
+        local code = response:getStatus()
+        
+        if code == 200 then
+            print("SUCCESS: " .. code)
+        else
+            print("ERROR: " .. code .. " - " .. body)
+        end
+        
+        if callback then
+            callback(body, code)
+        end
+    end)
+    
+    if not success then
+        print("ERROR sending request: " .. tostring(err))
+        if callback then callback(nil, err) end
     end
     
-    return result, code
+    return request
 end
 
 -- ============================================================
