@@ -17,7 +17,6 @@ local CONFIG = {
 -- ============================================================
 
 local function httpRequest(method, url, data, callback)
-    -- Пытаемся загрузить socket.http
     local success, http = pcall(require, "socket.http")
     if not success then
         print("❌ socket.http не найден")
@@ -87,7 +86,7 @@ function firebase.patch(path, data, callback)
 end
 
 -- ============================================================
--- КОМНАТЫ ДЛЯ МУЛЬТИПЛЕЕРА
+-- КОМНАТЫ
 -- ============================================================
 
 function firebase.createRoom(roomId, hostData, callback)
@@ -115,12 +114,10 @@ function firebase.createRoom(roomId, hostData, callback)
 end
 
 function firebase.joinRoom(roomId, playerData, callback)
-    -- Сначала проверяем, существует ли комната
     return firebase.get("rooms/" .. roomId, function(data, code)
         if data and code == 200 then
             local room = require("json").decode(data)
             if room then
-                -- Добавляем игрока
                 room.players[playerData.playerId] = {
                     x = playerData.x or 0,
                     y = playerData.y or 0,
@@ -186,7 +183,7 @@ function firebase.clearBullets(roomId, callback)
 end
 
 -- ============================================================
--- СЛУШАТЕЛЬ (polling)
+-- СЛУШАТЕЛЬ
 -- ============================================================
 
 function firebase.listen(path, interval, callback)
