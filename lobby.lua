@@ -120,7 +120,6 @@ end
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
     
-    -- Градиент
     local gradientSteps = 60
     local stepH = h / gradientSteps
     for i = 0, gradientSteps - 1 do
@@ -132,7 +131,6 @@ function lobby.draw()
         love.graphics.rectangle("fill", 0, i * stepH, w, stepH + 1)
     end
     
-    -- Звёзды
     love.graphics.setColor(1, 1, 1, 0.35)
     for i = 1, 50 do
         local px = (math.sin(animTimer * 0.3 + i * 7.3) * 0.5 + 0.5) * w
@@ -141,7 +139,6 @@ function lobby.draw()
         love.graphics.circle("fill", px, py, size)
     end
     
-    -- Заголовок
     local titleY = h/2 - 180
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
@@ -151,7 +148,6 @@ function lobby.draw()
     love.graphics.setFont(fontSmall)
     love.graphics.printf("Multiplayer Arena", 0, titleY + 55, w, "center")
     
-    -- Кнопки
     local bw, bh = 240, 50
     
     for _, btn in ipairs(buttons) do
@@ -182,7 +178,6 @@ function lobby.draw()
         love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
     end
     
-    -- Меню подключения
     if show_join_menu then
         love.graphics.setColor(0, 0, 0, 0.85)
         love.graphics.rectangle("fill", 0, 0, w, h)
@@ -202,7 +197,6 @@ function lobby.draw()
         love.graphics.setFont(fontBtn)
         love.graphics.printf("🔗 ПОДКЛЮЧЕНИЕ", panel_x, panel_y + 15, panel_w, "center")
         
-        -- Поле ввода IP
         local input_y = panel_y + 60
         love.graphics.setColor(0.05, 0.05, 0.1, 1)
         love.graphics.rectangle("fill", panel_x + 20, input_y, panel_w - 40, 45, 8, 8)
@@ -221,7 +215,6 @@ function lobby.draw()
         end
         love.graphics.print(display_text, panel_x + 30, input_y + 12)
         
-        -- Кнопки
         local btn_y = panel_y + panel_h - 55
         local btn_w = (panel_w - 50) / 2
         
@@ -236,11 +229,9 @@ function lobby.draw()
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.printf("❌ Отмена", panel_x + 30 + btn_w, btn_y + 10, btn_w, "center")
         
-        -- Экранная клавиатура
         drawKeyboard(panel_x, panel_y + panel_h + 10, panel_w)
     end
     
-    -- Статус
     if connecting then
         love.graphics.setColor(1, 0.9, 0, 0.7)
         love.graphics.setFont(fontBtn)
@@ -255,10 +246,6 @@ function lobby.draw()
     
     love.graphics.setColor(1, 1, 1, 1)
 end
-
--- ============================================================
--- ЭКРАННАЯ КЛАВИАТУРА
--- ============================================================
 
 function drawKeyboard(panel_x, panel_y, panel_w)
     if not keyboard_visible then return end
@@ -311,10 +298,6 @@ function drawKeyboard(panel_x, panel_y, panel_w)
     }
 end
 
--- ============================================================
--- ОБРАБОТКА КАСАНИЙ
--- ============================================================
-
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
     local h = love.graphics.getHeight()
@@ -328,7 +311,6 @@ function lobby.touchpressed(id, x, y)
         local btn_w = (panel_w - 50) / 2
         local btn_y = panel_y + panel_h - 55
         
-        -- Кнопка "Подключиться"
         if x >= panel_x + 15 and x <= panel_x + 15 + btn_w and 
            y >= btn_y and y <= btn_y + 40 then
             if input_ip ~= "" then
@@ -340,7 +322,6 @@ function lobby.touchpressed(id, x, y)
             return
         end
         
-        -- Кнопка "Отмена"
         if x >= panel_x + 30 + btn_w and x <= panel_x + 30 + btn_w + btn_w and 
            y >= btn_y and y <= btn_y + 40 then
             show_join_menu = false
@@ -349,7 +330,6 @@ function lobby.touchpressed(id, x, y)
             return
         end
         
-        -- Экранная клавиатура
         if keyboard_visible and lobby.keyboard_keys then
             local data = lobby.keyboard_data
             if data then
@@ -386,10 +366,6 @@ function lobby.touchpressed(id, x, y)
         end
     end
 end
-
--- ============================================================
--- ОБРАБОТКА КЛАВИШ
--- ============================================================
 
 function handleKeyPress(key)
     if key == "⌫" then
