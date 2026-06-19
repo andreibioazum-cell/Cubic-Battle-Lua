@@ -46,8 +46,8 @@ end
 local function drawHPBar(x, y, w, h, hp, max, color)
     hp = math.max(0, hp)
     love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", x - 2, y - 2, w + 4, h + 4, 6, 6)
-    love.graphics.setColor(0.15, 0.15, 0.15, 1)
+    love.graphics.rectangle("fill", x - 2, y - 2, w + 4, h + 4, 4, 4)
+    love.graphics.setColor(0.1, 0.1, 0.1, 1)
     love.graphics.rectangle("fill", x, y, w, h, 4, 4)
     love.graphics.setColor(color[1], color[2], color[3], 1)
     love.graphics.rectangle("fill", x, y, w * (hp / max), h, 4, 4)
@@ -104,11 +104,17 @@ function game.load()
         playerImg:setFilter("nearest", "nearest")
     end
 
-    font = font or love.graphics.newFont("Fredoka-Bold.ttf", 18)
+    font = font or love.graphics.newFont("Fredoka-Bold.ttf", 16)
 
     controls.load()
     enemy.load()
     enemy.reset()
+    enemy.spawnNow(cube.x, cube.y)
+
+    enemy.setDeathCallback(function()
+        -- Враг убит -> возврат в лобби
+        GameState.current = "lobby"
+    end)
 
     controls.setOnBack(function()
         GameState.current = "lobby"
@@ -190,37 +196,24 @@ function game.draw()
         end
     end
 
+    -- Пули игрока (ЧЁРНЫЕ)
     for _, b in ipairs(bullets) do
-        love.graphics.setColor(0.2, 0.4, 1, 0.3)
-        love.graphics.circle("fill", b.x, b.y, 10)
-
-        love.graphics.setColor(0.15, 0.35, 1, 1)
+        love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
-
-        love.graphics.setColor(0.6, 0.8, 1, 0.9)
-        love.graphics.circle("fill", b.x - 1, b.y - 1, 3)
-
-        love.graphics.setColor(0, 0, 0.3, 1)
-        love.graphics.setLineWidth(2)
-        love.graphics.circle("line", b.x, b.y, 7)
     end
 
     if controls.isAiming() then
         local ax, ay = controls.getAim()
-        love.graphics.setColor(0, 0, 0, 0.55)
-        love.graphics.setLineWidth(16)
+        love.graphics.setColor(0, 0, 0, 0.5)
+        love.graphics.setLineWidth(14)
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
-        love.graphics.setLineWidth(3)
-        love.graphics.setColor(1, 1, 1, 0.3)
+        love.graphics.setLineWidth(2)
+        love.graphics.setColor(1, 1, 1, 0.5)
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
     end
 
     if not online.enabled then
         enemy.draw()
-        local e_obj = enemy.get()
-        if e_obj then
-            drawHPBar(e_obj.x - 28, e_obj.y - 45, 56, 8, e_obj.hp, 5, { 0.9, 0.2, 0.2 })
-        end
     end
 
     if playerImg then
@@ -242,26 +235,38 @@ function game.draw()
 
     love.graphics.pop()
 
+    -- HUD: HP игрока СЛЕВА СВЕРХУ
     love.graphics.setColor(1, 1, 1, 1)
+    if font then love.graphics.setFont(font) end
+    
+    local barW, barH = 180, 16
+    local margin = 16
+    
+    -- HP игрока (слева)
+    drawHPBar(margin, margin, barW, barH, cube.hp, PLAYER_HP_MAX, { 0.3, 0.85, 0.35 })
     if font then
-        love.graphics.setFont(font)
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.print("HP " .. math.max(0, cube.hp), margin, margin + barH + 4)
     end
 
-    local barW = 200
-    local barH = 18
-    local px = love.graphics.getWidth() - barW - 20
-    local py = 20
-    drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, { 0.3, 0.85, 0.35 })
-
-    love.graphics.setColor(1, 1, 1, 1)
-    if font then
-        love.graphics.printf("HP " .. math.max(0, cube.hp) .. " / " .. PLAYER_HP_MAX, px, py + 22, barW, "right")
+    -- HP врага (справа)
+    if not online.enabled then
+        local e_obj = enemy.get()
+        if e_obj then
+            local ex = love.graphics.getWidth() - barW - margin
+            drawHPBar(ex, margin, barW, barH, e_obj.hp, 5, { 0.9, 0.2, 0.2 })
+            if font then
+                love.graphics.setColor(1, 1, 1, 1)
+                love.graphics.print("ENEMY " .. math.max(0, e_obj.hp), ex, margin + barH + 4)
+            end
+        end
     end
 
     if online.enabled then
         love.graphics.setColor(0, 1, 0, 0.7)
-        love.graphics.printf("ONLINE", px, py + 42, barW, "right")
-        love.graphics.setColor(1, 1, 1, 1)
+        if font then
+            love.graphics.print("ONLINE", love.graphics.getWidth() - 80, margin + barH + 22)
+        end
     end
 
     controls.draw()
