@@ -177,14 +177,36 @@ end
 
 function enemy.draw()
     if not e then return end
+    
+    -- ===== ВРАЖЕСКИЕ ПУЛИ (КРАСНЫЕ, ЯРКИЕ) =====
+    for _, b in ipairs(enemyBullets) do
+        -- Свечение
+        love.graphics.setColor(1, 0.1, 0.1, 0.3)
+        love.graphics.circle("fill", b.x, b.y, b.size + 6)
+        
+        -- Основная пуля
+        love.graphics.setColor(1, 0.15, 0.15, 1)
+        love.graphics.circle("fill", b.x, b.y, b.size)
+        
+        -- Белый блик
+        love.graphics.setColor(1, 0.7, 0.7, 0.8)
+        love.graphics.circle("fill", b.x - 1, b.y - 1, b.size * 0.4)
+        
+        -- Обводка чёрная
+        love.graphics.setColor(0, 0, 0, 1)
+        love.graphics.setLineWidth(2)
+        love.graphics.circle("line", b.x, b.y, b.size)
+    end
 
-    love.graphics.setColor(0,0,0,0.4)
+    -- Тень врага
+    love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.push()
     love.graphics.translate(e.x + 6, e.y + 8)
     love.graphics.rotate(e.angle)
     love.graphics.draw(img, -SIZE/2, -SIZE/2)
     love.graphics.pop()
 
+    -- Враг
     love.graphics.push()
     love.graphics.translate(e.x, e.y)
     love.graphics.rotate(e.angle)
@@ -193,7 +215,7 @@ function enemy.draw()
     love.graphics.draw(img, -SIZE/2, -SIZE/2)
     love.graphics.pop()
 
-    love.graphics.setColor(1,1,1,1)
+    love.graphics.setColor(1, 1, 1, 1)
 end
 
 return enemy
