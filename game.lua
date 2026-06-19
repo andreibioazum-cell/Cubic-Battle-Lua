@@ -13,38 +13,262 @@ local bg, playerImg, font
 local cam = { x=0, y=0 }
 local dead = false
 
-local onDeathCallback = nil
-
--- Онлайн состояние
+-- ===== ОНЛАЙН ЧАСТЬ =====
 local online = {
     enabled = false,
+    connected = false,
     socket = nil,
-    players = {},
-    bullets = {},
-    enemies = {},
+    server_ip = "192.168.1.100", -- IP сервера (измените на свой)
+    server_port = 4080,
     player_id = 0,
+    players = {},
+    enemies = {},
+    bullets = {},
+    name = "Player" .. math.random(1000, 9999),
     last_send = 0,
     send_interval = 1/20,
-    name = "Player" .. math.random(1000, 9999)
+    connecting = false,
+    reconnect_timer = 0
 }
 
-local function spawnBullet(x, y, dx, dy)
-    table.insert(bullets, {
-        x=x, y=y,
-        vx=dx*BULLET_SPEED,
-        vy=dy*BULLET_SPEED,
-        life=3
-    })
-    
-    if online.enabled and online.socket then
-        pcall(function()
-            online.socket:send(string.format("SHOOT:dx:%.2f,dy:%.2f\n", dx, dy))
-        end)
+-- Функции для лобби
+function game.set_online_mode(enabled)
+    online.enabled = enabled
+    if enabled then
+        online.connected = false
+        online.connecting = true
+        online.connect()
+    else
+        online.connected = false
+        online.enabled = false
+        if online.socket then
+            online.socket:close()
+            online.socket = nil
+        end
     end
 end
 
-local function drawHPBar(x, y, w, h, hp, max, color)
-    hp = math.max(0, hp)
+function game.get_online_status()
+    return online.enabled, online.connected
+end
+
+function game.reset_online()
+    online.players = {}
+    online.enemies = {}
+    online.bullets = {}
+    online.connected = false
+    online.enabled = false
+    if online.socket then
+        online.socket:close()
+        online.socket = nil
+    end
+end
+
+-- Попытка загрузить сокеты
+local socket_loaded = false
+local function load_socket()
+    if not socket_loaded then
+        local success, result = pcall(require, "socket")
+        if success then
+            socket_loaded = true
+            return result
+        end
+    end
+    return nil
+end
+
+-- Подключение к серверу
+function online.connect()
+    if online.connected then return true end
+    if online.connecting then return false end
+    
+    local socket = load_socket()
+    if not socket then
+        print("Socket library not available!")
+        online.connecting = false
+        return false
+    end
+    
+    online.socket = socket.tcp()
+    online.socket:settimeout(0)
+    
+    local success, err = pcall(function()
+        online.socket:connect(online.server_ip, online.server_port)
+    end)
+    
+    if success then
+        online.connected = true
+        online.connecting = false
+        online.enabled = true
+        print("Connected to server: " .. online.server_ip .. ":" .. online.server_port)
+        online.send("NAME:" .. online.name)
+        return true
+    else
+        print("Failed to connect: " .. tostring(err))
+        online.socket = nil
+        online.connecting = false
+        online.reconnect_timer = 5 -- Попробовать переподключиться через 5 секунд
+        return false
+    end
+end
+
+-- Отправка данных
+function online.send(data)
+    if not online.connected or not online.socket then return end
+    local success, err = pcall(function()
+        online.socket:send(data .. "\n")
+    end)
+    if not success then
+        online.connected = false
+        online.socket = nil
+        print("Connection lost!")
+    end
+end
+
+-- Получение данных
+function online.receive()
+    if not online.connected or not online.socket then return end
+    
+    local data, err = online.socket:receive("*l")
+    if data then
+        if string.sub(data, 1, 10) == "CONNECTED:" then
+            online.player_id = tonumber(string.sub(data, 11))
+            print("Connected! ID: " .. online.player_id)
+            online.send("NAME:" .. online.name)
+            
+        elseif string.sub(data, 1, 6) == "STATE:" then
+            local state_str = string.sub(data, 7)
+            online.parse_state(state_str)
+            
+        elseif string.sub(data, 1, 5) == "CHAT:" then
+            local msg = string.sub(data, 6)
+            print("[CHAT] " .. msg)
+            
+        elseif string.sub(data, 1, 6) == "ERROR:" then
+            print("[ERROR] " .. string.sub(data, 7))
+        end
+        
+    elseif err == "closed" then
+        online.connected = false
+        online.socket = nil
+        print("Disconnected from server")
+    end
+end
+
+-- Парсинг состояния игры
+function online.parse_state(data)
+    -- Простой парсер без JSON
+    -- Извлекаем игроков
+    local players_str = string.match(data, '"players":({[^}]*})')
+    if players_str then
+        online.players = {}
+        for id_str, info in string.gmatch(players_str, '([%d]+):({[^}]*})') do
+            local id = tonumber(id_str)
+            local x = tonumber(string.match(info, '"x":([^,}]+)'))
+            local y = tonumber(string.match(info, '"y":([^,}]+)'))
+            local hp = tonumber(string.match(info, '"hp":([^,}]+)'))
+            local angle = tonumber(string.match(info, '"angle":([^,}]+)'))
+            local name = string.match(info, '"name":"([^"]+)"')
+            
+            online.players[id] = {
+                x = x or 0,
+                y = y or 0,
+                hp = hp or 5,
+                angle = angle or 0,
+                name = name or "Unknown"
+            }
+        end
+    end
+    
+    -- Извлекаем врагов
+    local enemies_str = string.match(data, '"enemies":(%[.*%])')
+    if enemies_str then
+        online.enemies = {}
+        for info in string.gmatch(enemies_str, '({[^}]*})') do
+            local x = tonumber(string.match(info, '"x":([^,}]+)'))
+            local y = tonumber(string.match(info, '"y":([^,}]+)'))
+            local hp = tonumber(string.match(info, '"hp":([^,}]+)'))
+            local max_hp = tonumber(string.match(info, '"max_hp":([^,}]+)'))
+            local angle = tonumber(string.match(info, '"angle":([^,}]+)'))
+            
+            table.insert(online.enemies, {
+                x = x or 0,
+                y = y or 0,
+                hp = hp or 5,
+                max_hp = max_hp or 5,
+                angle = angle or 0
+            })
+        end
+    end
+    
+    -- Извлекаем пули
+    local bullets_str = string.match(data, '"bullets":(%[.*%])')
+    if bullets_str then
+        online.bullets = {}
+        for info in string.gmatch(bullets_str, '({[^}]*})') do
+            local x = tonumber(string.match(info, '"x":([^,}]+)'))
+            local y = tonumber(string.match(info, '"y":([^,}]+)'))
+            local vx = tonumber(string.match(info, '"vx":([^,}]+)'))
+            local vy = tonumber(string.match(info, '"vy":([^,}]+)'))
+            local is_enemy = string.match(info, '"is_enemy":([^,}]+)')
+            
+            table.insert(online.bullets, {
+                x = x or 0,
+                y = y or 0,
+                vx = vx or 0,
+                vy = vy or 0,
+                is_enemy = (is_enemy == "true")
+            })
+        end
+    end
+end
+
+-- Рисование онлайн игроков
+function online.draw_players()
+    for id, player in pairs(online.players) do
+        if id ~= online.player_id then
+            -- Рисуем другого игрока
+            love.graphics.setColor(0.3, 0.8, 1, 0.8)
+            love.graphics.rectangle("fill", player.x - 20, player.y - 20, 40, 40)
+            love.graphics.setColor(1, 1, 1, 1)
+            
+            -- Имя игрока
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.print(player.name or "Player", player.x - 20, player.y - 35)
+            
+            -- HP бар другого игрока
+            game.drawHPBar(player.x - 20, player.y - 45, 40, 4, player.hp or 5, 5, {0.3, 0.8, 0.3})
+        end
+    end
+end
+
+-- Рисование онлайн пуль
+function online.draw_bullets()
+    for _, b in ipairs(online.bullets) do
+        if b.is_enemy then
+            love.graphics.setColor(1, 0, 0, 1)
+            love.graphics.circle("fill", b.x, b.y, 8)
+        else
+            love.graphics.setColor(0, 0, 1, 1)
+            love.graphics.circle("fill", b.x, b.y, 6)
+        end
+    end
+end
+
+-- Рисование онлайн врагов
+function online.draw_enemies()
+    for _, e in ipairs(online.enemies) do
+        love.graphics.setColor(1, 0.2, 0.2, 1)
+        love.graphics.rectangle("fill", e.x - 25, e.y - 25, 50, 50)
+        love.graphics.setColor(1, 1, 1, 1)
+        game.drawHPBar(e.x - 25, e.y - 35, 50, 4, e.hp or 5, e.max_hp or 5, {0.9, 0.2, 0.2})
+    end
+end
+
+-- ===== ОСНОВНАЯ ИГРА =====
+
+function game.drawHPBar(x, y, w, h, hp, max, color)
+    if hp < 0 then hp = 0 end
     love.graphics.setColor(0,0,0,0.5)
     love.graphics.rectangle("fill", x-2, y-2, w+4, h+4, 6, 6)
     love.graphics.setColor(0.15,0.15,0.15,1)
@@ -56,6 +280,20 @@ local function drawHPBar(x, y, w, h, hp, max, color)
     love.graphics.rectangle("line", x, y, w, h, 4, 4)
 end
 
+local function spawnBullet(x, y, dx, dy)
+    table.insert(bullets, {
+        x=x, y=y,
+        vx=dx*BULLET_SPEED,
+        vy=dy*BULLET_SPEED,
+        life=3
+    })
+    
+    -- Отправляем выстрел на сервер
+    if online.enabled and online.connected then
+        online.send(string.format("SHOOT:dx:%.2f,dy:%.2f", dx, dy))
+    end
+end
+
 local function onHitPlayer(dmg)
     if dead then return end
     cube.hp = cube.hp - dmg
@@ -63,23 +301,7 @@ local function onHitPlayer(dmg)
     if cube.hp <= 0 then
         cube.hp = 0
         dead = true
-        if onDeathCallback then
-            onDeathCallback()
-        end
-    end
-end
-
-function game.setOnDeath(callback)
-    onDeathCallback = callback
-end
-
-function game.setOnlineMode(enabled, socket)
-    online.enabled = enabled
-    online.socket = socket
-    if enabled and socket then
-        print("Online mode activated")
-    else
-        print("Offline mode")
+        GameState.current = "lobby"
     end
 end
 
@@ -107,10 +329,6 @@ function game.load()
     controls.load()
     enemy.load()
     enemy.reset()
-    
-    controls.setOnBack(function()
-        GameState.current = "lobby"
-    end)
 end
 
 function game.resize()
@@ -138,6 +356,7 @@ function game.update(dt)
     cam.x = cam.x + (targetX - cam.x) * k
     cam.y = cam.y + (targetY - cam.y) * k
 
+    -- Обновляем локальные пули
     for i=#bullets,1,-1 do
         local b = bullets[i]
         b.x = b.x + b.vx*dt
@@ -146,29 +365,31 @@ function game.update(dt)
         if b.life <= 0 then table.remove(bullets,i) end
     end
 
-    -- Онлайн приём данных
-    if online.enabled and online.socket then
-        local data, err = online.socket:receive("*l")
-        while data do
-            if string.sub(data, 1, 10) == "CONNECTED:" then
-                online.player_id = tonumber(string.sub(data, 11))
-            elseif string.sub(data, 1, 6) == "STATE:" then
-                -- Простой парсер для демо
-                local state = string.sub(data, 7)
-                -- Здесь можно распарсить JSON-подобную строку
+    -- Если онлайн режим включен
+    if online.enabled then
+        if not online.connected and not online.connecting then
+            -- Пытаемся переподключиться
+            online.reconnect_timer = online.reconnect_timer - dt
+            if online.reconnect_timer <= 0 then
+                online.connecting = true
+                online.connect()
+                online.reconnect_timer = 5
             end
-            data, err = online.socket:receive("*l")
         end
         
-        online.last_send = online.last_send + dt
-        if online.last_send >= online.send_interval then
-            online.last_send = 0
-            pcall(function()
-                online.socket:send(string.format("MOVE:x:%.2f,y:%.2f,angle:%.2f,hp:%d\n", 
-                    cube.x, cube.y, cube.angle, cube.hp))
-            end)
+        if online.connected then
+            -- Получаем данные от сервера
+            online.receive()
+            
+            -- Отправляем позицию на сервер
+            online.last_send = online.last_send + dt
+            if online.last_send >= online.send_interval then
+                online.last_send = 0
+                online.send(string.format("MOVE:x:%.2f,y:%.2f,angle:%.2f", cube.x, cube.y, cube.angle))
+            end
         end
     else
+        -- Оффлайн режим - используем локального врага
         enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
     end
 end
@@ -179,6 +400,7 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-cam.x, -cam.y)
 
+    -- Фон
     local w,h = love.graphics.getDimensions()
     if bg then
         local tw,th = bg:getWidth(), bg:getHeight()
@@ -191,11 +413,20 @@ function game.draw()
         end
     end
 
+    -- Локальные пули игрока
     love.graphics.setColor(0, 0, 0, 1)
     for _,b in ipairs(bullets) do
         love.graphics.circle("fill", b.x, b.y, 6)
     end
+    
+    -- Онлайн пули
+    if online.enabled and online.connected then
+        online.draw_bullets()
+        online.draw_enemies()
+        online.draw_players()
+    end
 
+    -- Линия прицела
     if controls.isAiming() then
         local ax, ay = controls.getAim()
         love.graphics.setColor(0,0,0,0.55)
@@ -214,14 +445,16 @@ function game.draw()
         )
     end
 
-    if not online.enabled then
+    -- Оффлайн враг
+    if not online.enabled or not online.connected then
         enemy.draw()
-        local e_obj = enemy.get()
-        if e_obj then
-            drawHPBar(e_obj.x - 28, e_obj.y - 45, 56, 8, e_obj.hp, 5, {0.9,0.2,0.2})
+        local e = enemy.get()
+        if e then
+            game.drawHPBar(e.x - 28, e.y - 45, 56, 8, e.hp, 5, {0.9,0.2,0.2})
         end
     end
 
+    -- Игрок
     if playerImg then
         love.graphics.setColor(0,0,0,0.4)
         love.graphics.push()
@@ -250,7 +483,7 @@ function game.draw()
     local barW, barH = 200, 18
     local px = love.graphics.getWidth() - barW - 20
     local py = 20
-    drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
+    game.drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
 
     love.graphics.setColor(1,1,1,1)
     if font then
@@ -258,9 +491,15 @@ function game.draw()
             px, py + 22, barW, "right")
     end
     
+    -- Статус онлайн
     if online.enabled then
-        love.graphics.setColor(0, 1, 0, 0.7)
-        love.graphics.printf("ONLINE", px, py + 42, barW, "right")
+        if online.connected then
+            love.graphics.setColor(0, 1, 0, 0.7)
+            love.graphics.printf("● ONLINE", px, py + 42, barW, "right")
+        else
+            love.graphics.setColor(1, 0.5, 0, 0.7)
+            love.graphics.printf("● CONNECTING...", px, py + 42, barW, "right")
+        end
         love.graphics.setColor(1,1,1,1)
     end
 
