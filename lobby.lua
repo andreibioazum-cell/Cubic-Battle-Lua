@@ -85,6 +85,7 @@ local function updateButtons()
         show_join_menu = true
         input_active = true
         keyboard_visible = true
+        input_ip = ""  -- Очищаем при открытии
     end, {0.2, 0.7, 0.4})
     
     makeButton("❌ QUIT", startY + 195, function()
@@ -114,7 +115,7 @@ end
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
     
-    -- Фон
+    -- Градиент
     local gradientSteps = 60
     local stepH = h / gradientSteps
     for i = 0, gradientSteps - 1 do
@@ -181,9 +182,8 @@ function lobby.draw()
         love.graphics.setColor(0, 0, 0, 0.85)
         love.graphics.rectangle("fill", 0, 0, w, h)
         
-        -- Панель
         local panel_w = math.min(350, w - 40)
-        local panel_h = 300
+        local panel_h = 200
         local panel_x = w/2 - panel_w/2
         local panel_y = 60
         
@@ -209,7 +209,7 @@ function lobby.draw()
         love.graphics.setFont(fontSmall)
         local display_text = input_ip
         if display_text == "" then
-            display_text = "Введите IP адрес"
+            display_text = "Введите IP (пример: 192.168.1.100)"
             love.graphics.setColor(0.5, 0.5, 0.5, 1)
         else
             love.graphics.setColor(0, 1, 0, 1)
@@ -217,23 +217,21 @@ function lobby.draw()
         love.graphics.print(display_text, panel_x + 30, input_y + 12)
         
         -- Кнопки
-        local btn_y = panel_y + panel_h - 65
+        local btn_y = panel_y + panel_h - 55
         local btn_w = (panel_w - 50) / 2
         
-        -- Кнопка "Подключиться"
         love.graphics.setColor(0.2, 0.7, 0.4, 1)
-        love.graphics.rectangle("fill", panel_x + 15, btn_y, btn_w, 45, 10, 10)
+        love.graphics.rectangle("fill", panel_x + 15, btn_y, btn_w, 40, 10, 10)
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setFont(fontSmall)
-        love.graphics.printf("✅ Подключиться", panel_x + 15, btn_y + 12, btn_w, "center")
+        love.graphics.printf("✅ Подключиться", panel_x + 15, btn_y + 10, btn_w, "center")
         
-        -- Кнопка "Отмена"
         love.graphics.setColor(0.6, 0.2, 0.2, 1)
-        love.graphics.rectangle("fill", panel_x + 30 + btn_w, btn_y, btn_w, 45, 10, 10)
+        love.graphics.rectangle("fill", panel_x + 30 + btn_w, btn_y, btn_w, 40, 10, 10)
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.printf("❌ Отмена", panel_x + 30 + btn_w, btn_y + 12, btn_w, "center")
+        love.graphics.printf("❌ Отмена", panel_x + 30 + btn_w, btn_y + 10, btn_w, "center")
         
-        -- Экранная клавиатура (для телефона)
+        -- Экранная клавиатура
         drawKeyboard(panel_x, panel_y + panel_h + 10, panel_w)
     end
     
@@ -254,36 +252,25 @@ function lobby.draw()
 end
 
 -- ============================================================
--- ЭКРАННАЯ КЛАВИАТУРА (ДЛЯ ТЕЛЕФОНА)
+-- ЭКРАННАЯ КЛАВИАТУРА (ТОЛЬКО ЦИФРЫ И ТОЧКА)
 -- ============================================================
 
 function drawKeyboard(panel_x, panel_y, panel_w)
     if not keyboard_visible then return end
     
     local w = love.graphics.getWidth()
-    local h = love.graphics.getHeight()
     
-    -- Клавиатура
+    -- Только цифры и точка!
     local keys = {
         {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
-        {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
-        {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
-        {".", ":", "-", "_", "/", "⌫", "␣", "OK"}
+        {".", "⌫", "ОК"}
     }
     
-    local key_w = 45
-    local key_h = 45
-    local spacing = 4
-    local keyboard_w = #keys[1] * (key_w + spacing) - spacing
-    local start_x = w/2 - keyboard_w/2
-    
-    -- Если клавиатура не помещается, уменьшаем клавиши
-    if keyboard_w > w - 20 then
-        key_w = (w - 20 - (#keys[1] - 1) * spacing) / #keys[1]
-    end
+    local key_w = 55
+    local key_h = 50
+    local spacing = 6
     
     for row, row_keys in ipairs(keys) do
-        -- Центрируем каждый ряд
         local row_w = #row_keys * (key_w + spacing) - spacing
         local row_x = w/2 - row_w/2
         
@@ -291,48 +278,32 @@ function drawKeyboard(panel_x, panel_y, panel_w)
             local bx = row_x + col * (key_w + spacing) - key_w - spacing
             local by = panel_y + 10 + (row - 1) * (key_h + spacing)
             
-            -- Цвет клавиши
             if k == "⌫" then
                 love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-            elseif k == "OK" then
+            elseif k == "ОК" then
                 love.graphics.setColor(0.2, 0.6, 0.3, 0.9)
-            elseif k == "␣" then
-                love.graphics.setColor(0.3, 0.3, 0.4, 0.9)
-                -- Делаем пробел шире
-                key_w = key_w * 2.5
             else
                 love.graphics.setColor(0.2, 0.2, 0.3, 0.9)
             end
             
-            -- Рисуем клавишу
-            love.graphics.rectangle("fill", bx, by, key_w, key_h, 6, 6)
+            love.graphics.rectangle("fill", bx, by, key_w, key_h, 8, 8)
             love.graphics.setColor(0.4, 0.4, 0.6, 0.3)
             love.graphics.setLineWidth(1)
-            love.graphics.rectangle("line", bx, by, key_w, key_h, 6, 6)
+            love.graphics.rectangle("line", bx, by, key_w, key_h, 8, 8)
             
-            -- Текст на клавише
             love.graphics.setColor(1, 1, 1, 1)
             love.graphics.setFont(fontSmall)
             local text_w = fontSmall:getWidth(k)
-            love.graphics.print(k, bx + key_w/2 - text_w/2, by + key_h/2 - 12)
-            
-            -- Возвращаем ширину пробела
-            if k == "␣" then
-                key_w = 45
-            end
+            love.graphics.print(k, bx + key_w/2 - text_w/2, by + key_h/2 - 14)
         end
     end
     
-    -- Сохраняем клавиши для обработки касаний
     lobby.keyboard_keys = keys
     lobby.keyboard_data = {
         key_w = key_w,
         key_h = key_h,
         spacing = spacing,
-        start_y = panel_y + 10,
-        panel_x = panel_x,
-        panel_y = panel_y,
-        panel_w = panel_w
+        start_y = panel_y + 10
     }
 end
 
@@ -348,14 +319,14 @@ function lobby.touchpressed(id, x, y)
         local panel_w = math.min(350, w - 40)
         local panel_x = w/2 - panel_w/2
         local panel_y = 60
-        local panel_h = 300
+        local panel_h = 200
         
         -- Кнопка "Подключиться"
         local btn_w = (panel_w - 50) / 2
-        local btn_y = panel_y + panel_h - 65
+        local btn_y = panel_y + panel_h - 55
         
         if x >= panel_x + 15 and x <= panel_x + 15 + btn_w and 
-           y >= btn_y and y <= btn_y + 45 then
+           y >= btn_y and y <= btn_y + 40 then
             if input_ip ~= "" then
                 connectToServer(input_ip, input_port)
                 show_join_menu = false
@@ -367,14 +338,14 @@ function lobby.touchpressed(id, x, y)
         
         -- Кнопка "Отмена"
         if x >= panel_x + 30 + btn_w and x <= panel_x + 30 + btn_w + btn_w and 
-           y >= btn_y and y <= btn_y + 45 then
+           y >= btn_y and y <= btn_y + 40 then
             show_join_menu = false
             keyboard_visible = false
             input_active = false
             return
         end
         
-        -- Обработка экранной клавиатуры
+        -- Экранная клавиатура
         if keyboard_visible and lobby.keyboard_keys then
             local data = lobby.keyboard_data
             if data then
@@ -413,26 +384,59 @@ function lobby.touchpressed(id, x, y)
 end
 
 -- ============================================================
--- ОБРАБОТКА НАЖАТИЙ КЛАВИШ
+-- ОБРАБОТКА КЛАВИШ (ТОЛЬКО ЦИФРЫ И ТОЧКА!)
 -- ============================================================
 
 function handleKeyPress(key)
     if key == "⌫" then
         input_ip = input_ip:sub(1, -2)
-    elseif key == "OK" then
+    elseif key == "ОК" then
         if input_ip ~= "" then
             connectToServer(input_ip, input_port)
             show_join_menu = false
             keyboard_visible = false
             input_active = false
         end
-    elseif key == "␣" then
-        if #input_ip < 25 then
-            input_ip = input_ip .. " "
-        end
     else
-        if #input_ip < 25 then
-            input_ip = input_ip .. key
+        -- ✅ ТОЛЬКО ЦИФРЫ И ТОЧКА!
+        if string.match(key, "[0-9.]") then
+            if #input_ip < 25 then
+                input_ip = input_ip .. key
+            end
+        end
+    end
+end
+
+function lobby.keypressed(key)
+    if show_join_menu and input_active then
+        if key == "return" or key == "enter" or key == "kpenter" then
+            if input_ip ~= "" then
+                connectToServer(input_ip, input_port)
+                show_join_menu = false
+                input_active = false
+            end
+            return
+        end
+        
+        if key == "escape" then
+            show_join_menu = false
+            input_active = false
+            return
+        end
+        
+        if key == "backspace" then
+            input_ip = input_ip:sub(1, -2)
+            return
+        end
+        
+        -- ✅ ФИКС: только цифры и точка!
+        if #key == 1 then
+            local char = key
+            if string.match(char, "[0-9.]") then
+                if #input_ip < 25 then
+                    input_ip = input_ip .. char
+                end
+            end
         end
     end
 end
