@@ -5,12 +5,10 @@ local json = require("json")
 
 local game = {}
 
--- Константы
 local PLAYER_SIZE = 55
 local PLAYER_HP_MAX = 5
 local BULLET_SPEED = 340 * 1.15
 
--- Локальные переменные
 local cube = { x = 0, y = 0, speed = 260, angle = 0, hp = PLAYER_HP_MAX, hit = 0 }
 local bullets = {}
 local bg, playerImg, font
@@ -18,7 +16,6 @@ local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
 
--- Firebase режим
 local mode = "offline"
 local room_id = nil
 local player_id = nil
@@ -31,7 +28,7 @@ local send_interval = 1 / 10
 local listener = nil
 
 -- ============================================================
--- ФУНКЦИИ ОТРИСОВКИ
+-- DRAW FUNCTIONS
 -- ============================================================
 
 local function drawHPBar(x, y, w, h, hp, max, color)
@@ -73,7 +70,7 @@ local function drawScoreboard()
     
     love.graphics.setColor(1, 1, 1, 0.8)
     love.graphics.setFont(font)
-    love.graphics.print("🏆 SCOREBOARD", bx + 10, by + 8)
+    love.graphics.print("SCOREBOARD", bx + 10, by + 8)
     
     for i, s in ipairs(scores) do
         local y = by + 30 + (i - 1) * 25
@@ -91,18 +88,18 @@ local function drawRoomInfo()
     if mode == "firebase_host" or mode == "firebase_client" then
         love.graphics.setColor(0, 1, 0, 0.8)
         love.graphics.setFont(font)
-        love.graphics.print("🔥 Комната: " .. (room_id or "?"), 10, 60)
-        love.graphics.print("👤 ID: " .. (player_id or "?"), 10, 80)
-        love.graphics.print("👥 Игроков: " .. (#players + 1), 10, 100)
+        love.graphics.print("Room: " .. (room_id or "?"), 10, 60)
+        love.graphics.print("ID: " .. (player_id or "?"), 10, 80)
+        love.graphics.print("Players: " .. (#players + 1), 10, 100)
         if mode == "firebase_host" then
             love.graphics.setColor(1, 0.8, 0, 0.8)
-            love.graphics.print("👑 ВЫ ХОСТ", 10, 120)
+            love.graphics.print("YOU ARE HOST", 10, 120)
         end
     end
 end
 
 -- ============================================================
--- СОЗДАНИЕ ПУЛИ
+-- BULLET
 -- ============================================================
 
 local function spawnBullet(x, y, dx, dy)
@@ -130,7 +127,7 @@ local function spawnBullet(x, y, dx, dy)
 end
 
 -- ============================================================
--- ОБРАБОТЧИК УРОНА
+-- DAMAGE
 -- ============================================================
 
 local function onHitPlayer(dmg)
@@ -147,14 +144,14 @@ local function onHitPlayer(dmg)
 end
 
 -- ============================================================
--- FIREBASE ФУНКЦИИ
+-- FIREBASE FUNCTIONS
 -- ============================================================
 
 function game.hostGame()
     room_id = "room_" .. tostring(math.random(1000, 9999))
     player_id = "host_" .. tostring(math.random(1000, 9999))
     
-    print("🔥 Создание комнаты: " .. room_id)
+    print("Creating room: " .. room_id)
     
     local host_data = {
         playerId = player_id,
@@ -167,11 +164,11 @@ function game.hostGame()
     
     firebase.createRoom(room_id, host_data, function(result, code)
         if code == 200 then
-            print("✅ Комната создана!")
+            print("Room created!")
             game.setMode("firebase_host")
             game.startListener()
         else
-            print("❌ Ошибка: " .. tostring(code))
+            print("Error: " .. tostring(code))
         end
     end)
     
@@ -194,10 +191,10 @@ function game.joinRandomRoom()
             
             if #available_rooms > 0 then
                 local room_id_input = available_rooms[1]
-                print("🎮 Найдена комната: " .. room_id_input)
+                print("Found room: " .. room_id_input)
                 game.joinRoom(room_id_input)
             else
-                print("🎮 Нет комнат, создаем новую...")
+                print("No rooms, creating new...")
                 game.hostGame()
             end
         else
@@ -212,7 +209,7 @@ function game.joinRoom(room_id_input)
     room_id = room_id_input
     player_id = "player_" .. tostring(math.random(1000, 9999))
     
-    print("🔥 Подключение к комнате: " .. room_id)
+    print("Joining room: " .. room_id)
     
     local player_data = {
         playerId = player_id,
@@ -225,11 +222,11 @@ function game.joinRoom(room_id_input)
     
     firebase.joinRoom(room_id, player_data, function(result, code)
         if code == 200 then
-            print("✅ Подключено!")
+            print("Connected!")
             game.setMode("firebase_client")
             game.startListener()
         else
-            print("❌ Ошибка: " .. tostring(code))
+            print("Error: " .. tostring(code))
             game.hostGame()
         end
     end)
@@ -255,7 +252,7 @@ end
 
 function game.setMode(new_mode)
     mode = new_mode
-    print("🎮 Режим: " .. mode)
+    print("Mode: " .. mode)
 end
 
 function game.startListener()
@@ -301,7 +298,7 @@ function game.updatePlayerInFirebase()
 end
 
 -- ============================================================
--- ОСНОВНЫЕ ФУНКЦИИ
+-- MAIN FUNCTIONS
 -- ============================================================
 
 function game.setOnDeath(callback)
@@ -499,7 +496,7 @@ function game.draw()
         
         love.graphics.setColor(0, 1, 0, 0.8)
         love.graphics.setFont(font)
-        love.graphics.print(player_name, cube.x - 20, cube.y - 65)
+        love.graphics.print("YOU", cube.x - 20, cube.y - 65)
     end
 
     love.graphics.pop()
