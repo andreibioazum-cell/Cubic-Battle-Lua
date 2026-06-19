@@ -1,5 +1,5 @@
 -- server.lua
--- Полноценный сервер внутри игры с красивым UI
+-- Полноценный TCP сервер внутри Love2D
 
 local server = {}
 
@@ -9,24 +9,23 @@ local MAX_PLAYERS = 8
 local TICK_RATE = 60
 local TICK_TIME = 1 / TICK_RATE
 
--- Состояние
+-- Состояние сервера
 local state = {
     running = false,
     server_socket = nil,
-    clients = {},
-    players = {},
-    bullets = {},
+    clients = {},      -- { [id] = {socket, last_keepalive} }
+    players = {},      -- { [id] = {x, y, angle, hp, alive} }
+    bullets = {},      -- { id, player_id, x, y, vx, vy, life }
     enemies = {},
     next_player_id = 1,
     next_bullet_id = 1,
     start_time = 0,
-    last_enemy_spawn = 0,
-    game_started = false,
-    kill_count = {},
-    local_ip = "Неизвестно"
+    local_ip = "127.0.0.1",
+    error = nil,
+    last_enemy_spawn = 0
 }
 
--- Настройки
+-- Настройки игры
 local BULLET_SPEED = 390
 local PLAYER_RADIUS = 30
 local MAX_HP = 5
@@ -42,16 +41,22 @@ local KEEPALIVE_TIMEOUT = 15
 local function createTCPServer(port)
     local success, socket = pcall(require, "socket")
     if not success then
-        print("❌ LuaSocket не установлен")
-        return nil
+        return nil, "LuaSocket не установлен"
     end
     
-    local server = socket.tcp()
-    server:settimeout(0)
-    server:bind("*", port)
-    server:listen(10)
+    local server_socket = socket.tcp()
+    server_socket:settimeout(0)
     
-    return server
+    local success, err = pcall(function()
+        server_socket:bind("*", port)
+        server_socket:listen(10)
+    end)
+    
+    if not success then
+        return nil, err
+    end
+    
+    return server_socket, nil
 end
 
 function server.getLocalIP()
@@ -70,26 +75,42 @@ end
 -- ============================================================
 
 function server.start(port)
-    if state.running then return true end
+    if state.running then 
+        return true 
+    end
     
     port = port or PORT
-    state.local_ip = server.getLocalIP()
+    state.error = nil
     
-    state.server_socket = createTCPServer(port)
-    if not state.server_socket then
+    print("🚀 Запуск сервера на порту " .. port .. "...")
+    
+    -- Получаем IP
+    server.getLocalIP()
+    
+    -- Создаем сервер
+    local server_socket, err = createTCPServer(port)
+    if not server_socket then
+        state.error = "❌ " .. err
+        print(state.error)
         return false
     end
     
+    state.server_socket = server_socket
     state.running = true
     state.start_time = love.timer.getTime()
     state.last_enemy_spawn = state.start_time
-    state.game_started = true
-    state.kill_count = {}
+    state.next_player_id = 1
+    state.next_bullet_id = 1
+    state.clients = {}
+    state.players = {}
+    state.bullets = {}
+    state.enemies = {}
     
-    print("🚀 СЕРВЕР ЗАПУЩЕН")
+    print("✅ СЕРВЕР ЗАПУЩЕН!")
     print("📱 IP: " .. state.local_ip)
     print("🔌 Порт: " .. port)
     print("👥 Макс игроков: " .. MAX_PLAYERS)
+    print("=" .. string.rep("-", 40))
     
     return true
 end
@@ -99,12 +120,14 @@ function server.stop()
     
     state.running = false
     
+    -- Закрываем все клиентские сокеты
     for id, client in pairs(state.clients) do
-        if client.socket then
-            pcall(function() client.socket:close() end)
-        end
+        pcall(function() 
+            if client.socket then client.socket:close() end 
+        end)
     end
     
+    -- Закрываем серверный сокет
     if state.server_socket then
         pcall(function() state.server_socket:close() end)
         state.server_socket = nil
@@ -114,15 +137,24 @@ function server.stop()
     state.players = {}
     state.bullets = {}
     state.enemies = {}
-    state.next_player_id = 1
-    state.next_bullet_id = 1
-    state.game_started = false
     
     print("🛑 Сервер остановлен")
 end
 
 function server.isRunning()
     return state.running
+end
+
+function server.getInfo()
+    return {
+        running = state.running,
+        ip = state.local_ip,
+        port = PORT,
+        players = server.getPlayerCount(),
+        max_players = MAX_PLAYERS,
+        error = state.error,
+        uptime = state.running and (love.timer.getTime() - state.start_time) or 0
+    }
 end
 
 function server.getPlayerCount()
@@ -133,42 +165,36 @@ function server.getPlayerCount()
     return count
 end
 
-function server.getInfo()
-    return {
-        running = state.running,
-        players = server.getPlayerCount(),
-        max_players = MAX_PLAYERS,
-        ip = state.local_ip,
-        port = PORT,
-        uptime = love.timer.getTime() - state.start_time,
-        bullets = #state.bullets
-    }
+function server.getPlayers()
+    return state.players
+end
+
+function server.getBullets()
+    return state.bullets
 end
 
 -- ============================================================
--- ОБНОВЛЕНИЕ
+-- ОСНОВНОЙ ЦИКЛ
 -- ============================================================
 
 function server.update(dt)
     if not state.running then return end
     
+    -- 1. Принимаем новых клиентов
     server.acceptClients()
-    server.receiveFromClients()
-    server.updateGame(dt)
-    server.sendToClients()
     
-    -- Добавляем врагов со временем
-    if server.getPlayerCount() > 0 then
-        local now = love.timer.getTime()
-        if now - state.last_enemy_spawn > ENEMY_SPAWN_TIME then
-            state.last_enemy_spawn = now
-            server.spawnEnemy()
-        end
-    end
+    -- 2. Получаем данные от клиентов
+    server.receiveFromClients()
+    
+    -- 3. Обновляем игровую логику
+    server.updateGame(dt)
+    
+    -- 4. Отправляем состояние клиентам
+    server.sendToClients()
 end
 
 -- ============================================================
--- КЛИЕНТЫ
+-- ПРИЕМ КЛИЕНТОВ
 -- ============================================================
 
 function server.acceptClients()
@@ -178,27 +204,28 @@ function server.acceptClients()
         local client, err = state.server_socket:accept()
         if not client then break end
         
+        -- Проверяем лимит
         if server.getPlayerCount() >= MAX_PLAYERS then
             client:send("SERVER_FULL\n")
             client:close()
+            print("❌ Сервер полон")
             break
         end
         
-        local ip, port = client:getpeername()
+        -- Создаем игрока
         local player_id = state.next_player_id
         state.next_player_id = state.next_player_id + 1
         
         local x = math.random(100, WORLD_WIDTH - 100)
         local y = math.random(100, WORLD_HEIGHT - 100)
         
+        -- Сохраняем клиента
         state.clients[player_id] = {
             socket = client,
-            ip = ip,
-            port = port,
-            last_keepalive = love.timer.getTime(),
-            name = "Player" .. player_id
+            last_keepalive = love.timer.getTime()
         }
         
+        -- Сохраняем игрока
         state.players[player_id] = {
             x = x,
             y = y,
@@ -206,16 +233,19 @@ function server.acceptClients()
             hp = MAX_HP,
             max_hp = MAX_HP,
             alive = true,
-            kills = 0,
-            deaths = 0
+            kills = 0
         }
         
-        state.kill_count[player_id] = 0
-        
         client:settimeout(0)
+        
+        print("👤 Игрок " .. player_id .. " подключился")
+        print("📊 Всего игроков: " .. server.getPlayerCount())
+        
+        -- Отправляем ID новому игроку
         client:send("CONNECTED:" .. player_id .. "\n")
         client:send("SERVER_INFO:" .. state.local_ip .. ":" .. PORT .. "\n")
         
+        -- Отправляем список всех игроков новому игроку
         for pid, player in pairs(state.players) do
             if pid ~= player_id then
                 client:send(string.format(
@@ -225,14 +255,17 @@ function server.acceptClients()
             end
         end
         
+        -- Уведомляем всех о новом игроке
         server.broadcast(string.format(
             "PLAYER_JOIN:%d:%.2f:%.2f:%.2f:%d",
             player_id, x, y, 0, MAX_HP
         ), player_id)
-        
-        print("👤 Игрок " .. player_id .. " подключился")
     end
 end
+
+-- ============================================================
+-- ПОЛУЧЕНИЕ ДАННЫХ
+-- ============================================================
 
 function server.receiveFromClients()
     local to_remove = {}
@@ -241,12 +274,15 @@ function server.receiveFromClients()
         if not client.socket then
             table.insert(to_remove, id)
         else
+            -- Проверяем keepalive
             if love.timer.getTime() - client.last_keepalive > KEEPALIVE_TIMEOUT then
                 table.insert(to_remove, id)
             else
+                -- Читаем данные
                 while true do
                     local data, err = client.socket:receive("*l")
                     if not data then break end
+                    
                     server.processCommand(id, data)
                     client.last_keepalive = love.timer.getTime()
                 end
@@ -254,6 +290,7 @@ function server.receiveFromClients()
         end
     end
     
+    -- Удаляем отключившихся
     for _, id in ipairs(to_remove) do
         server.removeClient(id)
     end
@@ -264,6 +301,7 @@ function server.processCommand(player_id, command)
     if not player then return end
     
     if command:sub(1, 5) == "MOVE:" then
+        -- MOVE:x:100.00,y:200.00,angle:1.57,hp:5
         local params = {}
         local data = command:sub(6)
         for part in data:gmatch("[^,]+") do
@@ -273,12 +311,21 @@ function server.processCommand(player_id, command)
             end
         end
         
-        if params.x then player.x = math.max(0, math.min(WORLD_WIDTH, tonumber(params.x) or player.x)) end
-        if params.y then player.y = math.max(0, math.min(WORLD_HEIGHT, tonumber(params.y) or player.y)) end
-        if params.angle then player.angle = tonumber(params.angle) or player.angle end
-        if params.hp then player.hp = tonumber(params.hp) or player.hp end
+        if params.x then 
+            player.x = math.max(0, math.min(WORLD_WIDTH, tonumber(params.x) or player.x)) 
+        end
+        if params.y then 
+            player.y = math.max(0, math.min(WORLD_HEIGHT, tonumber(params.y) or player.y)) 
+        end
+        if params.angle then 
+            player.angle = tonumber(params.angle) or player.angle 
+        end
+        if params.hp then 
+            player.hp = tonumber(params.hp) or player.hp 
+        end
         
     elseif command:sub(1, 6) == "SHOOT:" then
+        -- SHOOT:dx:0.80,dy:-0.60
         local dx, dy = 0, -1
         local data = command:sub(7)
         for part in data:gmatch("[^,]+") do
@@ -334,7 +381,7 @@ end
 -- ============================================================
 
 function server.updateGame(dt)
-    -- Пули
+    -- Обновляем пули
     local to_remove = {}
     for i, bullet in ipairs(state.bullets) do
         bullet.x = bullet.x + bullet.vx * dt
@@ -352,10 +399,19 @@ function server.updateGame(dt)
         table.remove(state.bullets, to_remove[i])
     end
     
-    -- Коллизии
+    -- Проверяем коллизии
     server.checkCollisions()
     
-    -- Враги
+    -- Спавним врагов (только если есть игроки)
+    if server.getPlayerCount() > 0 then
+        local now = love.timer.getTime()
+        if now - state.last_enemy_spawn > ENEMY_SPAWN_TIME then
+            state.last_enemy_spawn = now
+            server.spawnEnemy()
+        end
+    end
+    
+    -- Обновляем врагов
     server.updateEnemies(dt)
 end
 
@@ -375,9 +431,7 @@ function server.checkCollisions()
                     if player.hp <= 0 then
                         player.hp = 0
                         player.alive = false
-                        player.deaths = (player.deaths or 0) + 1
                         
-                        -- Убийца получает очко
                         local killer = state.players[bullet.player_id]
                         if killer then
                             killer.kills = (killer.kills or 0) + 1
@@ -449,7 +503,7 @@ function server.updateEnemies(dt)
 end
 
 -- ============================================================
--- ОТПРАВКА
+-- ОТПРАВКА КЛИЕНТАМ
 -- ============================================================
 
 function server.sendToClients()
