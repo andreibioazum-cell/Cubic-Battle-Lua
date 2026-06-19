@@ -151,7 +151,7 @@ function controls.touchreleased(id)
 end
 
 function controls.draw()
-    -- Джойстик (НЕ прозрачный)
+    -- Джойстик
     love.graphics.setColor(0, 0, 0, 0.5)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
     love.graphics.setColor(0, 0, 0, 0.9)
@@ -160,7 +160,7 @@ function controls.draw()
     love.graphics.setColor(0, 0, 0, 1)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
     
-    -- Кнопка Shot (НЕ прозрачная)
+    -- Кнопка Shot
     local scale = 1 - atk.press * 0.12
     local r = atk.r * scale
     local textScale = 1 - atk.press * 0.18
