@@ -18,7 +18,7 @@ local skins = {
     },
     diamond = {
         name = "Diamond Cube",
-        color = {1, 1, 1},
+        color = {0.2, 0.8, 1},
         ability = "shield",
         ability_name = "Shield",
         ability_desc = "Blocks 1 hit every 10 sec",
@@ -87,14 +87,14 @@ local function buySkin(skin_name)
             skins[skin_name].owned = true
             selected_skin = skin_name
             saveGame()
-            print("✅ " .. skins[skin_name].name .. " purchased!")
+            print(skins[skin_name].name .. " purchased!")
         else
-            print("❌ Not enough coins!")
+            print("Not enough Cubicoins!")
         end
     elseif skins[skin_name] and skins[skin_name].owned then
         selected_skin = skin_name
         saveGame()
-        print("✅ " .. skins[skin_name].name .. " equipped!")
+        print(skins[skin_name].name .. " equipped!")
     end
 end
 
@@ -113,15 +113,15 @@ local function updateButtons()
     local h = love.graphics.getHeight()
     local startY = h/2 - 50
     
-    makeButton("⚔ PLAY", startY, startGame, {0.2, 0.6, 0.8})
-    makeButton("🛒 SHOP", startY + 65, function()
+    makeButton("PLAY", startY, startGame, {0.2, 0.6, 0.8})
+    makeButton("SHOP", startY + 65, function()
         shop_open = not shop_open
     end, {0.4, 0.2, 0.8})
 end
 
--- ============================================================
--- ОТРИСОВКА МАГАЗИНА В ЛОББИ
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
+-- ОТРИСОВКА МАГАЗИНА
+-- ═══════════════════════════════════════════════════════════
 
 local function drawShop()
     local w, h = love.graphics.getDimensions()
@@ -140,11 +140,11 @@ local function drawShop()
     
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.setFont(fontTitle)
-    love.graphics.print("🛒 SHOP", shop_x + 20, shop_y + 15)
+    love.graphics.print("SHOP", shop_x + 20, shop_y + 15)
     
     love.graphics.setColor(1, 1, 1, 0.8)
     love.graphics.setFont(fontBtn)
-    love.graphics.print("💰 Coins: " .. coins, shop_x + 20, shop_y + 55)
+    love.graphics.print("Cubicoins: " .. coins, shop_x + 20, shop_y + 55)
     
     -- Алмазный куб
     local item_x = shop_x + 20
@@ -160,15 +160,15 @@ local function drawShop()
     
     love.graphics.setColor(0.2, 0.8, 1, 0.9)
     love.graphics.setFont(fontBtn)
-    love.graphics.print("💎 Diamond Cube", item_x + 10, item_y + 8)
+    love.graphics.print("Diamond Cube", item_x + 10, item_y + 8)
     love.graphics.setColor(0.7, 0.7, 0.9, 0.7)
-    love.graphics.print("🛡️ Shield (blocks 1 hit / 10 sec)", item_x + 10, item_y + 32)
+    love.graphics.print("Shield (blocks 1 hit / 10 sec)", item_x + 10, item_y + 32)
     love.graphics.setColor(1, 1, 0, 0.8)
     
     if skins.diamond.owned then
         if selected_skin == "diamond" then
             love.graphics.setColor(0, 1, 0, 0.9)
-            love.graphics.print("✅ EQUIPPED", item_x + item_w - 100, item_y + 8)
+            love.graphics.print("EQUIPPED", item_x + item_w - 100, item_y + 8)
         else
             love.graphics.setColor(0.3, 0.8, 0.3, 0.9)
             love.graphics.rectangle("fill", item_x + item_w - 90, item_y + 8, 70, 25, 6, 6)
@@ -176,7 +176,7 @@ local function drawShop()
             love.graphics.print("EQUIP", item_x + item_w - 75, item_y + 13)
         end
     else
-        love.graphics.print("💰 " .. skins.diamond.price .. " coins", item_x + item_w - 110, item_y + 8)
+        love.graphics.print("" .. skins.diamond.price .. " Cubicoins", item_x + item_w - 130, item_y + 8)
         if coins >= skins.diamond.price then
             love.graphics.setColor(0.2, 0.8, 0.3, 0.9)
         else
@@ -194,9 +194,9 @@ local function drawShop()
     love.graphics.print("CLOSE", shop_x + shop_w - 65, shop_y + shop_h - 38)
 end
 
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
 -- ОСНОВНЫЕ ФУНКЦИИ
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
 
 function lobby.load()
     fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 48)
@@ -247,10 +247,10 @@ function lobby.draw()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("Open World Arena", 0, titleY + 55, w, "center")
     
-    -- 💰 ПОКАЗ МОНЕТ
+    -- Показ Cubicoins
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.setFont(fontBtn)
-    love.graphics.printf("💰 " .. coins, 0, titleY + 100, w, "center")
+    love.graphics.printf("Cubicoins: " .. coins, 0, titleY + 100, w, "center")
     
     -- Кнопки
     local bw, bh = 240, 50
@@ -291,9 +291,9 @@ function lobby.draw()
     love.graphics.setColor(1, 1, 1, 1)
 end
 
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
 -- ОБРАБОТКА КАСАНИЙ
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
