@@ -179,13 +179,11 @@ function game.hostGame()
 end
 
 function game.joinRandomRoom()
-    -- Получаем список всех комнат
     firebase.get("rooms", function(data, code)
         if code == 200 and data then
             local rooms = json.decode(data)
             local available_rooms = {}
             
-            -- Ищем доступные комнаты
             if rooms then
                 for id, room in pairs(rooms) do
                     if room.status == "waiting" then
@@ -195,19 +193,14 @@ function game.joinRandomRoom()
             end
             
             if #available_rooms > 0 then
-                -- Заходим в первую доступную комнату
                 local room_id_input = available_rooms[1]
                 print("🎮 Найдена комната: " .. room_id_input)
                 game.joinRoom(room_id_input)
             else
-                -- Нет комнат - создаем новую
                 print("🎮 Нет комнат, создаем новую...")
-                connect_error = "Нет комнат, создаём новую!"
                 game.hostGame()
             end
         else
-            -- Ошибка или нет данных - создаем комнату
-            print("🎮 Ошибка поиска, создаем комнату...")
             game.hostGame()
         end
     end)
@@ -236,8 +229,7 @@ function game.joinRoom(room_id_input)
             game.setMode("firebase_client")
             game.startListener()
         else
-            print("❌ Ошибка подключения: " .. tostring(code))
-            -- Если не получилось, создаем новую комнату
+            print("❌ Ошибка: " .. tostring(code))
             game.hostGame()
         end
     end)
@@ -367,7 +359,6 @@ function game.update(dt)
     
     controls.update(dt)
     
-    -- Движение
     local dx, dy = controls.getMove()
     cube.x = cube.x + dx * cube.speed * dt
     cube.y = cube.y + dy * cube.speed * dt
@@ -378,14 +369,12 @@ function game.update(dt)
 
     cube.hit = math.max(0, cube.hit - dt * 3)
 
-    -- Камера
     local targetX = cube.x - love.graphics.getWidth() / 2
     local targetY = cube.y - love.graphics.getHeight() / 2
     local k = 1 - math.exp(-dt * 7.3)
     cam.x = cam.x + (targetX - cam.x) * k
     cam.y = cam.y + (targetY - cam.y) * k
 
-    -- Свои пули
     for i = #bullets, 1, -1 do
         local b = bullets[i]
         b.x = b.x + b.vx * dt
@@ -396,7 +385,6 @@ function game.update(dt)
         end
     end
     
-    -- Пули от других
     for i = #online_bullets, 1, -1 do
         local b = online_bullets[i]
         b.x = b.x + b.vx * dt
@@ -407,12 +395,10 @@ function game.update(dt)
         end
     end
 
-    -- Оффлайн режим
     if mode == "offline" then
         enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
     end
     
-    -- Firebase режим
     if mode == "firebase_host" or mode == "firebase_client" then
         last_send = last_send + dt
         if last_send >= send_interval then
@@ -444,19 +430,16 @@ function game.draw()
         end
     end
 
-    -- Свои пули
     for _, b in ipairs(bullets) do
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
     end
     
-    -- Пули от других
     for _, b in ipairs(online_bullets) do
         love.graphics.setColor(1, 0.2, 0.2, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
     end
 
-    -- Прицел
     if controls.isAiming() then
         local ax, ay = controls.getAim()
         love.graphics.setColor(0, 0, 0, 0.5)
@@ -467,12 +450,10 @@ function game.draw()
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
     end
 
-    -- Оффлайн враг
     if mode == "offline" then
         enemy.draw()
     end
     
-    -- Игроки (онлайн)
     if mode == "firebase_host" or mode == "firebase_client" then
         for pid, p in pairs(players) do
             if pid ~= player_id and p.alive ~= false then
@@ -500,7 +481,6 @@ function game.draw()
         end
     end
 
-    -- Свой игрок
     if playerImg then
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.push()
@@ -524,7 +504,6 @@ function game.draw()
 
     love.graphics.pop()
 
-    -- HUD
     love.graphics.setColor(1, 1, 1, 1)
     if font then love.graphics.setFont(font) end
     
