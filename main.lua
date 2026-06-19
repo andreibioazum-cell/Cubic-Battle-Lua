@@ -14,18 +14,24 @@ function love.load()
     love.graphics.setDefaultFilter("nearest", "nearest")
     love.audio.setVolume(1.0)
     
-    -- Предзагрузка звуков
+    -- Предзагрузка звуков с поддержкой наложения
     local soundSuccess, soundErr = pcall(function()
         _G.sounds = {
             click = love.audio.newSource("cartoon-button-click-sound.mp3", "static"),
             shot = love.audio.newSource("loud-pistol-shot.mp3", "static")
         }
         -- Устанавливаем громкость
-        if _G.sounds.click then _G.sounds.click:setVolume(0.5) end
-        if _G.sounds.shot then _G.sounds.shot:setVolume(0.3) end
+        if _G.sounds.click then 
+            _G.sounds.click:setVolume(0.5) 
+            _G.sounds.click:setLooping(false)
+        end
+        if _G.sounds.shot then 
+            _G.sounds.shot:setVolume(0.3)
+            _G.sounds.shot:setLooping(false)
+        end
     end)
     if not soundSuccess then
-        print("⚠️ Sounds not loaded: " .. tostring(soundErr))
+        print("Sounds not loaded: " .. tostring(soundErr))
         _G.sounds = {}
     end
 
@@ -40,7 +46,7 @@ function love.load()
         if current and current.load then current.load() end
         lastState = _G.GameState.current
     end, function(err)
-        print("❌ Error: " .. tostring(err))
+        print("Error: " .. tostring(err))
         print(debug.traceback())
     end)
 end
@@ -100,9 +106,18 @@ function love.keypressed(key)
     if key == "escape" then love.event.quit() end
 end
 
--- Вспомогательная функция для воспроизведения звуков
+-- Функция для воспроизведения звуков с поддержкой наложения
 function playSound(name)
     if _G.sounds and _G.sounds[name] then
-        _G.sounds[name]:play()
+        local source = _G.sounds[name]
+        -- Клонируем источник для наложения звуков
+        local clone = love.audio.newSource(source:getFilename(), "static")
+        clone:setVolume(source:getVolume())
+        clone:setLooping(false)
+        clone:play()
+        -- Автоматически удаляем клон после воспроизведения
+        love.timer.after(0.1, function()
+            clone:stop()
+        end)
     end
 end
