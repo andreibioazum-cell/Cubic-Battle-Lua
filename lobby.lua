@@ -19,10 +19,6 @@ local function startGame()
     end
 end
 
-local function quitGame()
-    love.event.quit()
-end
-
 local buttons = {}
 local function makeButton(text, y, action, color)
     table.insert(buttons, { 
@@ -39,7 +35,7 @@ local function updateButtons()
     local startY = h/2 - 50
     
     makeButton("PLAY", startY, startGame, {0.2, 0.6, 0.8})
-    makeButton("QUIT", startY + 65, quitGame, {0.6, 0.2, 0.2})
+    -- ❌ КНОПКА ВЫЙТИ УДАЛЕНА
 end
 
 function lobby.load()
@@ -80,11 +76,11 @@ function lobby.draw()
     local titleY = h/2 - 100
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
-    love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
+    love.graphics.printf("CUBIC BATTLE 3", 0, titleY, w, "center")
     
     love.graphics.setColor(0.7, 0.7, 0.9, 0.5)
     love.graphics.setFont(fontBtn)
-    love.graphics.printf("Singleplayer Arena", 0, titleY + 55, w, "center")
+    love.graphics.printf("Open World Arena", 0, titleY + 55, w, "center")
     
     local bw, bh = 240, 50
     
