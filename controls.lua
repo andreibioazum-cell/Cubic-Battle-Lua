@@ -151,32 +151,33 @@ function controls.touchreleased(id)
 end
 
 function controls.draw()
-    love.graphics.setColor(0, 0, 0, 0.25)
+    -- Джойстик (НЕ прозрачный)
+    love.graphics.setColor(0, 0, 0, 0.5)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(0, 0, 0, 0.6)
-    love.graphics.setLineWidth(2.5)
+    love.graphics.setColor(0, 0, 0, 0.9)
+    love.graphics.setLineWidth(3)
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(0, 0, 0, 0.8)
+    love.graphics.setColor(0, 0, 0, 1)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
     
+    -- Кнопка Shot (НЕ прозрачная)
     local scale = 1 - atk.press * 0.12
     local r = atk.r * scale
     local textScale = 1 - atk.press * 0.18
-    local textAlpha = 1 - atk.press * 0.45
 
-    love.graphics.setColor(0.55 - atk.press * 0.2, 0.20, 0.85 - atk.press * 0.3, 0.8)
+    love.graphics.setColor(0.55 - atk.press * 0.2, 0.20, 0.85 - atk.press * 0.3, 1)
     love.graphics.circle("fill", atk.x, atk.y, r)
-    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.setColor(0, 0, 0, 1)
     love.graphics.setLineWidth(3)
     love.graphics.circle("line", atk.x, atk.y, r)
 
     love.graphics.push()
     love.graphics.translate(atk.x, atk.y)
     love.graphics.scale(textScale, textScale)
-    drawSpacedText("Shot", -atk.r, -12, atk.r * 2, "center", font, font:getWidth("A") * 0.05, textAlpha)
+    drawSpacedText("Shot", -atk.r, -12, atk.r * 2, "center", font, font:getWidth("A") * 0.05, 1)
     love.graphics.pop()
 
-    -- Back (ТОЧНО как кнопки в лобби: тень, заливка, блик, обводка)
+    -- Back
     local bw, bh = back.w, back.h
     local bx, by = back.x, back.y
     
