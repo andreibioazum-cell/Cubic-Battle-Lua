@@ -53,7 +53,7 @@ end
 local function updateButtons()
     buttons = {}
     local h = love.graphics.getHeight()
-    local startY = h/2 - 40
+    local startY = h/2 + 20
     
     makeButton("LOCAL GAME", startY, function()
         local g = tryLoadGame()
@@ -88,8 +88,8 @@ local function updateButtons()
 end
 
 function lobby.load()
-    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 48)
-    fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 20)
+    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 36)
+    fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 18)
     
     tryLoadGame()
     updateButtons()
@@ -141,7 +141,7 @@ function lobby.draw()
         love.graphics.circle("fill", px, py, 1.5)
     end
     
-    local titleY = h/2 - 200
+    local titleY = h/2 - 140
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
@@ -167,17 +167,17 @@ function lobby.draw()
         
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf(btn.text, bx, by + bh/2 - 12, bw, "center")
+        love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
     end
     
     if online.connecting then
         love.graphics.setColor(1, 0.9, 0, 0.7)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf("Connecting...", 0, h - 80, w, "center")
+        love.graphics.printf("Connecting...", 0, h - 60, w, "center")
     elseif online.connected then
         love.graphics.setColor(0, 1, 0.3, 0.5)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf("ONLINE", 0, h - 80, w, "center")
+        love.graphics.printf("ONLINE", 0, h - 60, w, "center")
     end
     
     love.graphics.setColor(1, 1, 1, 1)
