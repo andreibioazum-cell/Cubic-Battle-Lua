@@ -53,7 +53,7 @@ end
 local function updateButtons()
     buttons = {}
     local h = love.graphics.getHeight()
-    local startY = h/2 - 100
+    local startY = h/2 - 40
     
     makeButton("LOCAL GAME", startY, function()
         local g = tryLoadGame()
@@ -64,14 +64,14 @@ local function updateButtons()
     end)
     
     if online.connected then
-        makeButton("ONLINE GAME", startY + 80, function()
+        makeButton("ONLINE GAME", startY + 65, function()
             local g = tryLoadGame()
             if g then
                 g.setOnlineMode(true, online.socket)
                 GameState.current = "game"
             end
         end)
-        makeButton("DISCONNECT", startY + 160, function()
+        makeButton("DISCONNECT", startY + 130, function()
             if online.socket then
                 online.socket:close()
             end
@@ -80,20 +80,16 @@ local function updateButtons()
             updateButtons()
         end)
     else
-        makeButton("CONNECT ONLINE", startY + 80, function()
+        makeButton("CONNECT ONLINE", startY + 65, function()
             connectToServer("192.168.1.100", 4080)
             updateButtons()
         end)
     end
-    
-    makeButton("QUIT", startY + 240, function()
-        love.event.quit()
-    end)
 end
 
 function lobby.load()
-    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 56)
-    fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 26)
+    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 48)
+    fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 20)
     
     tryLoadGame()
     updateButtons()
@@ -117,7 +113,6 @@ function lobby.update(dt)
     if online.connecting then
         local data, err = online.socket:receive("*l")
         if data then
-            print("Server: " .. data)
             online.connected = true
             online.connecting = false
             updateButtons()
@@ -146,43 +141,43 @@ function lobby.draw()
         love.graphics.circle("fill", px, py, 1.5)
     end
     
-    local titleY = h/2 - 220
+    local titleY = h/2 - 200
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
     
-    local bw, bh = 280, 62
+    local bw, bh = 220, 48
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
         local by = btn.y
         
         love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", bx + 4, by + 4, bw, bh, 14, 14)
+        love.graphics.rectangle("fill", bx + 3, by + 3, bw, bh, 12, 12)
         
         love.graphics.setColor(0.45, 0.15, 0.75, 1)
-        love.graphics.rectangle("fill", bx, by, bw, bh, 14, 14)
+        love.graphics.rectangle("fill", bx, by, bw, bh, 12, 12)
         
         love.graphics.setColor(0.6, 0.3, 0.9, 0.4)
-        love.graphics.rectangle("fill", bx + 3, by + 2, bw - 6, bh/2, 14, 14)
+        love.graphics.rectangle("fill", bx + 3, by + 2, bw - 6, bh/2, 12, 12)
         
         love.graphics.setColor(0.8, 0.7, 1, 0.6)
         love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", bx, by, bw, bh, 14, 14)
+        love.graphics.rectangle("line", bx, by, bw, bh, 12, 12)
         
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf(btn.text, bx, by + bh/2 - 14, bw, "center")
+        love.graphics.printf(btn.text, bx, by + bh/2 - 12, bw, "center")
     end
     
     if online.connecting then
         love.graphics.setColor(1, 0.9, 0, 0.7)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf("Connecting...", 0, h - 100, w, "center")
+        love.graphics.printf("Connecting...", 0, h - 80, w, "center")
     elseif online.connected then
         love.graphics.setColor(0, 1, 0.3, 0.5)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf("ONLINE", 0, h - 100, w, "center")
+        love.graphics.printf("ONLINE", 0, h - 80, w, "center")
     end
     
     love.graphics.setColor(1, 1, 1, 1)
@@ -190,7 +185,7 @@ end
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    local bw, bh = 280, 62
+    local bw, bh = 220, 48
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
