@@ -4,6 +4,21 @@ local enemy = require("enemy")
 local game = {}
 
 -- ═══════════════════════════════════════════════════════════
+-- ПРИЁМ ДАННЫХ ИЗ ЛОББИ
+-- ═══════════════════════════════════════════════════════════
+
+local coins_from_lobby = 0
+local skin_from_lobby = "default"
+
+function game.setCoins(amount)
+    coins_from_lobby = amount
+end
+
+function game.setSkin(skin_name)
+    skin_from_lobby = skin_name
+end
+
+-- ═══════════════════════════════════════════════════════════
 -- КОНСТАНТЫ
 -- ═══════════════════════════════════════════════════════════
 
@@ -19,7 +34,7 @@ local WORLD_HEIGHT = 3000
 
 local cube = { x = 0, y = 0, speed = 260, angle = 0, hp = PLAYER_HP_MAX, hit = 0 }
 local bullets = {}
-local bg, playerImg, font
+local bg, playerImg, diamondImg, font
 local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
@@ -29,7 +44,7 @@ local onDeathCallback = nil
 -- ═══════════════════════════════════════════════════════════
 
 local coins = 0
-local selected_skin = "default"  -- "default", "diamond"
+local selected_skin = "default"
 local shop_open = false
 
 -- Скины
@@ -143,68 +158,6 @@ local function drawWorldObjects()
 end
 
 -- ═══════════════════════════════════════════════════════════
--- ОТРИСОВКА МАГАЗИНА
--- ═══════════════════════════════════════════════════════════
-
-local function drawShop()
-    local w, h = love.graphics.getDimensions()
-    local shop_w = 400
-    local shop_h = 350
-    local shop_x = w/2 - shop_w/2
-    local shop_y = h/2 - shop_h/2
-    
-    love.graphics.setColor(0, 0, 0, 0.7)
-    love.graphics.rectangle("fill", shop_x, shop_y, shop_w, shop_h, 16, 16)
-    love.graphics.setColor(0.2, 0.2, 0.3, 0.9)
-    love.graphics.rectangle("fill", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12, 12)
-    love.graphics.setColor(0.4, 0.4, 0.6, 0.3)
-    love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12, 12)
-    
-    love.graphics.setColor(1, 1, 0, 0.9)
-    love.graphics.setFont(font)
-    love.graphics.print("🛒 SHOP", shop_x + 20, shop_y + 15)
-    
-    love.graphics.setColor(1, 1, 1, 0.8)
-    love.graphics.print("💰 Coins: " .. coins, shop_x + 20, shop_y + 45)
-    
-    -- Алмазный куб
-    local item_x = shop_x + 20
-    local item_y = shop_y + 80
-    local item_w = shop_w - 40
-    local item_h = 65
-    
-    love.graphics.setColor(0.1, 0.1, 0.2, 0.8)
-    love.graphics.rectangle("fill", item_x, item_y, item_w, item_h, 8, 8)
-    love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
-    love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", item_x, item_y, item_w, item_h, 8, 8)
-    
-    love.graphics.setColor(0.2, 0.8, 1, 0.9)
-    love.graphics.print("💎 Diamond Cube", item_x + 10, item_y + 8)
-    love.graphics.setColor(0.7, 0.7, 0.9, 0.7)
-    love.graphics.setFont(font)
-    love.graphics.print("Ability: Shield (blocks 1 hit / 10 sec)", item_x + 10, item_y + 30)
-    love.graphics.setColor(1, 1, 0, 0.8)
-    
-    if skins.diamond.owned then
-        love.graphics.print("✅ OWNED", item_x + item_w - 80, item_y + 8)
-    else
-        love.graphics.print("💰 " .. skins.diamond.price .. " coins", item_x + item_w - 100, item_y + 8)
-        love.graphics.setColor(0.2, 0.8, 0.3, 0.9)
-        love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 30, 60, 25, 6, 6)
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.print("BUY", item_x + item_w - 65, item_y + 35)
-    end
-    
-    -- Кнопка закрытия
-    love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + shop_h - 45, 60, 30, 8, 8)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("CLOSE", shop_x + shop_w - 65, shop_y + shop_h - 38)
-end
-
--- ═══════════════════════════════════════════════════════════
 -- ПУЛИ
 -- ═══════════════════════════════════════════════════════════
 
@@ -228,7 +181,7 @@ local function onHitPlayer(dmg)
     -- Проверяем способность "Щит"
     if selected_skin == "diamond" and abilities.shield.timer > 0 then
         abilities.shield.active = true
-        abilities.shield.timer = abilities.shield.timer - 1  -- тратим заряд
+        abilities.shield.timer = abilities.shield.timer - 1
         print("🛡️ Shield blocked damage!")
         return
     end
@@ -249,7 +202,7 @@ end
 -- ═══════════════════════════════════════════════════════════
 
 local function onEnemyDefeated()
-    coins = coins + 10  -- 💰 10 монет за победу
+    coins = coins + 10
     print("💰 +10 coins! Total: " .. coins)
     GameState.current = "lobby"
 end
@@ -273,12 +226,24 @@ function game.load()
     cam.x = cube.x - love.graphics.getWidth() / 2
     cam.y = cube.y - love.graphics.getHeight() / 2
     shop_open = false
+    
+    -- Получаем данные из лобби
+    coins = coins_from_lobby
+    selected_skin = skin_from_lobby
+    
+    -- Проверяем, куплен ли алмазный скин
+    if selected_skin == "diamond" then
+        skins.diamond.owned = true
+    end
 
-    bg = bg or love.graphics.newImage("grass.png")
+    bg = bg or love.graphics.newImage("assets/grass.png")
     if bg then bg:setWrap("repeat", "repeat") end
 
-    playerImg = playerImg or love.graphics.newImage("player.png")
+    playerImg = playerImg or love.graphics.newImage("assets/player.png")
     if playerImg then playerImg:setFilter("nearest", "nearest") end
+    
+    diamondImg = diamondImg or love.graphics.newImage("assets/player_diamond.png")
+    if diamondImg then diamondImg:setFilter("nearest", "nearest") end
 
     font = font or love.graphics.newFont("Fredoka-Bold.ttf", 16)
 
@@ -396,17 +361,30 @@ function game.draw()
         love.graphics.push()
         love.graphics.translate(cube.x + 6, cube.y + 8)
         love.graphics.rotate(cube.angle)
-        love.graphics.draw(playerImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
+        
+        if selected_skin == "diamond" and diamondImg then
+            love.graphics.draw(diamondImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
+        else
+            love.graphics.draw(playerImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
+        end
         love.graphics.pop()
 
-        -- Основной спрайт с цветом скина
+        -- Основной спрайт
         love.graphics.push()
         love.graphics.translate(cube.x, cube.y)
         love.graphics.rotate(cube.angle)
         
-        local skin_color = skins[selected_skin].color
-        love.graphics.setColor(skin_color[1], skin_color[2], skin_color[3], 1)
-        love.graphics.draw(playerImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
+        if selected_skin == "diamond" and diamondImg then
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(diamondImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
+            
+            -- Свечение алмаза
+            love.graphics.setColor(0.2, 0.8, 1, 0.2)
+            love.graphics.circle("fill", 0, 0, PLAYER_SIZE * 0.9)
+        else
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.draw(playerImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
+        end
         
         -- Если способность активна — свечение
         if abilities.shield.active then
@@ -456,7 +434,7 @@ function game.draw()
         love.graphics.print("ENEMY " .. math.max(0, e_obj.hp), ex, margin + barH + 4)
     end
 
-    -- 🛒 КНОПКА МАГАЗИНА
+    -- 🛒 КНОПКА МАГАЗИНА (в игре)
     local shop_btn_x = love.graphics.getWidth() / 2 - 50
     local shop_btn_y = 10
     love.graphics.setColor(0.4, 0.2, 0.8, 0.9)
@@ -465,60 +443,18 @@ function game.draw()
     love.graphics.print("🛒 SHOP", shop_btn_x + 15, shop_btn_y + 8)
 
     controls.draw()
-    
-    -- Магазин
-    if shop_open then
-        drawShop()
-    end
 end
 
 function game.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
     local h = love.graphics.getHeight()
     
-    -- Кнопка магазина
+    -- Кнопка магазина в игре
     local shop_btn_x = w/2 - 50
     local shop_btn_y = 10
     if x >= shop_btn_x and x <= shop_btn_x + 100 and y >= shop_btn_y and y <= shop_btn_y + 35 then
         shop_open = not shop_open
         return
-    end
-    
-    -- Магазин
-    if shop_open then
-        local shop_w = 400
-        local shop_h = 350
-        local shop_x = w/2 - shop_w/2
-        local shop_y = h/2 - shop_h/2
-        
-        -- Кнопка CLOSE
-        if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and 
-           y >= shop_y + shop_h - 45 and y <= shop_y + shop_h - 15 then
-            shop_open = false
-            return
-        end
-        
-        -- Кнопка BUY (Diamond Cube)
-        local item_x = shop_x + 20
-        local item_y = shop_y + 80
-        local item_w = shop_w - 40
-        local item_h = 65
-        
-        if x >= item_x + item_w - 80 and x <= item_x + item_w - 20 and
-           y >= item_y + 30 and y <= item_y + 55 then
-            if not skins.diamond.owned and coins >= skins.diamond.price then
-                coins = coins - skins.diamond.price
-                skins.diamond.owned = true
-                selected_skin = "diamond"
-                print("💎 Diamond Cube purchased!")
-            elseif skins.diamond.owned then
-                selected_skin = "diamond"
-                print("💎 Diamond Cube equipped!")
-            else
-                print("❌ Not enough coins!")
-            end
-            return
-        end
     end
     
     controls.touchpressed(id, x, y)
@@ -537,11 +473,7 @@ end
 
 function game.keypressed(key, scancode, isrepeat)
     if key == "escape" then
-        if shop_open then
-            shop_open = false
-        else
-            GameState.current = "lobby"
-        end
+        GameState.current = "lobby"
     end
 end
 
