@@ -1,109 +1,65 @@
 local lobby = {}
-local game
-
+local game = require("game")
 local fontTitle, fontBtn
 local animTimer = 0
 
-local function tryLoadGame()
-    if not game then
-        game = require("game")
-    end
-    return game
+local function drawButton(text, x, y, w, h, font)
+    -- Тень кнопки (как просил, одинаковая везде)
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.rectangle("fill", x + 4, y + 4, w, h, 14, 14)
+    -- Тело кнопки
+    love.graphics.setColor(0.45, 0.15, 0.75, 1)
+    love.graphics.rectangle("fill", x, y, w, h, 14, 14)
+    -- Текст
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(font)
+    love.graphics.printf(text, x, y + h/2 - 14, w, "center")
 end
 
 local buttons = {}
-local function makeButton(text, y, action)
-    table.insert(buttons, { text = text, y = y, action = action })
-end
-
-local function updateButtons()
-    buttons = {}
-    local h = love.graphics.getHeight()
-    
-    -- Кнопки ниже центра (StartY увеличена)
-    local startY = h * 0.6
-    
-    makeButton("LOCAL GAME", startY, function()
-        local g = tryLoadGame()
-        if g then
-            g.setOnlineMode(false)
-            GameState.current = "game"
-        end
-    end)
-    
-    makeButton("ONLINE GAME", startY + 85, function()
-        local g = tryLoadGame()
-        if g then
-            g.setOnlineMode(false)
-            GameState.current = "game"
-        end
-    end)
+function lobby.updateButtons()
+    local w, h = love.graphics.getDimensions()
+    local startY = h * 0.4 -- ПОДНЯЛ ВЫШЕ
+    buttons = {
+        { text = "LOCAL GAME", y = startY, action = function() game.setOnlineMode(false); GameState.current = "game" end },
+        { text = "ONLINE GAME", y = startY + 90, action = function() game.setOnlineMode(false); GameState.current = "game" end }
+    }
 end
 
 function lobby.load()
-    fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 42) -- Меньше
+    fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 45)
     fontBtn = love.graphics.newFont("Fredoka-Bold.ttf", 26)
-    updateButtons()
-    animTimer = 0
+    lobby.updateButtons()
 end
 
-function lobby.update(dt)
-    animTimer = animTimer + dt
-end
+function lobby.update(dt) animTimer = animTimer + dt end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
-    
-    -- Красивый градиентный фон
-    local steps = 40
-    for i = 0, steps do
-        local t = i / steps
-        love.graphics.setColor(0.05 + t*0.05, 0.01 + t*0.03, 0.15 + t*0.1)
-        love.graphics.rectangle("fill", 0, i * (h/steps), w, h/steps + 1)
-    end
-    
-    -- Анимация звёзд
+    -- Фон
+    love.graphics.clear(0.05, 0.05, 0.1)
     love.graphics.setColor(1, 1, 1, 0.2)
-    for i = 1, 15 do
-        local px = (math.sin(animTimer * 0.2 + i) * 0.5 + 0.5) * w
-        local py = (math.cos(animTimer * 0.3 + i * 2) * 0.5 + 0.5) * h
+    for i = 1, 10 do
+        local px = (math.sin(animTimer * 0.5 + i) * 0.5 + 0.5) * w
+        local py = (math.cos(animTimer * 0.3 + i) * 0.5 + 0.5) * h
         love.graphics.circle("fill", px, py, 2)
     end
-    
-    -- Заголовок ниже и меньше
-    love.graphics.setColor(1, 1, 1, 1)
+    -- Заголовок (ВЫШЕ)
+    love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fontTitle)
-    love.graphics.printf("CUBIC BATTLE", 0, h * 0.38, w, "center")
-    
-    -- Кнопки
-    local bw, bh = 280, 62
-    love.graphics.setFont(fontBtn)
-    for _, btn in ipairs(buttons) do
-        local bx = w/2 - bw/2
-        -- Тень кнопки
-        love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", bx + 4, btn.y + 4, bw, bh, 15, 15)
-        -- Тело кнопки
-        love.graphics.setColor(0.45, 0.15, 0.75, 1)
-        love.graphics.rectangle("fill", bx, btn.y, bw, bh, 15, 15)
-        -- Текст
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.printf(btn.text, bx, btn.y + bh/2 - 15, bw, "center")
+    love.graphics.printf("CUBIC BATTLE", 0, h * 0.2, w, "center")
+
+    for _, b in ipairs(buttons) do
+        drawButton(b.text, w/2 - 140, b.y, 280, 62, fontBtn)
     end
 end
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    local bw, bh = 280, 62
-    for _, btn in ipairs(buttons) do
-        local bx = w/2 - bw/2
-        if x >= bx and x <= bx + bw and y >= btn.y and y <= btn.y + bh then
-            btn.action()
-            return
-        end
+    for _, b in ipairs(buttons) do
+        if x > w/2-140 and x < w/2+140 and y > b.y and y < b.y + 62 then b.action() end
     end
 end
 
-function lobby.resize() updateButtons() end
-
+function lobby.resize() lobby.updateButtons() end
 return lobby
