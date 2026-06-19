@@ -9,4 +9,13 @@ function love.conf(t)
     t.window.resizable = true
     t.modules.physics = false
     t.modules.video = false
+    
+    -- Для Android: разрешаем сеть
+    t.android = {
+        permissions = {
+            "android.permission.INTERNET",
+            "android.permission.ACCESS_NETWORK_STATE",
+            "android.permission.ACCESS_WIFI_STATE"
+        }
+    }
 end
