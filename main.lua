@@ -1,6 +1,7 @@
 local lobby = require("lobby")
 local game = require("game")
 local modSystem = require("mod_system")
+local gameInstaller = require("game_installer")
 
 _G.GameState = { current = "lobby" }
 
@@ -12,19 +13,17 @@ local states = {
 local lastState = nil
 
 -- ============================================================
--- ИСПРАВЛЕННАЯ ФУНКЦИЯ playSound
+-- ФУНКЦИЯ playSound (ИСПРАВЛЕННАЯ)
 -- ============================================================
 function playSound(name)
     if _G.sounds and _G.sounds[name] then
         local source = _G.sounds[name]
-        -- Проверяем что источник существует и у него есть метод clone
         if source and source:clone then
             local clone = source:clone()
             if clone then
                 clone:setVolume(source:getVolume() or 0.5)
                 clone:setLooping(false)
                 clone:play()
-                -- Автоматически останавливаем через 0.5 секунды
                 love.timer.after(0.5, function()
                     if clone and clone:isPlaying then
                         clone:stop()
@@ -32,7 +31,6 @@ function playSound(name)
                 end)
             end
         elseif source and source:play then
-            -- Fallback: просто проигрываем без клонирования
             source:play()
         end
     end
@@ -44,6 +42,16 @@ function love.load()
     
     -- Инициализируем систему модов
     modSystem.autoInit()
+    
+    -- Инициализируем установщик модов
+    gameInstaller.init()
+    
+    -- Проверяем безопасный режим
+    if gameInstaller.checkSafeMode() then
+        print("🔒 Безопасный режим активирован!")
+        -- Восстанавливаем бэкап если есть
+        gameInstaller.restoreBackup()
+    end
     
     -- Загружаем звуки
     local soundSuccess, soundErr = pcall(function()
@@ -70,7 +78,7 @@ function love.load()
         if game.setOnDeath then
             game.setOnDeath(function()
                 _G.GameState.current = "lobby"
-                modSystem.gameDeath()  -- Вызываем событие смерти для модов
+                modSystem.gameDeath()
             end)
         end
 
@@ -80,8 +88,15 @@ function love.load()
         end
         lastState = _G.GameState.current
         
-        -- Вызываем событие загрузки для модов
         modSystem.gameLoad()
+        
+        -- Показываем информацию об установленном моде
+        local installedMod = gameInstaller.getInstalledMod()
+        if installedMod then
+            print("📦 Установлен мод: " .. installedMod.title)
+            print("   Автор: " .. installedMod.author)
+            print("   Версия: " .. installedMod.version)
+        end
         
     end, function(err)
         print("❌ Ошибка: " .. tostring(err))
@@ -105,7 +120,6 @@ function love.update(dt)
         current.update(dt) 
     end
     
-    -- Обновляем моды
     modSystem.gameUpdate(dt)
 end
 
@@ -115,8 +129,14 @@ function love.draw()
         current.draw() 
     end
     
-    -- Рисуем моды (поверх всего)
     modSystem.gameDraw()
+    
+    -- Показываем статус установки в углу
+    local status = gameInstaller.getInstallStatus()
+    if status.isInstalling then
+        love.graphics.setColor(1, 1, 0, 0.8)
+        love.graphics.print("📦 Установка мода...", 10, love.graphics.getHeight() - 30)
+    end
 end
 
 function love.touchpressed(id, x, y)
