@@ -202,6 +202,7 @@ function lobby.touchpressed(id, x, y)
         if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and
            y >= shop_y + 10 and y <= shop_y + 40 then
             shop_open = false
+            playSound("click")  -- 🔊 Звук клика
             return
         end
 
@@ -210,6 +211,7 @@ function lobby.touchpressed(id, x, y)
         local item_w, item_h = shop_w - 40, 60
         if x >= item_x + item_w - 80 and x <= item_x + item_w - 20 and
            y >= item_y + 15 and y <= item_y + 45 then
+            playSound("click")  -- 🔊 Звук клика
             if not skins.diamond.owned and coins >= 100 then
                 coins = coins - 100
                 skins.diamond.owned = true
@@ -227,12 +229,14 @@ function lobby.touchpressed(id, x, y)
     local bx = w / 2 - 120
     if x >= bx and x <= bx + 240 then
         if y >= h / 2 - 20 and y <= h / 2 + 30 then
+            playSound("click")  -- 🔊 Звук клика
             local g = require("game")
             g.setCoins(coins)
             g.setSkin(selected_skin)
             g.load()
             _G.GameState.current = "game"
         elseif y >= h / 2 + 45 and y <= h / 2 + 95 then
+            playSound("click")  -- 🔊 Звук клика
             shop_open = true
         end
     end
