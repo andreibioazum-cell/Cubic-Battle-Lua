@@ -176,7 +176,6 @@ end
 function enemy.draw()
     if not e then return end
 
-    -- Пули врага (ЧЁРНЫЕ)
     for _, b in ipairs(enemyBullets) do
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("fill", b.x, b.y, b.size)
