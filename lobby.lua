@@ -2,362 +2,129 @@ local lobby = {}
 
 local fontTitle, fontBtn
 local animTimer = 0
-local game = nil
 local coins = 0
 local shop_open = false
+local bgCanvas = nil
+local stars = {}
 
--- Скины
 local skins = {
-    default = {
-        name = "Default Cube",
-        color = {1, 1, 1},
-        ability = nil,
-        ability_name = "None",
-        price = 0,
-        owned = true
-    },
-    diamond = {
-        name = "Diamond Cube",
-        color = {0.2, 0.8, 1},
-        ability = "shield",
-        ability_name = "Shield",
-        ability_desc = "Blocks 1 hit every 10 sec",
-        price = 100,
-        owned = false
-    }
+    default = { name = "Default Cube", price = 0, owned = true },
+    diamond = { name = "Diamond Cube", price = 100, owned = false }
 }
-
 local selected_skin = "default"
 
--- Загрузка сохранений
-local function loadSave()
-    local success, data = pcall(love.filesystem.read, "save.txt")
-    if success and data then
-        local lines = {}
-        for line in data:gmatch("[^\r\n]+") do
-            table.insert(lines, line)
-        end
-        if #lines >= 1 then
-            coins = tonumber(lines[1]) or 0
-        end
-        if #lines >= 2 then
-            if lines[2] == "diamond" then
-                skins.diamond.owned = true
-            end
-        end
-        if #lines >= 3 then
-            selected_skin = lines[3] or "default"
-        end
-    end
-end
-
--- Сохранение
 local function saveGame()
-    local data = tostring(coins) .. "\n"
-    if skins.diamond.owned then
-        data = data .. "diamond\n"
-    else
-        data = data .. "default\n"
-    end
-    data = data .. selected_skin .. "\n"
+    local data = string.format("%d\n%s\n%s", coins, skins.diamond.owned and "diamond" or "default", selected_skin)
     love.filesystem.write("save.txt", data)
 end
 
-local function tryLoadGame()
-    if not game then
-        game = require("game")
-    end
-    return game
-end
-
-local function startGame()
-    local g = tryLoadGame()
-    if g then
-        g.setCoins(coins)
-        g.setSkin(selected_skin)
-        g.load()
-        GameState.current = "game"
+local function loadSave()
+    local data = love.filesystem.read("save.txt")
+    if data then
+        local lines = {}
+        for line in data:gmatch("[^\r\n]+") do table.insert(lines, line) end
+        coins = tonumber(lines[1]) or 0
+        if lines[2] == "diamond" then skins.diamond.owned = true end
+        selected_skin = lines[3] or "default"
     end
 end
 
-local function buySkin(skin_name)
-    if skins[skin_name] and not skins[skin_name].owned then
-        if coins >= skins[skin_name].price then
-            coins = coins - skins[skin_name].price
-            skins[skin_name].owned = true
-            selected_skin = skin_name
-            saveGame()
-            print(skins[skin_name].name .. " purchased!")
-        else
-            print("Not enough Cubicoins!")
-        end
-    elseif skins[skin_name] and skins[skin_name].owned then
-        selected_skin = skin_name
-        saveGame()
-        print(skins[skin_name].name .. " equipped!")
-    end
-end
-
-local buttons = {}
-local function makeButton(text, y, action, color)
-    table.insert(buttons, { 
-        text = text, 
-        y = y, 
-        action = action,
-        color = color or {0.45, 0.15, 0.75}
-    })
-end
-
-local function updateButtons()
-    buttons = {}
-    local h = love.graphics.getHeight()
-    local startY = h/2 - 50
-    
-    makeButton("PLAY", startY, startGame, {0.2, 0.6, 0.8})
-    makeButton("SHOP", startY + 65, function()
-        shop_open = not shop_open
-    end, {0.4, 0.2, 0.8})
-end
-
--- ═══════════════════════════════════════════════════════════
--- ОТРИСОВКА МАГАЗИНА (КНОПКА CLOSE ВВЕРХУ)
--- ═══════════════════════════════════════════════════════════
-
-local function drawShop()
+local function createBG()
     local w, h = love.graphics.getDimensions()
-    local shop_w = 400
-    local shop_h = 350
-    local shop_x = w/2 - shop_w/2
-    local shop_y = h/2 - shop_h/2 + 50
-    
-    love.graphics.setColor(0, 0, 0, 0.8)
-    love.graphics.rectangle("fill", shop_x, shop_y, shop_w, shop_h, 16, 16)
-    love.graphics.setColor(0.2, 0.2, 0.3, 0.95)
-    love.graphics.rectangle("fill", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12, 12)
-    love.graphics.setColor(0.4, 0.4, 0.6, 0.3)
-    love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12, 12)
-    
-    -- ⬆️ КНОПКА CLOSE ВВЕРХУ
-    love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + 10, 60, 30, 8, 8)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("CLOSE", shop_x + shop_w - 65, shop_y + 18)
-    
-    love.graphics.setColor(1, 1, 0, 0.9)
-    love.graphics.setFont(fontTitle)
-    love.graphics.print("SHOP", shop_x + 20, shop_y + 15)
-    
-    love.graphics.setColor(1, 1, 1, 0.8)
-    love.graphics.setFont(fontBtn)
-    love.graphics.print("Cubicoins: " .. coins, shop_x + 20, shop_y + 55)
-    
-    -- Алмазный куб
-    local item_x = shop_x + 20
-    local item_y = shop_y + 90
-    local item_w = shop_w - 40
-    local item_h = 80
-    
-    love.graphics.setColor(0.1, 0.1, 0.2, 0.8)
-    love.graphics.rectangle("fill", item_x, item_y, item_w, item_h, 8, 8)
-    love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
-    love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", item_x, item_y, item_w, item_h, 8, 8)
-    
-    love.graphics.setColor(0.2, 0.8, 1, 0.9)
-    love.graphics.setFont(fontBtn)
-    love.graphics.print("Diamond Cube", item_x + 10, item_y + 8)
-    love.graphics.setColor(0.7, 0.7, 0.9, 0.7)
-    love.graphics.print("Shield (blocks 1 hit / 10 sec)", item_x + 10, item_y + 32)
-    love.graphics.setColor(1, 1, 0, 0.8)
-    
-    if skins.diamond.owned then
-        if selected_skin == "diamond" then
-            love.graphics.setColor(0, 1, 0, 0.9)
-            love.graphics.print("EQUIPPED", item_x + item_w - 100, item_y + 8)
-        else
-            love.graphics.setColor(0.3, 0.8, 0.3, 0.9)
-            love.graphics.rectangle("fill", item_x + item_w - 90, item_y + 8, 70, 25, 6, 6)
-            love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.print("EQUIP", item_x + item_w - 75, item_y + 13)
-        end
-    else
-        love.graphics.print("" .. skins.diamond.price .. " Cubicoins", item_x + item_w - 130, item_y + 8)
-        if coins >= skins.diamond.price then
-            love.graphics.setColor(0.2, 0.8, 0.3, 0.9)
-        else
-            love.graphics.setColor(0.5, 0.5, 0.5, 0.9)
-        end
-        love.graphics.rectangle("fill", item_x + item_w - 90, item_y + 32, 70, 25, 6, 6)
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.print("BUY", item_x + item_w - 75, item_y + 37)
+    bgCanvas = love.graphics.newCanvas(w, h)
+    love.graphics.setCanvas(bgCanvas)
+    for i = 0, 60 do
+        local t = i / 60
+        love.graphics.setColor(0.08 + t*0.07, 0.02 + t*0.05, 0.18 + t*0.3)
+        love.graphics.rectangle("fill", 0, i * (h/60), w, h/60 + 1)
     end
+    love.graphics.setCanvas()
 end
-
--- ═══════════════════════════════════════════════════════════
--- ОСНОВНЫЕ ФУНКЦИИ
--- ═══════════════════════════════════════════════════════════
 
 function lobby.load()
-    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 48)
-    fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 20)
-    
+    fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 48)
+    fontBtn = love.graphics.newFont("Fredoka-Bold.ttf", 20)
     loadSave()
-    tryLoadGame()
-    updateButtons()
-    animTimer = 0
-    shop_open = false
+    createBG()
+    stars = {}
+    for i=1, 50 do table.insert(stars, {x=math.random(), y=math.random(), s=0.1+math.random()*0.4}) end
 end
 
-function lobby.update(dt)
-    animTimer = animTimer + dt
-end
+function lobby.update(dt) animTimer = animTimer + dt end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
+    love.graphics.setColor(1,1,1)
+    if bgCanvas then love.graphics.draw(bgCanvas) end
     
-    -- Градиент
-    local gradientSteps = 60
-    local stepH = h / gradientSteps
-    for i = 0, gradientSteps - 1 do
-        local t = i / (gradientSteps - 1)
-        local r = 0.08 + t * 0.07
-        local g = 0.02 + t * 0.05
-        local b = 0.18 + t * 0.30
-        love.graphics.setColor(r, g, b, 1)
-        love.graphics.rectangle("fill", 0, i * stepH, w, stepH + 1)
+    for _, s in ipairs(stars) do
+        love.graphics.setColor(1,1,1, 0.3)
+        love.graphics.circle("fill", (s.x*w + animTimer*20*s.s)%w, (s.y*h + animTimer*10*s.s)%h, 1.5)
     end
-    
-    -- Звёзды
-    love.graphics.setColor(1, 1, 1, 0.35)
-    for i = 1, 50 do
-        local px = (math.sin(animTimer * 0.3 + i * 7.3) * 0.5 + 0.5) * w
-        local py = (math.cos(animTimer * 0.5 + i * 4.7) * 0.5 + 0.5) * h
-        local size = 1 + math.sin(animTimer * 2 + i) * 1
-        love.graphics.circle("fill", px, py, size)
-    end
-    
-    -- Заголовок
-    local titleY = h/2 - 180
-    love.graphics.setColor(1, 1, 1, 1)
+
+    love.graphics.setColor(1,1,1)
     love.graphics.setFont(fontTitle)
-    love.graphics.printf("CUBIC BATTLE 3", 0, titleY, w, "center")
+    love.graphics.printf("CUBIC BATTLE 3", 0, h/2 - 180, w, "center")
     
-    love.graphics.setColor(0.7, 0.7, 0.9, 0.5)
+    love.graphics.setColor(1,1,0)
     love.graphics.setFont(fontBtn)
-    love.graphics.printf("Open World Arena", 0, titleY + 55, w, "center")
-    
-    -- Показ Cubicoins
-    love.graphics.setColor(1, 1, 0, 0.9)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("Cubicoins: " .. coins, 0, titleY + 100, w, "center")
-    
-    -- Кнопки
-    local bw, bh = 240, 50
-    
-    for _, btn in ipairs(buttons) do
-        local bx = w/2 - bw/2
-        local by = btn.y
-        
-        love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", bx + 3, by + 3, bw, bh, 12, 12)
-        
-        local color = btn.color or {0.45, 0.15, 0.75}
-        love.graphics.setColor(color[1], color[2], color[3], 1)
-        love.graphics.rectangle("fill", bx, by, bw, bh, 12, 12)
-        
-        love.graphics.setColor(
-            math.min(1, color[1] + 0.2),
-            math.min(1, color[2] + 0.2),
-            math.min(1, color[3] + 0.2),
-            0.3
-        )
-        love.graphics.rectangle("fill", bx + 3, by + 2, bw - 6, bh/2, 12, 12)
-        
-        love.graphics.setColor(1, 1, 1, 0.5)
-        love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", bx, by, bw, bh, 12, 12)
-        
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setFont(fontBtn)
-        love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
-    end
-    
-    -- Магазин
-    if shop_open then
-        drawShop()
-    end
-    
-    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.printf("Cubicoins: " .. coins, 0, h/2 - 80, w, "center")
+
+    -- Кнопки (упрощенно для скорости)
+    local bx = w/2 - 120
+    love.graphics.setColor(0.2, 0.6, 0.8)
+    love.graphics.rectangle("fill", bx, h/2 - 20, 240, 50, 10)
+    love.graphics.setColor(0.4, 0.2, 0.8)
+    love.graphics.rectangle("fill", bx, h/2 + 45, 240, 50, 10)
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("PLAY", bx, h/2 - 5, 240, "center")
+    love.graphics.printf("SHOP", bx, h/2 + 60, 240, "center")
+
+    if shop_open then lobby.drawShop() end
 end
 
--- ═══════════════════════════════════════════════════════════
--- ОБРАБОТКА КАСАНИЙ
--- ═══════════════════════════════════════════════════════════
+function lobby.drawShop()
+    local w, h = love.graphics.getDimensions()
+    local sx, sy = w/2-200, h/2-150
+    love.graphics.setColor(0,0,0,0.9)
+    love.graphics.rectangle("fill", sx, sy, 400, 350, 15)
+    
+    -- Кнопка CLOSE вверху
+    love.graphics.setColor(0.8, 0.2, 0.2)
+    love.graphics.rectangle("fill", sx + 330, sy + 10, 60, 30, 5)
+    love.graphics.setColor(1,1,1)
+    love.graphics.print("X", sx + 353, sy + 14)
+
+    love.graphics.print("SHOP - Diamond Cube (100C)", sx+20, sy+70)
+    if skins.diamond.owned then
+        love.graphics.print(selected_skin == "diamond" and "EQUIPPED" or "EQUIP", sx+20, sy+110)
+    else
+        love.graphics.print("BUY", sx+20, sy+110)
+    end
+end
 
 function lobby.touchpressed(id, x, y)
-    local w = love.graphics.getWidth()
-    local h = love.graphics.getHeight()
-    local bw, bh = 240, 50
-    
-    -- Магазин
+    local w, h = love.graphics.getDimensions()
     if shop_open then
-        local shop_w = 400
-        local shop_h = 350
-        local shop_x = w/2 - shop_w/2
-        local shop_y = h/2 - shop_h/2 + 50
-        
-        -- ⬆️ КНОПКА CLOSE ВВЕРХУ
-        if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and 
-           y >= shop_y + 10 and y <= shop_y + 40 then
-            shop_open = false
-            return
-        end
-        
-        -- Кнопка BUY/EQUIP (Diamond Cube)
-        local item_x = shop_x + 20
-        local item_y = shop_y + 90
-        local item_w = shop_w - 40
-        
-        if skins.diamond.owned then
-            -- Кнопка EQUIP
-            if x >= item_x + item_w - 90 and x <= item_x + item_w - 20 and
-               y >= item_y + 8 and y <= item_y + 33 then
-                buySkin("diamond")
-                saveGame()
-                return
-            end
-        else
-            -- Кнопка BUY
-            if x >= item_x + item_w - 90 and x <= item_x + item_w - 20 and
-               y >= item_y + 32 and y <= item_y + 57 then
-                buySkin("diamond")
-                saveGame()
-                return
+        local sx, sy = w/2-200, h/2-150
+        if x > sx+330 and x < sx+390 and y > sy+10 and y < sy+40 then shop_open = false end
+        if y > sy+100 and y < sy+150 then
+            if not skins.diamond.owned and coins >= 100 then
+                coins = coins - 100; skins.diamond.owned = true; selected_skin = "diamond"; saveGame()
+            elseif skins.diamond.owned then
+                selected_skin = "diamond"; saveGame()
             end
         end
         return
     end
-    
-    -- Кнопки меню
-    for _, btn in ipairs(buttons) do
-        local bx = w/2 - bw/2
-        local by = btn.y
-        if x >= bx and x <= bx + bw and y >= by and y <= by + bh then
-            if btn.action then 
-                btn.action() 
-            end
-            return
-        end
+    if x > w/2-120 and x < w/2+120 then
+        if y > h/2-20 and y < h/2+30 then
+            local g = require("game")
+            g.setCoins(coins); g.setSkin(selected_skin); g.load(); _G.GameState.current = "game"
+        elseif y > h/2+45 and y < h/2+95 then shop_open = true end
     end
 end
 
-function lobby.mousepressed(x, y)
-    lobby.touchpressed(1, x, y)
-end
-
-function lobby.resize()
-    updateButtons()
-end
+function lobby.resize() createBG() end
 
 return lobby
