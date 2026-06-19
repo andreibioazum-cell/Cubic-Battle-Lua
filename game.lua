@@ -9,7 +9,7 @@ local PLAYER_SIZE = 55
 local PLAYER_HP_MAX = 5
 local BULLET_SPEED = 340 * 1.15
 
--- Переменные
+-- Локальные переменные
 local cube = { x = 0, y = 0, speed = 260, angle = 0, hp = PLAYER_HP_MAX, hit = 0 }
 local bullets = {}
 local bg, playerImg, font
@@ -17,8 +17,8 @@ local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
 
--- Онлайн
-local mode = "offline"
+-- Онлайн переменные
+local mode = "offline"  -- "offline", "client", "host"
 local socket = nil
 local connected = false
 local player_id = 0
@@ -27,12 +27,11 @@ local last_send = 0
 local send_interval = 1 / 20
 local online_bullets = {}
 local kill_messages = {}
-local message_timer = 0
-local scoreboard = {}
 local game_start_time = 0
+local connect_error = ""
 
 -- ============================================================
--- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+-- ФУНКЦИИ ОТРИСОВКИ
 -- ============================================================
 
 local function drawHPBar(x, y, w, h, hp, max, color)
@@ -50,9 +49,7 @@ end
 
 local function drawScoreboard()
     local w = love.graphics.getWidth()
-    local h = love.graphics.getHeight()
     
-    -- Собираем данные
     local scores = {}
     for pid, p in pairs(players) do
         if p.alive ~= false then
@@ -64,10 +61,8 @@ local function drawScoreboard()
         end
     end
     
-    -- Сортируем по убийствам
     table.sort(scores, function(a, b) return a.kills > b.kills end)
     
-    -- Рисуем таблицу
     local bx = w - 220
     local by = 100
     local bw = 200
@@ -107,7 +102,7 @@ local function drawHostInfo()
 end
 
 -- ============================================================
--- ОСНОВНЫЕ ФУНКЦИИ
+-- СОЗДАНИЕ ПУЛИ
 -- ============================================================
 
 local function spawnBullet(x, y, dx, dy)
@@ -126,6 +121,10 @@ local function spawnBullet(x, y, dx, dy)
     end
 end
 
+-- ============================================================
+-- ОБРАБОТЧИК УРОНА
+-- ============================================================
+
 local function onHitPlayer(dmg)
     if dead then return end
     cube.hp = cube.hp - dmg
@@ -139,12 +138,8 @@ local function onHitPlayer(dmg)
     end
 end
 
-function game.setOnDeath(callback)
-    onDeathCallback = callback
-end
-
 -- ============================================================
--- РЕЖИМЫ
+-- РЕЖИМЫ ИГРЫ
 -- ============================================================
 
 function game.setMode(new_mode)
@@ -153,27 +148,47 @@ function game.setMode(new_mode)
 end
 
 function game.hostGame(port)
-    if not server.start(port) then
-        print("❌ Не удалось запустить сервер")
+    print("👑 Запуск сервера...")
+    
+    local success = server.start(port)
+    
+    if not success then
+        local info = server.getInfo()
+        if info.error then
+            connect_error = info.error
+            print(connect_error)
+        end
         return false
     end
     
-    game_start_time = love.timer.getTime()
+    -- Даем серверу время запуститься
+    local wait = 0.1
+    local start = love.timer.getTime()
     
-    local success = game.connect("127.0.0.1", port)
-    if success then
-        game.setMode("host")
-        print("👑 Вы хост игры!")
-        return true
+    -- Подключаемся как клиент
+    local conn_success = false
+    while love.timer.getTime() - start < wait do
+        conn_success = game.connect("127.0.0.1", port)
+        if conn_success then break end
     end
     
-    return false
+    if conn_success then
+        game.setMode("host")
+        game_start_time = love.timer.getTime()
+        print("👑 Вы хост игры!")
+        return true
+    else
+        print("❌ Не удалось подключиться к своему серверу")
+        server.stop()
+        return false
+    end
 end
 
 function game.connect(ip, port)
     local success, socket_lib = pcall(require, "socket")
     if not success then
-        print("❌ LuaSocket не установлен")
+        connect_error = "❌ LuaSocket не установлен"
+        print(connect_error)
         return false
     end
     
@@ -186,7 +201,8 @@ function game.connect(ip, port)
         print("✅ Подключено к серверу " .. ip .. ":" .. port)
         return true
     else
-        print("❌ Ошибка подключения: " .. tostring(err))
+        connect_error = "❌ Ошибка подключения: " .. tostring(err)
+        print(connect_error)
         socket = nil
         connected = false
         return false
@@ -206,6 +222,10 @@ function game.disconnect()
     online_bullets = {}
     kill_messages = {}
     game.setMode("offline")
+end
+
+function game.getConnectError()
+    return connect_error
 end
 
 -- ============================================================
@@ -249,6 +269,7 @@ function game.load()
     end)
     
     game.setMode("offline")
+    connect_error = ""
 end
 
 function game.resize()
@@ -510,7 +531,6 @@ function game.draw()
                     love.graphics.pop()
                 end
                 
-                -- Ник и HP
                 love.graphics.setColor(1, 1, 1, 0.7)
                 love.graphics.setFont(font)
                 love.graphics.print("P" .. pid, p.x - 15, p.y - 65)
@@ -536,7 +556,6 @@ function game.draw()
         love.graphics.draw(playerImg, -PLAYER_SIZE / 2, -PLAYER_SIZE / 2)
         love.graphics.pop()
         
-        -- Ник
         love.graphics.setColor(0, 1, 0, 0.8)
         love.graphics.setFont(font)
         love.graphics.print("YOU", cube.x - 15, cube.y - 65)
@@ -555,7 +574,6 @@ function game.draw()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("HP " .. math.max(0, cube.hp), margin, margin + barH + 4)
 
-    -- Оффлайн враг HP
     if mode == "offline" then
         local e_obj = enemy.get()
         if e_obj then
@@ -566,13 +584,9 @@ function game.draw()
         end
     end
     
-    -- Информация хоста
     drawHostInfo()
-    
-    -- Счет
     drawScoreboard()
     
-    -- Сообщения о убийствах
     for i, msg in ipairs(kill_messages) do
         local alpha = math.min(1, msg.timer)
         local y = 150 + (i - 1) * 30
