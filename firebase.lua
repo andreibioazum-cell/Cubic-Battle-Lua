@@ -1,10 +1,10 @@
 -- firebase.lua
--- Работа с Firebase через HTTP (без SSL)
+-- Firebase Realtime Database client for LOVE2D
 
 local firebase = {}
 
 -- ============================================================
--- ТВОИ ДАННЫЕ ИЗ FIREBASE
+-- CONFIG
 -- ============================================================
 
 local CONFIG = {
@@ -13,23 +13,27 @@ local CONFIG = {
 }
 
 -- ============================================================
--- HTTP ЗАПРОСЫ (БЕЗ SSL!)
+-- HTTP REQUEST
 -- ============================================================
 
 local function httpRequest(method, url, data, callback)
     local success, http = pcall(require, "socket.http")
     if not success then
-        print("❌ socket.http не найден")
+        print("ERROR: socket.http not found")
+        if callback then callback(nil, "no_http") end
         return nil
     end
     
     local ltn12 = require("ltn12")
     
-    -- Заменяем https на http (для теста)
-    url = url:gsub("https://", "http://")
+    print(method .. " " .. url)
+    
+    -- Try HTTPS first
+    local ssl_success, https = pcall(require, "ssl.https")
+    local http_lib = ssl_success and https or http
     
     local response_body = {}
-    local res, code, headers = http.request{
+    local res, code, headers = http_lib.request{
         url = url,
         method = method,
         headers = {
@@ -41,6 +45,13 @@ local function httpRequest(method, url, data, callback)
     
     local result = table.concat(response_body)
     
+    if code == 200 then
+        print("SUCCESS: " .. code)
+    else
+        print("ERROR: " .. tostring(code))
+        print("RESPONSE: " .. result)
+    end
+    
     if callback then
         callback(result, code)
     end
@@ -49,44 +60,39 @@ local function httpRequest(method, url, data, callback)
 end
 
 -- ============================================================
--- ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ
+-- DATABASE FUNCTIONS
 -- ============================================================
 
 function firebase.get(path, callback)
     local url = CONFIG.databaseURL .. path .. ".json"
-    print("📡 GET: " .. url)
     return httpRequest("GET", url, nil, callback)
 end
 
 function firebase.put(path, data, callback)
     local url = CONFIG.databaseURL .. path .. ".json"
     local json_data = require("json").encode(data)
-    print("📡 PUT: " .. url)
     return httpRequest("PUT", url, json_data, callback)
 end
 
 function firebase.post(path, data, callback)
     local url = CONFIG.databaseURL .. path .. ".json"
     local json_data = require("json").encode(data)
-    print("📡 POST: " .. url)
     return httpRequest("POST", url, json_data, callback)
 end
 
 function firebase.delete(path, callback)
     local url = CONFIG.databaseURL .. path .. ".json"
-    print("📡 DELETE: " .. url)
     return httpRequest("DELETE", url, nil, callback)
 end
 
 function firebase.patch(path, data, callback)
     local url = CONFIG.databaseURL .. path .. ".json"
     local json_data = require("json").encode(data)
-    print("📡 PATCH: " .. url)
     return httpRequest("PATCH", url, json_data, callback)
 end
 
 -- ============================================================
--- КОМНАТЫ
+-- ROOMS
 -- ============================================================
 
 function firebase.createRoom(roomId, hostData, callback)
@@ -183,7 +189,7 @@ function firebase.clearBullets(roomId, callback)
 end
 
 -- ============================================================
--- СЛУШАТЕЛЬ
+-- LISTENER (polling)
 -- ============================================================
 
 function firebase.listen(path, interval, callback)
