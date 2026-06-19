@@ -12,14 +12,14 @@ local lastState = nil
 
 function love.load()
     love.graphics.setDefaultFilter("nearest", "nearest")
-    
+
     local success, err = xpcall(function()
         if game.setOnDeath then
             game.setOnDeath(function()
                 _G.GameState.current = "lobby"
             end)
         end
-        
+
         local current = states[_G.GameState.current]
         if current and current.load then current.load() end
         lastState = _G.GameState.current
@@ -31,13 +31,13 @@ end
 
 function love.update(dt)
     if dt > 0.05 then dt = 0.05 end
-    
+
     if _G.GameState.current ~= lastState then
         local new_state = states[_G.GameState.current]
         if new_state and new_state.load then new_state.load() end
         lastState = _G.GameState.current
     end
-    
+
     local current = states[_G.GameState.current]
     if current and current.update then current.update(dt) end
 end
@@ -47,7 +47,6 @@ function love.draw()
     if current and current.draw then current.draw() end
 end
 
--- Ввод: объединяем Тач и Мышь
 function love.touchpressed(id, x, y)
     local current = states[_G.GameState.current]
     if current and current.touchpressed then current.touchpressed(id, x, y) end
@@ -63,12 +62,22 @@ function love.touchreleased(id, x, y)
     if current and current.touchreleased then current.touchreleased(id, x, y) end
 end
 
-function love.mousepressed(x, y, b) love.touchpressed(1, x, y) end
-function love.mousemoved(x, y) love.touchmoved(1, x, y) end
-function love.mousereleased(x, y, b) love.touchreleased(1, x, y) end
+function love.mousepressed(x, y, b)
+    love.touchpressed(1, x, y)
+end
+
+function love.mousemoved(x, y)
+    love.touchmoved(1, x, y)
+end
+
+function love.mousereleased(x, y, b)
+    love.touchreleased(1, x, y)
+end
 
 function love.resize(w, h)
-    for _, s in pairs(states) do if s.resize then s.resize(w, h) end end
+    for _, s in pairs(states) do
+        if s.resize then s.resize(w, h) end
+    end
 end
 
 function love.keypressed(key)
