@@ -80,20 +80,28 @@ jobs:
 
       - name: Change package name to com.CB3
         run: |
-          # Проверяем существование файлов
-          if [ -f "love-android/app/build.gradle" ]; then
-            sed -i 's/applicationId "org.love2d.android"/applicationId "com.CB3"/g' love-android/app/build.gradle
-            echo "✅ build.gradle updated"
+          # Создаём папку для нового пакета
+          mkdir -p love-android/app/src/main/java/com/CB3
+          
+          # Копируем GameActivity
+          if [ -f "love-android/app/src/main/java/org/love2d/android/GameActivity.java" ]; then
+            cp love-android/app/src/main/java/org/love2d/android/GameActivity.java love-android/app/src/main/java/com/CB3/GameActivity.java
+            sed -i 's/package org.love2d.android;/package com.CB3;/g' love-android/app/src/main/java/com/CB3/GameActivity.java
           fi
           
-          if [ -f "love-android/app/src/main/AndroidManifest.xml" ]; then
-            sed -i 's/package="org.love2d.android"/package="com.CB3"/g' love-android/app/src/main/AndroidManifest.xml
-            echo "✅ AndroidManifest.xml updated"
-          fi
+          # Меняем applicationId
+          sed -i 's/applicationId "org.love2d.android"/applicationId "com.CB3"/g' love-android/app/build.gradle
           
+          # Меняем название
           if [ -f "love-android/app/src/main/res/values/strings.xml" ]; then
             sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/res/values/strings.xml
-            echo "✅ strings.xml updated"
+          fi
+          
+          # Меняем manifest
+          if [ -f "love-android/app/src/main/AndroidManifest.xml" ]; then
+            sed -i 's/package="org.love2d.android"/package="com.CB3"/g' love-android/app/src/main/AndroidManifest.xml
+            sed -i 's/org.love2d.android.GameActivity/com.CB3.GameActivity/g' love-android/app/src/main/AndroidManifest.xml
+            sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/AndroidManifest.xml
           fi
 
       - name: Package game.love
@@ -132,13 +140,7 @@ jobs:
       - name: Collect APK
         run: |
           APK=$(find love-android -name "*.apk" -type f | head -1)
-          if [ -f "$APK" ]; then
-            cp "$APK" CubicBattle3.apk
-            echo "✅ APK created: CubicBattle3.apk"
-          else
-            echo "❌ APK not found!"
-            exit 1
-          fi
+          cp "$APK" CubicBattle3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
