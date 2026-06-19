@@ -5,7 +5,6 @@ local animTimer = 0
 local game = nil
 local connecting = false
 local connect_error = ""
-local hosting = false
 
 local function tryLoadGame()
     if not game then
@@ -35,26 +34,6 @@ local function connectToServer(ip, port)
     connecting = false
 end
 
-local function hostServer(port)
-    if hosting then return end
-    
-    local g = tryLoadGame()
-    if not g then return end
-    
-    hosting = true
-    connect_error = ""
-    
-    local success = g.hostGame(port)
-    
-    if success then
-        GameState.current = "game"
-    else
-        connect_error = "❌ Не удалось создать сервер"
-    end
-    
-    hosting = false
-end
-
 local buttons = {}
 local function makeButton(text, y, action, color)
     table.insert(buttons, { 
@@ -70,25 +49,21 @@ local function updateButtons()
     local h = love.graphics.getHeight()
     local startY = h/2 + 20
     
-    makeButton("🏠 OFFLINE GAME", startY, function()
+    makeButton("🏠 LOCAL GAME", startY, function()
         local g = tryLoadGame()
         if g then
-            g.setMode("offline")
             g.disconnect()
+            g.setMode("offline")
+            g.load()
             GameState.current = "game"
         end
     end)
     
-    makeButton("👑 CREATE SERVER", startY + 65, function()
-        hostServer(12345)
-    end, {0.8, 0.5, 0.2})
-    
-    makeButton("🔗 CONNECT TO SERVER", startY + 130, function()
-        -- Показываем диалог ввода IP
-        connectToServer("127.0.0.1", 12345)  -- или введите IP
+    makeButton("🔗 CONNECT TO SERVER", startY + 65, function()
+        connectToServer("127.0.0.1", 12345)
     end, {0.2, 0.5, 0.8})
     
-    makeButton("❌ QUIT", startY + 195, function()
+    makeButton("❌ QUIT", startY + 130, function()
         love.event.quit()
     end, {0.6, 0.2, 0.2})
 end
@@ -131,18 +106,13 @@ function lobby.draw()
     end
     
     -- Заголовок
-    local titleY = h/2 - 140
+    local titleY = h/2 - 100
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
     
-    -- Подзаголовок
-    love.graphics.setColor(0.7, 0.7, 0.9, 0.6)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("Multiplayer Arena", 0, titleY + 45, w, "center")
-    
     -- Кнопки
-    local bw, bh = 250, 50
+    local bw, bh = 240, 50
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
@@ -172,13 +142,6 @@ function lobby.draw()
         love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
     end
     
-    -- Статус
-    if hosting then
-        love.graphics.setColor(1, 0.8, 0, 0.7)
-        love.graphics.setFont(fontBtn)
-        love.graphics.printf("⏳ Создание сервера...", 0, h - 60, w, "center")
-    end
-    
     if connecting then
         love.graphics.setColor(1, 0.9, 0, 0.7)
         love.graphics.setFont(fontBtn)
@@ -196,7 +159,7 @@ end
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    local bw, bh = 250, 50
+    local bw, bh = 240, 50
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
