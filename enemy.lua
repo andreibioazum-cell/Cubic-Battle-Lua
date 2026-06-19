@@ -17,6 +17,7 @@ local enemyBullets = {}
 local onEnemyDeath = nil
 
 local function tryShoot(dt, dx, dy)
+    if not e then return end
     e.shootT = e.shootT - dt
     if e.shootT <= 0 then
         e.shootT = e.shootCooldown
@@ -64,12 +65,11 @@ local function spawn(px, py)
 end
 
 function enemy.load()
-    -- 🔥 ЗАГРУЗКА ИЗ КОРНЯ (БЕЗ assets/)
     local success, loaded_img = pcall(love.graphics.newImage, "player.png")
     if success then
         img = loaded_img
     else
-        print("⚠️ player.png not found, using fallback")
+        print("player.png not found, using fallback")
         img = love.graphics.newImage(love.image.newImageData(55, 55))
     end
     if img then img:setFilter("nearest", "nearest") end
@@ -97,7 +97,26 @@ function enemy.getBullets()
 end
 
 function enemy.update(dt, px, py, bullets, onHitPlayer)
-    if not e then return end
+    if not e then 
+        -- Если врага нет, создаём его на координатах 11, 11
+        e = {
+            x = 11,
+            y = 11,
+            hp = MAX_HP,
+            hit = 0,
+            angle = 0,
+            state = "wander",
+            wanderT = 0,
+            wanderDX = 0,
+            wanderDY = 0,
+            atkT = 0,
+            shootT = 0,
+            shootCooldown = ATTACK_CD
+        }
+        enemyBullets = {}
+        print("BOSS spawned at 11, 11")
+        return
+    end
 
     local dx = px - e.x
     local dy = py - e.y
