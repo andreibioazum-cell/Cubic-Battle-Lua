@@ -2,33 +2,89 @@ local lobby = require("lobby")
 local game = require("game")
 
 GameState = { current = "lobby" }
-local states = { lobby = lobby, game = game }
+
+local states = {
+    lobby = lobby,
+    game = game
+}
+
 local lastState = nil
 
 function love.load()
     love.graphics.setDefaultFilter("linear", "linear")
-    if game.load then game.load() end
-    if lobby.load then lobby.load() end
+    
+    if game.setOnDeath then
+        game.setOnDeath(function()
+            GameState.current = "lobby"
+        end)
+    end
+    
+    local current = states[GameState.current]
+    if current and current.load then
+        current.load()
+    end
     lastState = GameState.current
 end
 
 function love.update(dt)
     if dt > 0.05 then dt = 0.05 end
+    
     if GameState.current ~= lastState then
-        if states[GameState.current].load then states[GameState.current].load() end
+        local new_state = states[GameState.current]
+        if new_state and new_state.load then
+            new_state.load()
+        end
         lastState = GameState.current
     end
-    states[GameState.current].update(dt)
+    
+    local current = states[GameState.current]
+    if current and current.update then
+        current.update(dt)
+    end
 end
 
 function love.draw()
-    states[GameState.current].draw()
+    local current = states[GameState.current]
+    if current and current.draw then
+        current.draw()
+    end
 end
 
 function love.resize(w, h)
-    for _, s in pairs(states) do if s.resize then s.resize(w, h) end end
+    local current = states[GameState.current]
+    if current and current.resize then
+        current.resize(w, h)
+    end
 end
 
-function love.touchpressed(id, x, y) states[GameState.current].touchpressed(id, x, y) end
-function love.touchmoved(id, x, y) states[GameState.current].touchmoved(id, x, y) end
-function love.touchreleased(id, x, y) states[GameState.current].touchreleased(id, x, y) end
+function love.touchpressed(id, x, y, dx, dy, pressure)
+    local current = states[GameState.current]
+    if current and current.touchpressed then
+        current.touchpressed(id, x, y, dx, dy, pressure)
+    end
+end
+
+function love.touchmoved(id, x, y, dx, dy, pressure)
+    local current = states[GameState.current]
+    if current and current.touchmoved then
+        current.touchmoved(id, x, y, dx, dy, pressure)
+    end
+end
+
+function love.touchreleased(id, x, y, dx, dy, pressure)
+    local current = states[GameState.current]
+    if current and current.touchreleased then
+        current.touchreleased(id, x, y, dx, dy, pressure)
+    end
+end
+
+function love.keypressed(key)
+    local current = states[GameState.current]
+    if current and current.keypressed then
+        current.keypressed(key)
+    end
+    
+    if key == "escape" then
+        love.event.quit()
+    end
+end
