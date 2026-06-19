@@ -1,216 +1,176 @@
 local lobby = {}
-local game  -- загрузим лениво
 
-local bg, font24, font18
-local online = { connected = false, socket = nil, connecting = false }
+local btn = { w=220, h=75, x=0, y=0 }
+local btnOnline = { w=220, h=55, x=0, y=0 }
+local btnOffline = { w=220, h=55, x=0, y=0 }
+local grad, lastW, lastH = nil, 0, 0
+local fontTitle, fontSub, fontBtn
 
-local function tryLoadGame()
-    if not game then
-        game = require("game")
-    end
-    return game
+local function mkGrad(w, h)
+    return love.graphics.newMesh({
+        {0,0, 0,0, 0.45,0.15,0.80,1},
+        {w,0, 1,0, 0.55,0.20,0.85,1},
+        {w,h, 1,1, 0.85,0.30,0.65,1},
+        {0,h, 0,1, 0.80,0.25,0.70,1},
+    }, "fan", "static")
 end
 
--- ===== СЕТЕВЫЕ ФУНКЦИИ =====
-local function loadSocket()
-    local success, socket = pcall(require, "socket")
-    if success then return socket end
-    return nil
-end
-
-local function connectToServer(ip, port)
-    if online.connected or online.connecting then return end
-    
-    local socket_lib = loadSocket()
-    if not socket_lib then
-        print("LuaSocket not available")
-        return false
-    end
-    
-    online.connecting = true
-    online.socket = socket_lib.tcp()
-    online.socket:settimeout(0)
-    
-    local success, err = online.socket:connect(ip, port)
-    if success then
-        online.connected = true
-        online.connecting = false
-        print("Connected to server: " .. ip .. ":" .. port)
-        return true
-    else
-        print("Connection failed: " .. tostring(err))
-        online.socket = nil
-        online.connecting = false
-        return false
-    end
-end
-
--- ===== КНОПКИ МЕНЮ =====
-local buttons = {}
-local function makeButton(text, x, y, w, h, action)
-    table.insert(buttons, { text=text, x=x, y=y, w=w, h=h, action=action })
-end
-
-local function checkButtons(x, y)
-    for _, btn in ipairs(buttons) do
-        if x >= btn.x and x <= btn.x + btn.w and
-           y >= btn.y and y <= btn.y + btn.h then
-            if btn.action then btn.action() end
-            return true
-        end
-    end
-    return false
-end
-
-local function updateButtons()
-    buttons = {}
+local function place()
     local w, h = love.graphics.getDimensions()
-    local bw, bh = 260, 62
-    local cx = w/2 - bw/2
-    local cy = h/2 - 140
-    
-    makeButton("LOCAL GAME", cx, cy + 100, bw, bh, function()
-        local g = tryLoadGame()
-        if g then
-            -- Отключаем онлайн в игре
-            g.setOnlineMode(false)
-            GameState.current = "game"
-        end
-    end)
-    
-    if online.connected then
-        makeButton("ONLINE GAME", cx, cy + 180, bw, bh, function()
-            local g = tryLoadGame()
-            if g then
-                g.setOnlineMode(true, online.socket)
-                GameState.current = "game"
-            end
-        end)
-        makeButton("DISCONNECT", cx, cy + 260, bw, bh, function()
-            if online.socket then
-                online.socket:close()
-            end
-            online.connected = false
-            online.socket = nil
-            updateButtons()
-        end)
-    else
-        makeButton("CONNECT ONLINE", cx, cy + 180, bw, bh, function()
-            connectToServer("192.168.1.100", 4080)
-            updateButtons()
-        end)
+    btn.x = w/2 - btn.w/2
+    btn.y = h/2 + 20
+    btnOnline.x = w/2 - btnOnline.w/2
+    btnOnline.y = btn.y + btn.h + 15
+    btnOffline.x = w/2 - btnOffline.w/2
+    btnOffline.y = btnOnline.y + btnOnline.h + 15
+end
+
+local function drawSpacedText(text, x, y, w, align, font, spacing)
+    spacing = spacing or 0
+    love.graphics.setFont(font)
+
+    local totalW = 0
+    local widths = {}
+    for i=1, #text do
+        local ch = text:sub(i,i)
+        local cw = font:getWidth(ch)
+        widths[i] = cw
+        totalW = totalW + cw
     end
-    
-    makeButton("QUIT", cx, cy + 340, bw, bh, function()
-        love.event.quit()
-    end)
+    totalW = totalW + spacing * (#text - 1)
+
+    local startX = x
+    if align == "center" then
+        startX = x + (w - totalW)/2
+    elseif align == "right" then
+        startX = x + (w - totalW)
+    end
+
+    local outline = math.floor(2 * 0.85 + 0.5)
+
+    love.graphics.setColor(0,0,0,1)
+    local cx = startX
+    for i=1, #text do
+        local ch = text:sub(i,i)
+        for dx=-outline, outline, outline do
+            for dy=-outline, outline, outline do
+                if dx ~= 0 or dy ~= 0 then
+                    love.graphics.print(ch, cx+dx, y+dy)
+                end
+            end
+        end
+        cx = cx + widths[i] + spacing
+    end
+
+    love.graphics.setColor(1,1,1,1)
+    cx = startX
+    for i=1, #text do
+        local ch = text:sub(i,i)
+        love.graphics.print(ch, cx, y)
+        cx = cx + widths[i] + spacing
+    end
 end
 
 function lobby.load()
-    bg = bg or love.graphics.newImage("grass.png")
-    if bg then bg:setWrap("repeat", "repeat") end
+    fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 64)
+    fontSub   = love.graphics.newFont("Fredoka-Bold.ttf", 22)
+    fontBtn   = love.graphics.newFont("Fredoka-Bold.ttf", 30)
+    place()
     
-    font24 = font24 or love.graphics.newFont("Fredoka-Bold.ttf", 24)
-    font18 = font18 or love.graphics.newFont("Fredoka-Bold.ttf", 18)
-    
-    -- Предзагружаем game модуль
-    tryLoadGame()
-    
-    updateButtons()
-end
-
-function lobby.update(dt)
-    -- Проверяем ответ от сервера
-    if online.connected and online.socket then
-        local data, err = online.socket:receive("*l")
-        if data then
-            print("Server: " .. data)
-        elseif err == "closed" then
-            online.connected = false
-            online.socket = nil
-            updateButtons()
-        end
+    -- Сброс состояния игры при загрузке лобби
+    local game = require("game")
+    if game and game.reset_online then
+        game.reset_online()
     end
-end
-
-function lobby.draw()
-    local w, h = love.graphics.getDimensions()
-    
-    -- Фон
-    love.graphics.setColor(0.3, 0.6, 0.3, 1)
-    love.graphics.rectangle("fill", 0, 0, w, h)
-    
-    if bg then
-        love.graphics.setColor(1, 1, 1, 0.3)
-        local tw, th = bg:getWidth(), bg:getHeight()
-        for x = 0, w, tw do
-            for y = 0, h, th do
-                love.graphics.draw(bg, x, y)
-            end
-        end
-    end
-    
-    -- Заголовок
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(font24)
-    love.graphics.printf("CUBIC BATTLE", 0, h/2 - 240, w, "center")
-    
-    -- Версия игры
-    love.graphics.setFont(font18)
-    love.graphics.setColor(0.7, 0.7, 0.7, 1)
-    love.graphics.printf("v11.5 | Love2D", 0, h/2 - 200, w, "center")
-    
-    -- Статус подключения
-    if online.connecting then
-        love.graphics.setColor(1, 1, 0, 1)
-        love.graphics.printf("Connecting...", 0, h/2 - 170, w, "center")
-    elseif online.connected then
-        love.graphics.setColor(0, 1, 0, 1)
-        love.graphics.printf("ONLINE - Connected", 0, h/2 - 170, w, "center")
-    else
-        love.graphics.setColor(1, 0.3, 0.3, 1)
-        love.graphics.printf("OFFLINE", 0, h/2 - 170, w, "center")
-    end
-    
-    -- Кнопки
-    for _, btn in ipairs(buttons) do
-        -- Тень
-        love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", btn.x+4, btn.y+5, btn.w, btn.h, 14, 14)
-        
-        -- Кнопка
-        love.graphics.setColor(0.55, 0.20, 0.85, 1)
-        love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 14, 14)
-        
-        -- Обводка
-        love.graphics.setColor(0, 0, 0, 1)
-        love.graphics.setLineWidth(3)
-        love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 14, 14)
-        
-        -- Текст
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setFont(font18)
-        love.graphics.printf(btn.text, btn.x, btn.y + btn.h/2 - 12, btn.w, "center")
-    end
-    
-    -- Подсказка внизу
-    love.graphics.setColor(0.5, 0.5, 0.5, 1)
-    love.graphics.setFont(font18)
-    love.graphics.printf("Tap to play | ESC to quit", 0, h - 60, w, "center")
-    
-    love.graphics.setColor(1, 1, 1, 1)
-end
-
-function lobby.touchpressed(id, x, y)
-    checkButtons(x, y)
-end
-
-function lobby.mousepressed(x, y)
-    checkButtons(x, y)
 end
 
 function lobby.resize()
-    updateButtons()
+    grad = nil
+    place()
 end
+
+function lobby.update(dt) end
+
+function lobby.draw()
+    local w, h = love.graphics.getDimensions()
+
+    if not grad or w ~= lastW or h ~= lastH then
+        grad = mkGrad(w, h)
+        lastW, lastH = w, h
+    end
+
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.draw(grad, 0, 0)
+
+    drawSpacedText("Cubic Battle", 0, h/2 - 180, w, "center", fontTitle, fontTitle:getWidth("A")*0.05)
+    drawSpacedText("Touch & Dodge", 0, h/2 - 90, w, "center", fontSub, fontSub:getWidth("A")*0.05)
+
+    -- Кнопка Play Online
+    love.graphics.setColor(0,0,0,0.20)
+    love.graphics.rectangle("fill", btnOnline.x+5, btnOnline.y+6, btnOnline.w, btnOnline.h, 16, 16)
+
+    love.graphics.setColor(0.2, 0.7, 0.3, 1)
+    love.graphics.rectangle("fill", btnOnline.x, btnOnline.y, btnOnline.w, btnOnline.h, 16, 16)
+
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(3.4)
+    love.graphics.rectangle("line", btnOnline.x, btnOnline.y, btnOnline.w, btnOnline.h, 16, 16)
+
+    drawSpacedText("Play Online", btnOnline.x, btnOnline.y + 14, btnOnline.w, "center", fontBtn, fontBtn:getWidth("A")*0.05)
+
+    -- Кнопка Play Offline
+    love.graphics.setColor(0,0,0,0.20)
+    love.graphics.rectangle("fill", btnOffline.x+5, btnOffline.y+6, btnOffline.w, btnOffline.h, 16, 16)
+
+    love.graphics.setColor(0.55, 0.20, 0.85, 1)
+    love.graphics.rectangle("fill", btnOffline.x, btnOffline.y, btnOffline.w, btnOffline.h, 16, 16)
+
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(3.4)
+    love.graphics.rectangle("line", btnOffline.x, btnOffline.y, btnOffline.w, btnOffline.h, 16, 16)
+
+    drawSpacedText("Play Offline", btnOffline.x, btnOffline.y + 14, btnOffline.w, "center", fontBtn, fontBtn:getWidth("A")*0.05)
+
+    -- Информация о статусе
+    local game = require("game")
+    if game and game.get_online_status then
+        local status, connected = game.get_online_status()
+        if connected then
+            love.graphics.setColor(0, 1, 0, 1)
+            love.graphics.setFont(fontSub)
+            love.graphics.printf("● Online", 0, btnOffline.y + btnOffline.h + 20, w, "center")
+        else
+            love.graphics.setColor(1, 0.3, 0.3, 1)
+            love.graphics.setFont(fontSub)
+            love.graphics.printf("● Offline", 0, btnOffline.y + btnOffline.h + 20, w, "center")
+        end
+        love.graphics.setColor(1,1,1,1)
+    end
+end
+
+function lobby.touchpressed(id, x, y)
+    local game = require("game")
+    
+    -- Кнопка Play Online
+    if x>=btnOnline.x and x<=btnOnline.x+btnOnline.w and 
+       y>=btnOnline.y and y<=btnOnline.y+btnOnline.h then
+        if game and game.set_online_mode then
+            game.set_online_mode(true)
+        end
+        GameState.current = "game"
+    end
+    
+    -- Кнопка Play Offline
+    if x>=btnOffline.x and x<=btnOffline.x+btnOffline.w and 
+       y>=btnOffline.y and y<=btnOffline.y+btnOffline.h then
+        if game and game.set_online_mode then
+            game.set_online_mode(false)
+        end
+        GameState.current = "game"
+    end
+end
+
+function lobby.touchmoved() end
+function lobby.touchreleased() end
 
 return lobby
