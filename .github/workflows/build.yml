@@ -80,15 +80,25 @@ jobs:
 
       - name: Change package name to com.CB3
         run: |
+          # Создаем папку com/CB3
+          mkdir -p love-android/app/src/main/java/com/CB3
+          
+          # Копируем GameActivity.java в новый пакет
+          cp love-android/app/src/main/java/org/love2d/android/GameActivity.java love-android/app/src/main/java/com/CB3/GameActivity.java
+          
+          # Меняем package в GameActivity.java
+          sed -i 's/package org.love2d.android;/package com.CB3;/g' love-android/app/src/main/java/com/CB3/GameActivity.java
+          
           # Меняем package name в build.gradle
-          sed -i 's/org.love2d.android/com.CB3/g' love-android/app/build.gradle
           sed -i 's/applicationId "org.love2d.android"/applicationId "com.CB3"/g' love-android/app/build.gradle
           
-          # Меняем название приложения
+          # Меняем название приложения в strings.xml
           sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/res/values/strings.xml
           
-          # Меняем имя APK
-          sed -i 's/LOVE/CubicBattle3/g' love-android/app/build.gradle
+          # ✅ Обновляем AndroidManifest.xml
+          sed -i 's/package="org.love2d.android"/package="com.CB3"/g' love-android/app/src/main/AndroidManifest.xml
+          sed -i 's/org.love2d.android.GameActivity/com.CB3.GameActivity/g' love-android/app/src/main/AndroidManifest.xml
+          sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/AndroidManifest.xml
 
       - name: Package game.love
         run: |
