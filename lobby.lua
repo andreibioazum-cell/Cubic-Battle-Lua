@@ -6,6 +6,29 @@ local game = nil
 local coins = 0
 local shop_open = false
 
+-- Скины
+local skins = {
+    default = {
+        name = "Default Cube",
+        color = {1, 1, 1},
+        ability = nil,
+        ability_name = "None",
+        price = 0,
+        owned = true
+    },
+    diamond = {
+        name = "Diamond Cube",
+        color = {0.2, 0.8, 1},
+        ability = "shield",
+        ability_name = "Shield",
+        ability_desc = "Blocks 1 hit every 10 sec",
+        price = 100,
+        owned = false
+    }
+}
+
+local selected_skin = "default"
+
 -- Загрузка сохранений
 local function loadSave()
     local success, data = pcall(love.filesystem.read, "save.txt")
@@ -40,29 +63,6 @@ local function saveGame()
     love.filesystem.write("save.txt", data)
 end
 
--- Скины
-local skins = {
-    default = {
-        name = "Default Cube",
-        color = {1, 1, 1},
-        ability = nil,
-        ability_name = "None",
-        price = 0,
-        owned = true
-    },
-    diamond = {
-        name = "Diamond Cube",
-        color = {0.2, 0.8, 1},
-        ability = "shield",
-        ability_name = "Shield",
-        ability_desc = "Blocks 1 hit every 10 sec",
-        price = 100,
-        owned = false
-    }
-}
-
-local selected_skin = "default"
-
 local function tryLoadGame()
     if not game then
         game = require("game")
@@ -73,7 +73,6 @@ end
 local function startGame()
     local g = tryLoadGame()
     if g then
-        -- Передаём данные в игру
         g.setCoins(coins)
         g.setSkin(selected_skin)
         g.load()
