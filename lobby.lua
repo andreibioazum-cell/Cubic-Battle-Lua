@@ -18,7 +18,7 @@ local skins = {
     },
     diamond = {
         name = "Diamond Cube",
-        color = {0.2, 0.8, 1},
+        color = {1, 1, 1},
         ability = "shield",
         ability_name = "Shield",
         ability_desc = "Blocks 1 hit every 10 sec",
