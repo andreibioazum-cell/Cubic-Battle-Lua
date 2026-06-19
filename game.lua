@@ -1,13 +1,16 @@
 local controls = require("controls")
 local enemy = require("enemy")
-local server = require("server")
+local firebase = require("firebase")
+local json = require("json")
 
 local game = {}
 
+-- Константы
 local PLAYER_SIZE = 55
 local PLAYER_HP_MAX = 5
 local BULLET_SPEED = 340 * 1.15
 
+-- Локальные переменные
 local cube = { x = 0, y = 0, speed = 260, angle = 0, hp = PLAYER_HP_MAX, hit = 0 }
 local bullets = {}
 local bg, playerImg, font
@@ -15,16 +18,21 @@ local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
 
-local mode = "offline"
-local socket = nil
-local connected = false
-local player_id = 0
+-- Firebase режим
+local mode = "offline"  -- "offline", "firebase_host", "firebase_client"
+local room_id = nil
+local player_id = nil
 local players = {}
-local last_send = 0
-local send_interval = 1 / 20
 local online_bullets = {}
 local kill_messages = {}
-local connect_error = ""
+local player_name = "Player" .. math.random(1000, 9999)
+local last_send = 0
+local send_interval = 1 / 10
+local listener = nil
+
+-- ============================================================
+-- ФУНКЦИИ ОТРИСОВКИ
+-- ============================================================
 
 local function drawHPBar(x, y, w, h, hp, max, color)
     hp = math.max(0, hp)
@@ -44,7 +52,11 @@ local function drawScoreboard()
     local scores = {}
     for pid, p in pairs(players) do
         if p.alive ~= false then
-            table.insert(scores, { id = pid, kills = p.kills or 0, name = "P" .. pid })
+            table.insert(scores, { 
+                id = pid, 
+                kills = p.kills or 0, 
+                name = p.name or "P" .. pid 
+            })
         end
     end
     table.sort(scores, function(a, b) return a.kills > b.kills end)
@@ -75,16 +87,23 @@ local function drawScoreboard()
     end
 end
 
-local function drawHostInfo()
-    if mode == "host" then
-        local info = server.getInfo()
-        love.graphics.setColor(1, 0.8, 0, 0.8)
+local function drawRoomInfo()
+    if mode == "firebase_host" or mode == "firebase_client" then
+        love.graphics.setColor(0, 1, 0, 0.8)
         love.graphics.setFont(font)
-        love.graphics.print("👑 ХОСТ", 10, 60)
-        love.graphics.print("IP: " .. info.ip .. ":" .. info.port, 10, 80)
-        love.graphics.print("Игроков: " .. info.players .. "/" .. info.max_players, 10, 100)
+        love.graphics.print("🔥 Комната: " .. (room_id or "?"), 10, 60)
+        love.graphics.print("ID: " .. (player_id or "?"), 10, 80)
+        love.graphics.print("Игроков: " .. (#players + 1), 10, 100)
+        if mode == "firebase_host" then
+            love.graphics.setColor(1, 0.8, 0, 0.8)
+            love.graphics.print("👑 ВЫ ХОСТ", 10, 120)
+        end
     end
 end
+
+-- ============================================================
+-- СОЗДАНИЕ ПУЛИ
+-- ============================================================
 
 local function spawnBullet(x, y, dx, dy)
     table.insert(bullets, {
@@ -95,12 +114,24 @@ local function spawnBullet(x, y, dx, dy)
         life = 3
     })
     
-    if connected and socket then
-        pcall(function()
-            socket:send(string.format("SHOOT:dx:%.2f,dy:%.2f\n", dx, dy))
-        end)
+    if mode == "firebase_host" or mode == "firebase_client" then
+        if room_id and player_id then
+            local bullet_data = {
+                x = x,
+                y = y,
+                vx = dx * BULLET_SPEED,
+                vy = dy * BULLET_SPEED,
+                player_id = player_id,
+                time = love.timer.getTime()
+            }
+            firebase.addBullet(room_id, bullet_data)
+        end
     end
 end
+
+-- ============================================================
+-- ОБРАБОТЧИК УРОНА
+-- ============================================================
 
 local function onHitPlayer(dmg)
     if dead then return end
@@ -115,8 +146,75 @@ local function onHitPlayer(dmg)
     end
 end
 
-function game.setOnDeath(callback)
-    onDeathCallback = callback
+-- ============================================================
+-- FIREBASE ФУНКЦИИ
+-- ============================================================
+
+function game.hostGame()
+    room_id = "room_" .. tostring(math.random(1000, 9999))
+    player_id = "host_" .. tostring(math.random(1000, 9999))
+    
+    print("🔥 Создание комнаты: " .. room_id)
+    print("👑 Хост: " .. player_id)
+    
+    local host_data = {
+        playerId = player_id,
+        x = cube.x,
+        y = cube.y,
+        angle = cube.angle,
+        hp = cube.hp,
+        name = player_name
+    }
+    
+    firebase.createRoom(room_id, host_data, function(result)
+        if result then
+            print("✅ Комната создана!")
+            game.setMode("firebase_host")
+            game.startListener()
+        end
+    end)
+    
+    return true
+end
+
+function game.joinRoom(room_id_input)
+    room_id = room_id_input
+    player_id = "player_" .. tostring(math.random(1000, 9999))
+    
+    print("🔥 Подключение к комнате: " .. room_id)
+    print("👤 Игрок: " .. player_id)
+    
+    local player_data = {
+        playerId = player_id,
+        x = cube.x,
+        y = cube.y,
+        angle = cube.angle,
+        hp = cube.hp,
+        name = player_name
+    }
+    
+    firebase.joinRoom(room_id, player_data)
+    game.setMode("firebase_client")
+    game.startListener()
+    
+    return true
+end
+
+function game.leaveRoom()
+    if room_id and player_id then
+        firebase.leaveRoom(room_id, player_id)
+        
+        if mode == "firebase_host" then
+            firebase.deleteRoom(room_id)
+        end
+    end
+    
+    room_id = nil
+    player_id = nil
+    players = {}
+    online_bullets = {}
+    kill_messages = {}
+    game.setMode("offline")
 end
 
 function game.setMode(new_mode)
@@ -124,77 +222,56 @@ function game.setMode(new_mode)
     print("🎮 Режим: " .. mode)
 end
 
-function game.hostGame(port)
-    print("👑 Запуск сервера...")
+function game.startListener()
+    if not room_id then return end
     
-    local success = server.start(port)
-    if not success then
-        connect_error = "❌ Не удалось создать сервер"
-        return false
-    end
-    
-    local wait = 0.1
-    local start = love.timer.getTime()
-    local conn_success = false
-    
-    while love.timer.getTime() - start < wait do
-        conn_success = game.connect("127.0.0.1", port)
-        if conn_success then break end
-    end
-    
-    if conn_success then
-        game.setMode("host")
-        print("👑 Вы хост игры!")
-        return true
-    else
-        print("❌ Не удалось подключиться к своему серверу")
-        server.stop()
-        return false
-    end
+    listener = firebase.listen(room_id, 0.1, function(data)
+        if data then
+            local room = json.decode(data)
+            if room then
+                -- Обновляем игроков
+                if room.players then
+                    for pid, p in pairs(room.players) do
+                        if pid ~= player_id then
+                            players[pid] = p
+                        end
+                    end
+                end
+                
+                -- Обновляем пули
+                if room.bullets then
+                    for _, b in ipairs(room.bullets) do
+                        if b.player_id ~= player_id then
+                            table.insert(online_bullets, b)
+                        end
+                    end
+                end
+            end
+        end
+    end)
 end
 
-function game.connect(ip, port)
-    local success, socket_lib = pcall(require, "socket")
-    if not success then
-        connect_error = "❌ LuaSocket не установлен"
-        print(connect_error)
-        return false
-    end
+function game.updatePlayerInFirebase()
+    if not room_id or not player_id then return end
     
-    socket = socket_lib.tcp()
-    socket:settimeout(0.1)
+    local player_data = {
+        x = cube.x,
+        y = cube.y,
+        angle = cube.angle,
+        hp = cube.hp,
+        alive = not dead,
+        kills = 0
+    }
     
-    local success, err = socket:connect(ip, port)
-    if success then
-        connected = true
-        print("✅ Подключено к серверу " .. ip .. ":" .. port)
-        return true
-    else
-        connect_error = "❌ Ошибка подключения: " .. tostring(err)
-        print(connect_error)
-        socket = nil
-        connected = false
-        return false
-    end
+    firebase.updatePlayer(room_id, player_id, player_data)
 end
 
-function game.disconnect()
-    if connected and socket then
-        pcall(function() socket:close() end)
-        socket = nil
-        connected = false
-    end
-    if server.isRunning() then
-        server.stop()
-    end
-    players = {}
-    online_bullets = {}
-    kill_messages = {}
-    game.setMode("offline")
-end
+-- ============================================================
+-- ОСНОВНЫЕ ФУНКЦИИ
+-- ============================================================
 
-function game.getConnectError()
-    return connect_error
+function game.setOnDeath(callback)
+    onDeathCallback = callback
 end
 
 function game.load()
@@ -229,12 +306,11 @@ function game.load()
     end)
 
     controls.setOnBack(function()
-        game.disconnect()
+        game.leaveRoom()
         GameState.current = "lobby"
     end)
     
     game.setMode("offline")
-    connect_error = ""
 end
 
 function game.resize()
@@ -249,6 +325,7 @@ function game.update(dt)
     
     controls.update(dt)
     
+    -- Движение
     local dx, dy = controls.getMove()
     cube.x = cube.x + dx * cube.speed * dt
     cube.y = cube.y + dy * cube.speed * dt
@@ -259,12 +336,14 @@ function game.update(dt)
 
     cube.hit = math.max(0, cube.hit - dt * 3)
 
+    -- Камера
     local targetX = cube.x - love.graphics.getWidth() / 2
     local targetY = cube.y - love.graphics.getHeight() / 2
     local k = 1 - math.exp(-dt * 7.3)
     cam.x = cam.x + (targetX - cam.x) * k
     cam.y = cam.y + (targetY - cam.y) * k
 
+    -- Свои пули
     for i = #bullets, 1, -1 do
         local b = bullets[i]
         b.x = b.x + b.vx * dt
@@ -275,6 +354,7 @@ function game.update(dt)
         end
     end
     
+    -- Пули от других
     for i = #online_bullets, 1, -1 do
         local b = online_bullets[i]
         b.x = b.x + b.vx * dt
@@ -285,126 +365,23 @@ function game.update(dt)
         end
     end
 
-    if mode == "host" and server.isRunning() then
-        server.update(dt)
-    end
-
+    -- Оффлайн режим
     if mode == "offline" then
         enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
     end
     
-    if mode == "client" or mode == "host" then
-        if connected and socket then
-            last_send = last_send + dt
-            if last_send >= send_interval then
-                last_send = 0
-                pcall(function()
-                    socket:send(string.format(
-                        "MOVE:x:%.2f,y:%.2f,angle:%.2f,hp:%d\n",
-                        cube.x, cube.y, cube.angle, cube.hp
-                    ))
-                end)
-            end
-            
-            while true do
-                local data, err = socket:receive("*l")
-                if not data then break end
-                
-                if data:sub(1, 10) == "CONNECTED:" then
-                    player_id = tonumber(data:sub(11))
-                    print("🎮 ID: " .. player_id)
-                elseif data:sub(1, 12) == "SERVER_INFO:" then
-                    print("📱 " .. data:sub(13))
-                elseif data:sub(1, 12) == "PLAYER_JOIN:" then
-                    local parts = {}
-                    for part in data:gmatch("[^:]+") do
-                        table.insert(parts, part)
-                    end
-                    if #parts >= 6 then
-                        local pid = tonumber(parts[2])
-                        if pid ~= player_id then
-                            players[pid] = {
-                                x = tonumber(parts[3]),
-                                y = tonumber(parts[4]),
-                                angle = tonumber(parts[5]),
-                                hp = tonumber(parts[6]),
-                                alive = true,
-                                kills = 0
-                            }
-                        end
-                    end
-                elseif data:sub(1, 12) == "PLAYER_LEFT:" then
-                    local pid = tonumber(data:sub(13))
-                    players[pid] = nil
-                elseif data:sub(1, 7) == "BULLET:" then
-                    local parts = {}
-                    for part in data:gmatch("[^:]+") do
-                        table.insert(parts, part)
-                    end
-                    if #parts >= 6 then
-                        table.insert(online_bullets, {
-                            id = tonumber(parts[2]),
-                            x = tonumber(parts[3]),
-                            y = tonumber(parts[4]),
-                            vx = tonumber(parts[5]),
-                            vy = tonumber(parts[6]),
-                            life = 3.0
-                        })
-                    end
-                elseif data:sub(1, 4) == "HIT:" then
-                    local parts = {}
-                    for part in data:gmatch("[^:]+") do
-                        table.insert(parts, part)
-                    end
-                    if #parts >= 3 then
-                        local target_id = tonumber(parts[2])
-                        local damage = tonumber(parts[3])
-                        if target_id == player_id then
-                            onHitPlayer(damage)
-                        end
-                    end
-                elseif data:sub(1, 5) == "KILL:" then
-                    local parts = {}
-                    for part in data:gmatch("[^:]+") do
-                        table.insert(parts, part)
-                    end
-                    if #parts >= 3 then
-                        local killer = tonumber(parts[2])
-                        local victim = tonumber(parts[3])
-                        if killer == player_id then
-                            table.insert(kill_messages, {text = "💀 Вы убили P" .. victim, timer = 3})
-                        elseif victim == player_id then
-                            table.insert(kill_messages, {text = "💀 Вас убил P" .. killer, timer = 3})
-                        else
-                            table.insert(kill_messages, {text = "💀 P" .. killer .. " убил P" .. victim, timer = 2})
-                        end
-                    end
-                elseif data:sub(1, 14) == "PLAYER_UPDATE:" then
-                    local parts = {}
-                    for part in data:gmatch("[^:]+") do
-                        table.insert(parts, part)
-                    end
-                    if #parts >= 8 then
-                        local pid = tonumber(parts[2])
-                        if pid ~= player_id then
-                            if not players[pid] then players[pid] = {} end
-                            players[pid].x = tonumber(parts[3])
-                            players[pid].y = tonumber(parts[4])
-                            players[pid].angle = tonumber(parts[5])
-                            players[pid].hp = tonumber(parts[6])
-                            players[pid].alive = tonumber(parts[7]) == 1
-                            players[pid].kills = tonumber(parts[8]) or 0
-                        end
-                    end
-                end
-            end
+    -- Firebase режим
+    if mode == "firebase_host" or mode == "firebase_client" then
+        -- Отправляем позицию
+        last_send = last_send + dt
+        if last_send >= send_interval then
+            last_send = 0
+            game.updatePlayerInFirebase()
         end
-    end
-    
-    for i = #kill_messages, 1, -1 do
-        kill_messages[i].timer = kill_messages[i].timer - dt
-        if kill_messages[i].timer <= 0 then
-            table.remove(kill_messages, i)
+        
+        -- Запускаем слушатель
+        if listener then
+            listener(dt)
         end
     end
 end
@@ -427,16 +404,19 @@ function game.draw()
         end
     end
 
+    -- Свои пули
     for _, b in ipairs(bullets) do
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
     end
     
+    -- Пули от других
     for _, b in ipairs(online_bullets) do
         love.graphics.setColor(1, 0.2, 0.2, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
     end
 
+    -- Прицел
     if controls.isAiming() then
         local ax, ay = controls.getAim()
         love.graphics.setColor(0, 0, 0, 0.5)
@@ -447,11 +427,13 @@ function game.draw()
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
     end
 
+    -- Оффлайн враг
     if mode == "offline" then
         enemy.draw()
     end
     
-    if mode == "client" or mode == "host" then
+    -- Игроки (онлайн)
+    if mode == "firebase_host" or mode == "firebase_client" then
         for pid, p in pairs(players) do
             if pid ~= player_id and p.alive ~= false then
                 if playerImg then
@@ -472,12 +454,13 @@ function game.draw()
                 
                 love.graphics.setColor(1, 1, 1, 0.7)
                 love.graphics.setFont(font)
-                love.graphics.print("P" .. pid, p.x - 15, p.y - 65)
+                love.graphics.print(p.name or "P" .. pid, p.x - 20, p.y - 65)
                 drawHPBar(p.x - 30, p.y - 50, 60, 6, p.hp or 5, 5, {0.3, 0.8, 0.3})
             end
         end
     end
 
+    -- Свой игрок
     if playerImg then
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.push()
@@ -496,11 +479,12 @@ function game.draw()
         
         love.graphics.setColor(0, 1, 0, 0.8)
         love.graphics.setFont(font)
-        love.graphics.print("YOU", cube.x - 15, cube.y - 65)
+        love.graphics.print(player_name, cube.x - 20, cube.y - 65)
     end
 
     love.graphics.pop()
 
+    -- HUD
     love.graphics.setColor(1, 1, 1, 1)
     if font then love.graphics.setFont(font) end
     
@@ -521,16 +505,8 @@ function game.draw()
         end
     end
     
-    drawHostInfo()
+    drawRoomInfo()
     drawScoreboard()
-    
-    for i, msg in ipairs(kill_messages) do
-        local alpha = math.min(1, msg.timer)
-        local y = 150 + (i - 1) * 30
-        love.graphics.setColor(1, 1, 1, alpha * 0.8)
-        love.graphics.setFont(font)
-        love.graphics.print(msg.text, love.graphics.getWidth()/2 - 50, y)
-    end
 
     controls.draw()
 end
@@ -552,7 +528,7 @@ end
 
 function game.keypressed(key)
     if key == "escape" then
-        game.disconnect()
+        game.leaveRoom()
         GameState.current = "lobby"
     end
 end
