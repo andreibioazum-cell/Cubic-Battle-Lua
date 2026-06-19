@@ -46,9 +46,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: love-android
-          key: love-android-src-v8-${{ hashFiles('love-android/.git') }}
+          key: love-android-src-v9-${{ hashFiles('love-android/.git') }}
           restore-keys: |
-            love-android-src-v8-
+            love-android-src-v9-
 
       - name: Clone love-android
         run: |
@@ -63,9 +63,9 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
             love-android/.gradle
-          key: gradle-v8-${{ hashFiles('love-android/build.gradle', 'love-android/app/build.gradle') }}
+          key: gradle-v9-${{ hashFiles('love-android/build.gradle', 'love-android/app/build.gradle') }}
           restore-keys: |
-            gradle-v8-
+            gradle-v9-
 
       - name: Cache Native Builds
         uses: actions/cache@v4
@@ -74,35 +74,9 @@ jobs:
             love-android/app/.cxx
             love-android/app/build
             love-android/app/build/intermediates
-          key: native-v8-${{ hashFiles('love-android/app/src/main/cpp/*') }}
+          key: native-v9-${{ hashFiles('love-android/app/src/main/cpp/*') }}
           restore-keys: |
-            native-v8-
-
-      - name: Change package name to com.CB3
-        run: |
-          # Создаём папку для нового пакета
-          mkdir -p love-android/app/src/main/java/com/CB3
-          
-          # Копируем GameActivity
-          if [ -f "love-android/app/src/main/java/org/love2d/android/GameActivity.java" ]; then
-            cp love-android/app/src/main/java/org/love2d/android/GameActivity.java love-android/app/src/main/java/com/CB3/GameActivity.java
-            sed -i 's/package org.love2d.android;/package com.CB3;/g' love-android/app/src/main/java/com/CB3/GameActivity.java
-          fi
-          
-          # Меняем applicationId
-          sed -i 's/applicationId "org.love2d.android"/applicationId "com.CB3"/g' love-android/app/build.gradle
-          
-          # Меняем название
-          if [ -f "love-android/app/src/main/res/values/strings.xml" ]; then
-            sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/res/values/strings.xml
-          fi
-          
-          # Меняем manifest
-          if [ -f "love-android/app/src/main/AndroidManifest.xml" ]; then
-            sed -i 's/package="org.love2d.android"/package="com.CB3"/g' love-android/app/src/main/AndroidManifest.xml
-            sed -i 's/org.love2d.android.GameActivity/com.CB3.GameActivity/g' love-android/app/src/main/AndroidManifest.xml
-            sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/AndroidManifest.xml
-          fi
+            native-v9-
 
       - name: Package game.love
         run: |
@@ -118,6 +92,12 @@ jobs:
         run: |
           sed -i '/abiFilters/d' love-android/app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' love-android/app/build.gradle
+
+      - name: Change app name in strings.xml
+        run: |
+          if [ -f "love-android/app/src/main/res/values/strings.xml" ]; then
+            sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/res/values/strings.xml
+          fi
 
       - name: Optimize Gradle
         run: |
