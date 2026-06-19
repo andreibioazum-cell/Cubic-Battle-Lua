@@ -12,6 +12,22 @@ local lastState = nil
 
 function love.load()
     love.graphics.setDefaultFilter("nearest", "nearest")
+    love.audio.setVolume(1.0)
+    
+    -- Предзагрузка звуков
+    local soundSuccess, soundErr = pcall(function()
+        _G.sounds = {
+            click = love.audio.newSource("cartoon-button-click-sound.mp3", "static"),
+            shot = love.audio.newSource("loud-pistol-shot.mp3", "static")
+        }
+        -- Устанавливаем громкость
+        if _G.sounds.click then _G.sounds.click:setVolume(0.5) end
+        if _G.sounds.shot then _G.sounds.shot:setVolume(0.3) end
+    end)
+    if not soundSuccess then
+        print("⚠️ Sounds not loaded: " .. tostring(soundErr))
+        _G.sounds = {}
+    end
 
     local success, err = xpcall(function()
         if game.setOnDeath then
@@ -82,4 +98,11 @@ end
 
 function love.keypressed(key)
     if key == "escape" then love.event.quit() end
+end
+
+-- Вспомогательная функция для воспроизведения звуков
+function playSound(name)
+    if _G.sounds and _G.sounds[name] then
+        _G.sounds[name]:play()
+    end
 end
