@@ -1,4 +1,5 @@
 local controls = require("controls")
+local server = require("server")  -- Добавляем сервер
 
 local game = {}
 
@@ -8,13 +9,14 @@ local BULLET_SPEED = 390
 
 -- Локальные переменные
 local player = { x = 0, y = 0, angle = 0, hp = 5, max_hp = 5, id = 0 }
-local players = {}  -- Другие игроки { id = {x, y, angle, hp} }
-local bullets = {}  -- Все пули { id, player_id, x, y, vx, vy, life }
+local players = {}  -- Другие игроки
+local bullets = {}  -- Все пули
 local bg, playerImg, font
 local cam = { x = 0, y = 0 }
 local dead = false
 
--- Онлайн
+-- Режимы
+local mode = "offline"  -- "offline", "client", "host"
 local socket = nil
 local connected = false
 local player_id = 0
@@ -23,7 +25,10 @@ local send_interval = 1 / 20
 
 local onDeathCallback = nil
 
--- Функции отрисовки HP бара
+-- ============================================================
+-- ФУНКЦИИ ОТРИСОВКИ
+-- ============================================================
+
 local function drawHPBar(x, y, w, h, hp, max, color)
     hp = math.max(0, hp)
     love.graphics.setColor(0, 0, 0, 0.5)
@@ -37,32 +42,31 @@ local function drawHPBar(x, y, w, h, hp, max, color)
     love.graphics.rectangle("line", x, y, w, h, 4, 4)
 end
 
--- Создание пули
-local function spawnBullet(x, y, dx, dy)
-    -- Отправляем на сервер
-    if connected and socket then
-        pcall(function()
-            socket:send(string.format("SHOOT:dx:%.2f,dy:%.2f\n", dx, dy))
-        end)
-    end
+-- ============================================================
+-- РЕЖИМЫ ИГРЫ
+-- ============================================================
+
+function game.setMode(new_mode)
+    mode = new_mode
+    print("🎮 Режим: " .. mode)
 end
 
--- Обработчик получения урона
-local function onHitPlayer(dmg)
-    if dead then return end
-    player.hp = player.hp - dmg
-    if player.hp <= 0 then
-        player.hp = 0
-        dead = true
-        if onDeathCallback then
-            onDeathCallback()
-        end
+function game.hostGame(port)
+    -- Запускаем сервер
+    if not server.start(port) then
+        print("❌ Не удалось запустить сервер")
+        return false
     end
-end
-
--- Публичные функции
-function game.setOnDeath(callback)
-    onDeathCallback = callback
+    
+    -- Подключаемся как клиент
+    local success = game.connect("127.0.0.1", port)
+    if success then
+        game.setMode("host")
+        print("👑 Вы хост игры")
+        return true
+    end
+    
+    return false
 end
 
 function game.connect(ip, port)
@@ -86,6 +90,54 @@ function game.connect(ip, port)
         connected = false
         return false
     end
+end
+
+function game.disconnect()
+    if connected and socket then
+        pcall(function() socket:close() end)
+        socket = nil
+        connected = false
+    end
+    if server.isRunning() then
+        server.stop()
+    end
+    game.setMode("offline")
+end
+
+-- ============================================================
+-- СОЗДАНИЕ ПУЛИ
+-- ============================================================
+
+local function spawnBullet(x, y, dx, dy)
+    if connected and socket then
+        pcall(function()
+            socket:send(string.format("SHOOT:dx:%.2f,dy:%.2f\n", dx, dy))
+        end)
+    end
+end
+
+-- ============================================================
+-- ОБРАБОТЧИК УРОНА
+-- ============================================================
+
+local function onHitPlayer(dmg)
+    if dead then return end
+    player.hp = player.hp - dmg
+    if player.hp <= 0 then
+        player.hp = 0
+        dead = true
+        if onDeathCallback then
+            onDeathCallback()
+        end
+    end
+end
+
+-- ============================================================
+-- ПУБЛИЧНЫЕ ФУНКЦИИ
+-- ============================================================
+
+function game.setOnDeath(callback)
+    onDeathCallback = callback
 end
 
 function game.load()
@@ -116,13 +168,10 @@ function game.load()
     font = font or love.graphics.newFont("Fredoka-Bold.ttf", 16)
     
     controls.load()
+    server.init()
     
     controls.setOnBack(function()
-        if connected and socket then
-            pcall(function() socket:close() end)
-            socket = nil
-            connected = false
-        end
+        game.disconnect()
         GameState.current = "lobby"
     end)
 end
@@ -133,6 +182,12 @@ end
 
 function game.update(dt)
     if dead then return end
+    
+    -- Если мы хост, обновляем сервер
+    if mode == "host" and server.isRunning() then
+        server.update(dt)
+    end
+    
     if not connected then return end
     
     -- Обновление контролов
@@ -178,14 +233,13 @@ function game.update(dt)
             local data, err = socket:receive("*l")
             if not data then break end
             
-            -- Парсинг команд от сервера
+            -- Парсинг команд
             if data:sub(1, 10) == "CONNECTED:" then
                 player_id = tonumber(data:sub(11))
                 player.id = player_id
                 print("🎮 Получен ID: " .. player_id)
                 
             elseif data:sub(1, 12) == "PLAYER_JOIN:" then
-                -- PLAYER_JOIN:2:100.00:200.00:1.57:5
                 local parts = {}
                 for part in data:gmatch("[^:]+") do
                     table.insert(parts, part)
@@ -207,7 +261,6 @@ function game.update(dt)
                 players[pid] = nil
                 
             elseif data:sub(1, 7) == "BULLET:" then
-                -- BULLET:1:100.00:200.00:2.50:-1.20
                 local parts = {}
                 for part in data:gmatch("[^:]+") do
                     table.insert(parts, part)
@@ -219,13 +272,11 @@ function game.update(dt)
                         y = tonumber(parts[4]),
                         vx = tonumber(parts[5]),
                         vy = tonumber(parts[6]),
-                        life = 3.0,
-                        player_id = tonumber(parts[2]) -- упрощенно
+                        life = 3.0
                     })
                 end
                 
             elseif data:sub(1, 4) == "HIT:" then
-                -- HIT:player_id:damage
                 local parts = {}
                 for part in data:gmatch("[^:]+") do
                     table.insert(parts, part)
@@ -235,6 +286,23 @@ function game.update(dt)
                     local damage = tonumber(parts[3])
                     if target_id == player_id then
                         onHitPlayer(damage)
+                    end
+                end
+                
+            elseif data:sub(1, 14) == "PLAYER_UPDATE:" then
+                local parts = {}
+                for part in data:gmatch("[^:]+") do
+                    table.insert(parts, part)
+                end
+                if #parts >= 8 then
+                    local pid = tonumber(parts[2])
+                    if pid ~= player_id then
+                        if not players[pid] then players[pid] = {} end
+                        players[pid].x = tonumber(parts[3])
+                        players[pid].y = tonumber(parts[4])
+                        players[pid].angle = tonumber(parts[5])
+                        players[pid].hp = tonumber(parts[6])
+                        players[pid].alive = tonumber(parts[7]) == 1
                     end
                 end
             end
@@ -280,7 +348,7 @@ function game.draw()
     
     -- Другие игроки
     for pid, p in pairs(players) do
-        if pid ~= player_id then
+        if pid ~= player_id and p.alive ~= false then
             if playerImg then
                 love.graphics.setColor(0.3, 0.3, 0.8, 0.4)
                 love.graphics.push()
@@ -297,7 +365,6 @@ function game.draw()
                 love.graphics.pop()
             end
             
-            -- HP бар над игроком
             drawHPBar(p.x - 30, p.y - 50, 60, 6, p.hp or 5, 5, {0.3, 0.8, 0.3})
         end
     end
@@ -339,21 +406,29 @@ function game.draw()
     local barW, barH = 180, 16
     local margin = 16
     
-    -- HP игрока
     drawHPBar(margin, margin, barW, barH, player.hp, player.max_hp, {0.3, 0.85, 0.35})
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("HP " .. math.max(0, player.hp), margin, margin + barH + 4)
     
-    -- Онлайн статус
+    -- Статус
     if connected then
-        love.graphics.setColor(0, 1, 0, 0.7)
-        love.graphics.print("ONLINE | ID: " .. player_id, love.graphics.getWidth() - 200, margin)
+        local status = "ONLINE"
+        if mode == "host" then
+            status = "👑 HOST"
+            love.graphics.setColor(1, 0.8, 0, 0.7)
+        else
+            love.graphics.setColor(0, 1, 0, 0.7)
+        end
+        love.graphics.print(status .. " | ID: " .. player_id, love.graphics.getWidth() - 200, margin)
         love.graphics.print("Игроков: " .. (#players + 1), love.graphics.getWidth() - 200, margin + 20)
     end
     
-    -- Контролы
     controls.draw()
 end
+
+-- ============================================================
+-- ОБРАБОТЧИКИ ВВОДА
+-- ============================================================
 
 function game.touchpressed(id, x, y)
     controls.touchpressed(id, x, y)
@@ -372,11 +447,7 @@ end
 
 function game.keypressed(key)
     if key == "escape" then
-        if connected and socket then
-            pcall(function() socket:close() end)
-            socket = nil
-            connected = false
-        end
+        game.disconnect()
         GameState.current = "lobby"
     end
 end
