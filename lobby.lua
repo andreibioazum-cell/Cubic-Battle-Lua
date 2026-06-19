@@ -4,10 +4,6 @@ local fontTitle, fontBtn, fontSmall
 local animTimer = 0
 local game = nil
 local connect_error = ""
-local input_room = ""
-local show_join_menu = false
-local input_active = false
-local keyboard_visible = false
 
 local function tryLoadGame()
     if not game then
@@ -32,24 +28,20 @@ local function hostGame()
     end
 end
 
-local function joinRoom(room_id)
+local function joinRandomRoom()
     local g = tryLoadGame()
     if not g then return end
     
-    if room_id == "" then
-        connect_error = "❌ Введите ID комнаты"
-        return
-    end
+    connect_error = "⏳ Поиск комнаты..."
     
-    connect_error = "⏳ Подключение..."
-    
-    local success = g.joinRoom(room_id)
+    -- Просто заходим в случайную комнату
+    local success = g.joinRandomRoom()
     
     if success then
         connect_error = ""
         GameState.current = "game"
     else
-        connect_error = "❌ Комната не найдена"
+        connect_error = "❌ Нет доступных комнат, создайте новую!"
     end
 end
 
@@ -78,19 +70,15 @@ local function updateButtons()
         end
     end, {0.2, 0.6, 0.8})
     
-    makeButton("🔥 CREATE ROOM", startY + 65, function()
+    makeButton("🔥 СОЗДАТЬ КОМНАТУ", startY + 65, function()
         hostGame()
     end, {0.8, 0.3, 0.1})
     
-    makeButton("🔗 JOIN ROOM", startY + 130, function()
-        show_join_menu = true
-        input_room = ""
-        input_active = true
-        keyboard_visible = true
-        connect_error = ""
+    makeButton("🎮 НАЙТИ ИГРУ", startY + 130, function()
+        joinRandomRoom()
     end, {0.2, 0.7, 0.4})
     
-    makeButton("❌ QUIT", startY + 195, function()
+    makeButton("❌ ВЫЙТИ", startY + 195, function()
         love.event.quit()
     end, {0.6, 0.2, 0.2})
 end
@@ -103,10 +91,6 @@ function lobby.load()
     tryLoadGame()
     updateButtons()
     animTimer = 0
-    show_join_menu = false
-    input_room = ""
-    input_active = false
-    keyboard_visible = false
     connect_error = ""
 end
 
@@ -117,6 +101,7 @@ end
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
     
+    -- Градиент
     local gradientSteps = 60
     local stepH = h / gradientSteps
     for i = 0, gradientSteps - 1 do
@@ -128,6 +113,7 @@ function lobby.draw()
         love.graphics.rectangle("fill", 0, i * stepH, w, stepH + 1)
     end
     
+    -- Звёзды
     love.graphics.setColor(1, 1, 1, 0.35)
     for i = 1, 50 do
         local px = (math.sin(animTimer * 0.3 + i * 7.3) * 0.5 + 0.5) * w
@@ -136,6 +122,7 @@ function lobby.draw()
         love.graphics.circle("fill", px, py, size)
     end
     
+    -- Заголовок
     local titleY = h/2 - 180
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
@@ -143,9 +130,10 @@ function lobby.draw()
     
     love.graphics.setColor(0.7, 0.7, 0.9, 0.5)
     love.graphics.setFont(fontSmall)
-    love.graphics.printf("Multiplayer Arena", 0, titleY + 55, w, "center")
+    love.graphics.printf("🔥 МУЛЬТИПЛЕЕР БЕЗ РЕГИСТРАЦИИ", 0, titleY + 55, w, "center")
     
-    local bw, bh = 240, 50
+    -- Кнопки
+    local bw, bh = 280, 55
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
@@ -175,64 +163,7 @@ function lobby.draw()
         love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
     end
     
-    if show_join_menu then
-        love.graphics.setColor(0, 0, 0, 0.85)
-        love.graphics.rectangle("fill", 0, 0, w, h)
-        
-        local panel_w = math.min(350, w - 40)
-        local panel_h = 200
-        local panel_x = w/2 - panel_w/2
-        local panel_y = 60
-        
-        love.graphics.setColor(0.1, 0.1, 0.2, 0.95)
-        love.graphics.rectangle("fill", panel_x, panel_y, panel_w, panel_h, 16, 16)
-        love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
-        love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", panel_x, panel_y, panel_w, panel_h, 16, 16)
-        
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setFont(fontBtn)
-        love.graphics.printf("🔗 ПОДКЛЮЧЕНИЕ", panel_x, panel_y + 15, panel_w, "center")
-        
-        love.graphics.setColor(0.2, 0.2, 0.3, 0.5)
-        love.graphics.setFont(fontSmall)
-        love.graphics.printf("Введите ID комнаты:", panel_x, panel_y + 55, panel_w, "center")
-        
-        local input_y = panel_y + 80
-        love.graphics.setColor(0.05, 0.05, 0.1, 1)
-        love.graphics.rectangle("fill", panel_x + 20, input_y, panel_w - 40, 45, 8, 8)
-        love.graphics.setColor(0.3, 0.3, 0.6, 0.5)
-        love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", panel_x + 20, input_y, panel_w - 40, 45, 8, 8)
-        
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setFont(fontSmall)
-        local display_text = input_room
-        if display_text == "" then
-            display_text = "Введите ID (например: room_1234)"
-            love.graphics.setColor(0.5, 0.5, 0.5, 1)
-        else
-            love.graphics.setColor(0, 1, 0, 1)
-        end
-        love.graphics.print(display_text, panel_x + 30, input_y + 12)
-        
-        local btn_y = panel_y + panel_h - 55
-        local btn_w = (panel_w - 50) / 2
-        
-        love.graphics.setColor(0.2, 0.7, 0.4, 1)
-        love.graphics.rectangle("fill", panel_x + 15, btn_y, btn_w, 40, 10, 10)
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.setFont(fontSmall)
-        love.graphics.printf("✅ Подключиться", panel_x + 15, btn_y + 10, btn_w, "center")
-        
-        love.graphics.setColor(0.6, 0.2, 0.2, 1)
-        love.graphics.rectangle("fill", panel_x + 30 + btn_w, btn_y, btn_w, 40, 10, 10)
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.printf("❌ Отмена", panel_x + 30 + btn_w, btn_y + 10, btn_w, "center")
-        
-        drawKeyboard(panel_x, panel_y + panel_h + 10, panel_w)
-    end
-    
+    -- Статус
     if connect_error ~= "" then
         love.graphics.setColor(1, 0.3, 0.3, 0.8)
         love.graphics.setFont(fontSmall)
@@ -242,114 +173,9 @@ function lobby.draw()
     love.graphics.setColor(1, 1, 1, 1)
 end
 
-function drawKeyboard(panel_x, panel_y, panel_w)
-    if not keyboard_visible then return end
-    
-    local w = love.graphics.getWidth()
-    
-    local keys = {
-        {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
-        {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"},
-        {"k", "l", "m", "n", "o", "p", "q", "r", "s", "t"},
-        {"u", "v", "w", "x", "y", "z", "_", "-", "⌫", "ОК"}
-    }
-    
-    local key_w = 42
-    local key_h = 40
-    local spacing = 3
-    
-    for row, row_keys in ipairs(keys) do
-        local row_w = #row_keys * (key_w + spacing) - spacing
-        local row_x = w/2 - row_w/2
-        
-        for col, k in ipairs(row_keys) do
-            local bx = row_x + col * (key_w + spacing) - key_w - spacing
-            local by = panel_y + 10 + (row - 1) * (key_h + spacing)
-            
-            if k == "⌫" then
-                love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-            elseif k == "ОК" then
-                love.graphics.setColor(0.2, 0.6, 0.3, 0.9)
-            else
-                love.graphics.setColor(0.2, 0.2, 0.3, 0.9)
-            end
-            
-            love.graphics.rectangle("fill", bx, by, key_w, key_h, 6, 6)
-            love.graphics.setColor(0.4, 0.4, 0.6, 0.3)
-            love.graphics.setLineWidth(1)
-            love.graphics.rectangle("line", bx, by, key_w, key_h, 6, 6)
-            
-            love.graphics.setColor(1, 1, 1, 1)
-            love.graphics.setFont(fontSmall)
-            local text_w = fontSmall:getWidth(k)
-            love.graphics.print(k, bx + key_w/2 - text_w/2, by + key_h/2 - 12)
-        end
-    end
-    
-    lobby.keyboard_keys = keys
-    lobby.keyboard_data = {
-        key_w = key_w,
-        key_h = key_h,
-        spacing = spacing,
-        start_y = panel_y + 10
-    }
-end
-
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    
-    if show_join_menu then
-        local panel_w = math.min(350, w - 40)
-        local panel_x = w/2 - panel_w/2
-        local panel_y = 60
-        local panel_h = 200
-        
-        local btn_w = (panel_w - 50) / 2
-        local btn_y = panel_y + panel_h - 55
-        
-        if x >= panel_x + 15 and x <= panel_x + 15 + btn_w and 
-           y >= btn_y and y <= btn_y + 40 then
-            if input_room ~= "" then
-                joinRoom(input_room)
-                show_join_menu = false
-                keyboard_visible = false
-                input_active = false
-            end
-            return
-        end
-        
-        if x >= panel_x + 30 + btn_w and x <= panel_x + 30 + btn_w + btn_w and 
-           y >= btn_y and y <= btn_y + 40 then
-            show_join_menu = false
-            keyboard_visible = false
-            input_active = false
-            return
-        end
-        
-        if keyboard_visible and lobby.keyboard_keys then
-            local data = lobby.keyboard_data
-            if data then
-                for row, row_keys in ipairs(lobby.keyboard_keys) do
-                    local row_w = #row_keys * (data.key_w + data.spacing) - data.spacing
-                    local row_x = w/2 - row_w/2
-                    
-                    for col, k in ipairs(row_keys) do
-                        local bx = row_x + col * (data.key_w + data.spacing) - data.key_w - data.spacing
-                        local by = data.start_y + (row - 1) * (data.key_h + data.spacing)
-                        
-                        if x >= bx and x <= bx + data.key_w and y >= by and y <= by + data.key_h then
-                            handleKeyPress(k)
-                            return
-                        end
-                    end
-                end
-            end
-        end
-        
-        return
-    end
-    
-    local bw, bh = 240, 50
+    local bw, bh = 280, 55
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
@@ -359,56 +185,6 @@ function lobby.touchpressed(id, x, y)
                 btn.action() 
             end
             return
-        end
-    end
-end
-
-function handleKeyPress(key)
-    if key == "⌫" then
-        input_room = input_room:sub(1, -2)
-    elseif key == "ОК" then
-        if input_room ~= "" then
-            joinRoom(input_room)
-            show_join_menu = false
-            keyboard_visible = false
-            input_active = false
-        end
-    else
-        if #input_room < 25 then
-            input_room = input_room .. key
-        end
-    end
-end
-
-function lobby.keypressed(key)
-    if show_join_menu and input_active then
-        if key == "return" or key == "enter" or key == "kpenter" then
-            if input_room ~= "" then
-                joinRoom(input_room)
-                show_join_menu = false
-                input_active = false
-            end
-            return
-        end
-        
-        if key == "escape" then
-            show_join_menu = false
-            input_active = false
-            return
-        end
-        
-        if key == "backspace" then
-            input_room = input_room:sub(1, -2)
-            return
-        end
-        
-        if #key == 1 then
-            local char = key
-            if string.match(char, "[a-zA-Z0-9_-]") then
-                if #input_room < 25 then
-                    input_room = input_room .. char
-                end
-            end
         end
     end
 end
