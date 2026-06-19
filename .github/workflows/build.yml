@@ -1,4 +1,4 @@
-name: Build_Cubic_Battle_FAST
+name: Build_Cubic_Battle_3
 
 on:
   push:
@@ -78,6 +78,18 @@ jobs:
           restore-keys: |
             native-v7-
 
+      - name: Change package name to com.CB3
+        run: |
+          # Меняем package name в build.gradle
+          sed -i 's/org.love2d.android/com.CB3/g' love-android/app/build.gradle
+          sed -i 's/applicationId "org.love2d.android"/applicationId "com.CB3"/g' love-android/app/build.gradle
+          
+          # Меняем название приложения
+          sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/res/values/strings.xml
+          
+          # Меняем имя APK
+          sed -i 's/LOVE/CubicBattle3/g' love-android/app/build.gradle
+
       - name: Package game.love
         run: |
           cd game
@@ -114,12 +126,12 @@ jobs:
       - name: Collect APK
         run: |
           APK=$(find love-android -name "*.apk" -type f | head -1)
-          cp "$APK" CubicBattle.apk
+          cp "$APK" CubicBattle3.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CubicBattle_APK
-          path: CubicBattle.apk
+          name: CubicBattle3_APK
+          path: CubicBattle3.apk
           compression-level: 0
           retention-days: 7
