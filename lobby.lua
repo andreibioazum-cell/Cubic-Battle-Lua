@@ -120,7 +120,7 @@ local function updateButtons()
 end
 
 -- ═══════════════════════════════════════════════════════════
--- ОТРИСОВКА МАГАЗИНА
+-- ОТРИСОВКА МАГАЗИНА (КНОПКА CLOSE ВВЕРХУ)
 -- ═══════════════════════════════════════════════════════════
 
 local function drawShop()
@@ -137,6 +137,12 @@ local function drawShop()
     love.graphics.setColor(0.4, 0.4, 0.6, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12, 12)
+    
+    -- ⬆️ КНОПКА CLOSE ВВЕРХУ
+    love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
+    love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + 10, 60, 30, 8, 8)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print("CLOSE", shop_x + shop_w - 65, shop_y + 18)
     
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.setFont(fontTitle)
@@ -186,12 +192,6 @@ local function drawShop()
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.print("BUY", item_x + item_w - 75, item_y + 37)
     end
-    
-    -- Кнопка закрытия
-    love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + shop_h - 45, 60, 30, 8, 8)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("CLOSE", shop_x + shop_w - 65, shop_y + shop_h - 38)
 end
 
 -- ═══════════════════════════════════════════════════════════
@@ -307,9 +307,9 @@ function lobby.touchpressed(id, x, y)
         local shop_x = w/2 - shop_w/2
         local shop_y = h/2 - shop_h/2 + 50
         
-        -- Кнопка CLOSE
+        -- ⬆️ КНОПКА CLOSE ВВЕРХУ
         if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and 
-           y >= shop_y + shop_h - 45 and y <= shop_y + shop_h - 15 then
+           y >= shop_y + 10 and y <= shop_y + 40 then
             shop_open = false
             return
         end
