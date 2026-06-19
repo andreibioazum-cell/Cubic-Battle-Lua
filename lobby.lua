@@ -88,7 +88,7 @@ local function updateButtons()
 end
 
 function lobby.load()
-    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 36)
+    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 32)
     fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 18)
     
     tryLoadGame()
@@ -134,14 +134,17 @@ function lobby.draw()
         love.graphics.rectangle("fill", 0, i * stepH, w, stepH + 1)
     end
     
-    love.graphics.setColor(1, 1, 1, 0.3)
-    for i = 1, 20 do
+    -- БОЛЬШЕ ЗВЁЗД (50 штук)
+    love.graphics.setColor(1, 1, 1, 0.35)
+    for i = 1, 50 do
         local px = (math.sin(animTimer * 0.3 + i * 7.3) * 0.5 + 0.5) * w
         local py = (math.cos(animTimer * 0.5 + i * 4.7) * 0.5 + 0.5) * h
-        love.graphics.circle("fill", px, py, 1.5)
+        local size = 1 + math.sin(animTimer * 2 + i) * 1
+        love.graphics.circle("fill", px, py, size)
     end
     
-    local titleY = h/2 - 140
+    -- Заголовок НИЖЕ
+    local titleY = h/2 - 100
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
