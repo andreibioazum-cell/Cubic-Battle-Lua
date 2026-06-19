@@ -33,7 +33,7 @@ function controls.getMove()
 end
 
 function controls.getAim()
-    -- ВОЗВРАЩАЕМ СОХРАНЕННОЕ НАПРАВЛЕНИЕ ПРИЦЕЛА
+    -- Возвращаем сохраненное направление прицела
     return aim.x, aim.y
 end
 
@@ -52,7 +52,7 @@ function controls.touchpressed(id, x, y)
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
-        -- ВЫЧИСЛЯЕМ НАПРАВЛЕНИЕ ОТ ЦЕНТРА КНОПКИ К МЕСТУ КАСАНИЯ
+        -- Вычисляем направление от центра кнопки к месту касания
         local len = math.sqrt(ax*ax + ay*ay)
         if len > 5 then  -- Минимальное расстояние, чтобы избежать (0,0)
             aim.x = ax / len
@@ -74,7 +74,7 @@ function controls.touchmoved(id, x, y)
         joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
     end
     
-    -- ОБНОВЛЯЕМ ПРИЦЕЛ ПРИ ДВИЖЕНИИ НА КНОПКЕ ВЫСТРЕЛА
+    -- Обновляем прицел при движении на кнопке выстрела
     if id == atk.id then
         local ax, ay = x - atk.x, y - atk.y
         local len = math.sqrt(ax*ax + ay*ay)
@@ -98,7 +98,7 @@ function controls.touchreleased(id)
         atk.id = nil
         atk.hold = false
         shot = true
-        -- ИСПОЛЬЗУЕМ СОХРАНЕННОЕ НАПРАВЛЕНИЕ
+        -- Используем сохраненное направление
         dx, dy = aim.x, aim.y
         -- Если всё равно (0,0), стреляем вверх
         if dx == 0 and dy == 0 then
@@ -124,7 +124,7 @@ function controls.draw()
     love.graphics.setColor(0.5, 0, 1, 0.6)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
     
-    -- ЛИНИЯ ПРИЦЕЛА (показывает куда полетит пуля)
+    -- Линия прицела (показывает куда полетит пуля)
     if atk.hold then
         love.graphics.setColor(1, 1, 1, 0.6)
         love.graphics.setLineWidth(3)
