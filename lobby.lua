@@ -33,7 +33,7 @@ local function connectToServer(ip, port)
         g.setMode("client")
         GameState.current = "game"
     else
-        connect_error = "❌ Не удалось подключиться"
+        connect_error = g.getConnectError() or "❌ Не удалось подключиться"
     end
     
     connecting = false
@@ -43,12 +43,15 @@ local function hostServer(port)
     local g = tryLoadGame()
     if not g then return end
     
+    connect_error = "⏳ Запуск сервера..."
+    
     local success = g.hostGame(tonumber(port) or 12345)
     
     if success then
+        connect_error = ""
         GameState.current = "game"
     else
-        connect_error = "❌ Не удалось создать сервер"
+        connect_error = g.getConnectError() or "❌ Ошибка создания сервера"
     end
 end
 
@@ -85,7 +88,8 @@ local function updateButtons()
         show_join_menu = true
         input_active = true
         keyboard_visible = true
-        input_ip = ""  -- Очищаем при открытии
+        input_ip = ""
+        connect_error = ""
     end, {0.2, 0.7, 0.4})
     
     makeButton("❌ QUIT", startY + 195, function()
@@ -106,6 +110,7 @@ function lobby.load()
     input_port = "12345"
     input_active = false
     keyboard_visible = false
+    connect_error = ""
 end
 
 function lobby.update(dt)
@@ -252,7 +257,7 @@ function lobby.draw()
 end
 
 -- ============================================================
--- ЭКРАННАЯ КЛАВИАТУРА (ТОЛЬКО ЦИФРЫ И ТОЧКА)
+-- ЭКРАННАЯ КЛАВИАТУРА
 -- ============================================================
 
 function drawKeyboard(panel_x, panel_y, panel_w)
@@ -260,7 +265,6 @@ function drawKeyboard(panel_x, panel_y, panel_w)
     
     local w = love.graphics.getWidth()
     
-    -- Только цифры и точка!
     local keys = {
         {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
         {".", "⌫", "ОК"}
@@ -321,10 +325,10 @@ function lobby.touchpressed(id, x, y)
         local panel_y = 60
         local panel_h = 200
         
-        -- Кнопка "Подключиться"
         local btn_w = (panel_w - 50) / 2
         local btn_y = panel_y + panel_h - 55
         
+        -- Кнопка "Подключиться"
         if x >= panel_x + 15 and x <= panel_x + 15 + btn_w and 
            y >= btn_y and y <= btn_y + 40 then
             if input_ip ~= "" then
@@ -384,7 +388,7 @@ function lobby.touchpressed(id, x, y)
 end
 
 -- ============================================================
--- ОБРАБОТКА КЛАВИШ (ТОЛЬКО ЦИФРЫ И ТОЧКА!)
+-- ОБРАБОТКА КЛАВИШ
 -- ============================================================
 
 function handleKeyPress(key)
@@ -398,7 +402,6 @@ function handleKeyPress(key)
             input_active = false
         end
     else
-        -- ✅ ТОЛЬКО ЦИФРЫ И ТОЧКА!
         if string.match(key, "[0-9.]") then
             if #input_ip < 25 then
                 input_ip = input_ip .. key
@@ -429,7 +432,6 @@ function lobby.keypressed(key)
             return
         end
         
-        -- ✅ ФИКС: только цифры и точка!
         if #key == 1 then
             local char = key
             if string.match(char, "[0-9.]") then
