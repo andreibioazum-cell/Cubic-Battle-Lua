@@ -1,201 +1,90 @@
 local controls = {}
-
-local joy  = { id = nil, cx = 0, cy = 0, sx = 0, sy = 0, r = 50, sr = 20 }
-local atk  = { id = nil, x = 0, y = 0, r = 55, hold = false, press = 0 }
-local back = { x = 0, y = 0, w = 120, h = 44 }
-
-local font, fontBack
-local aimDx, aimDy = 0, -1
-local onBackCallback = nil
-
-local function place()
-    local w, h = love.graphics.getDimensions()
-    joy.cx = 90
-    joy.cy = h - 90
-    if not joy.id then
-        joy.sx, joy.sy = joy.cx, joy.cy
-    end
-    atk.x = w - 90
-    atk.y = h - 90
-    back.x = w/2 - back.w/2
-    back.y = 16
-end
-
-local function drawSpacedText(text, x, y, w, align, font, spacing, alpha)
-    alpha = alpha or 1
-    spacing = spacing or 0
-    love.graphics.setFont(font)
-
-    local totalW = 0
-    local widths = {}
-    for i = 1, #text do
-        local ch = text:sub(i, i)
-        local cw = font:getWidth(ch)
-        widths[i] = cw
-        totalW = totalW + cw
-    end
-    totalW = totalW + spacing * (#text - 1)
-
-    local startX
-    if align == "center" then
-        startX = x + (w - totalW) / 2
-    else
-        startX = x
-    end
-
-    local outline = 2
-    love.graphics.setColor(0, 0, 0, alpha)
-    local cx = startX
-    for i = 1, #text do
-        local ch = text:sub(i, i)
-        for dx = -outline, outline, outline do
-            for dy = -outline, outline, outline do
-                if dx ~= 0 or dy ~= 0 then
-                    love.graphics.print(ch, cx + dx, y + dy)
-                end
-            end
-        end
-        cx = cx + widths[i] + spacing
-    end
-
-    love.graphics.setColor(1, 1, 1, alpha)
-    cx = startX
-    for i = 1, #text do
-        local ch = text:sub(i, i)
-        love.graphics.print(ch, cx, y)
-        cx = cx + widths[i] + spacing
-    end
-end
+local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
+local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
+local font
 
 function controls.load()
-    font = love.graphics.newFont("Fredoka-Bold.ttf", 22)
-    fontBack = love.graphics.newFont("Fredoka-Bold.ttf", 18)
-    place()
+    font = love.graphics.newFont("Fredoka-Bold.ttf", 20)
+    controls.resize()
 end
 
 function controls.resize()
-    place()
+    local w, h = love.graphics.getDimensions()
+    joy.cy = h - 90
+    joy.sy = joy.cy
+    atk.x = w - 90
+    atk.y = h - 90
 end
 
-function controls.update(dt)
-    local target = atk.hold and 1 or 0
-    atk.press = atk.press + (target - atk.press) * math.min(dt * 12, 1)
-end
+function controls.update(dt) end
 
 function controls.getMove()
     if not joy.id then return 0, 0 end
-    local dx = joy.sx - joy.cx
-    local dy = joy.sy - joy.cy
-    local len = math.sqrt(dx * dx + dy * dy)
+    local dx, dy = joy.sx - joy.cx, joy.sy - joy.cy
+    local len = math.sqrt(dx*dx + dy*dy)
     if len == 0 then return 0, 0 end
-    aimDx, aimDy = dx / len, dy / len
-    return aimDx, aimDy
+    return dx/len, dy/len
+end
+
+function controls.getAim()
+    local dx, dy = controls.getMove()
+    return dx, dy
 end
 
 function controls.isAiming() return atk.hold end
-function controls.getAim() return aimDx, aimDy end
-
-function controls.setOnBack(fn)
-    onBackCallback = fn
-end
 
 function controls.touchpressed(id, x, y)
-    if x >= back.x and x <= back.x + back.w and y >= back.y and y <= back.y + back.h then
-        if onBackCallback then
-            onBackCallback()
-        end
-        return
-    end
-
-    local dx = x - joy.cx
-    local dy = y - joy.cy
-    if dx * dx + dy * dy <= joy.r * joy.r then
+    local dx, dy = x - joy.cx, y - joy.cy
+    if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
         joy.sx, joy.sy = x, y
-        return
     end
-
-    local ax = x - atk.x
-    local ay = y - atk.y
-    if ax * ax + ay * ay <= atk.r * atk.r then
+    local ax, ay = x - atk.x, y - atk.y
+    if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
     end
 end
 
 function controls.touchmoved(id, x, y)
-    if joy.id == id then
-        local dx = x - joy.cx
-        local dy = y - joy.cy
-        local len = math.sqrt(dx * dx + dy * dy)
+    if id == joy.id then
+        local dx, dy = x - joy.cx, y - joy.cy
+        local len = math.sqrt(dx*dx + dy*dy)
         if len > joy.r then
-            dx = dx / len * joy.r
-            dy = dy / len * joy.r
+            dx, dy = dx/len*joy.r, dy/len*joy.r
         end
-        joy.sx = joy.cx + dx
-        joy.sy = joy.cy + dy
+        joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
     end
 end
 
 function controls.touchreleased(id)
-    if joy.id == id then
+    local shot = false
+    local dx, dy = 0, 0
+    if id == joy.id then
         joy.id = nil
         joy.sx, joy.sy = joy.cx, joy.cy
     end
-    if atk.id == id then
+    if id == atk.id then
         atk.id = nil
         atk.hold = false
-        return true, aimDx, aimDy
+        shot = true
+        dx, dy = controls.getAim()
+        if dx == 0 and dy == 0 then dy = -1 end -- Стрельба вверх по умолчанию
     end
-    return false
+    return shot, dx, dy
 end
 
 function controls.draw()
-    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.setColor(0,0,0,0.5)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(0, 0, 0, 0.9)
-    love.graphics.setLineWidth(3)
-    love.graphics.circle("line", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(0, 0, 0, 1)
+    love.graphics.setColor(1,1,1)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
     
-    local scale = 1 - atk.press * 0.12
-    local r = atk.r * scale
-    local textScale = 1 - atk.press * 0.18
-
-    love.graphics.setColor(0.55 - atk.press * 0.2, 0.20, 0.85 - atk.press * 0.3, 1)
-    love.graphics.circle("fill", atk.x, atk.y, r)
-    love.graphics.setColor(0, 0, 0, 1)
-    love.graphics.setLineWidth(3)
-    love.graphics.circle("line", atk.x, atk.y, r)
-
-    love.graphics.push()
-    love.graphics.translate(atk.x, atk.y)
-    love.graphics.scale(textScale, textScale)
-    drawSpacedText("Shot", -atk.r, -12, atk.r * 2, "center", font, font:getWidth("A") * 0.05, 1)
-    love.graphics.pop()
-
-    local bw, bh = back.w, back.h
-    local bx, by = back.x, back.y
-    
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", bx + 3, by + 3, bw, bh, 12, 12)
-    
-    love.graphics.setColor(0.45, 0.15, 0.75, 0.85)
-    love.graphics.rectangle("fill", bx, by, bw, bh, 12, 12)
-    
-    love.graphics.setColor(0.6, 0.3, 0.9, 0.4)
-    love.graphics.rectangle("fill", bx + 3, by + 2, bw - 6, bh/2, 12, 12)
-    
-    love.graphics.setColor(0.8, 0.7, 1, 0.6)
-    love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", bx, by, bw, bh, 12, 12)
-    
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(fontBack)
-    love.graphics.printf("Back", bx, by + bh/2 - 10, bw, "center")
-
-    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setColor(0.5, 0, 1, 0.6)
+    love.graphics.circle("fill", atk.x, atk.y, atk.r)
+    love.graphics.setColor(1,1,1)
+    love.graphics.setFont(font)
+    love.graphics.printf("Shot", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
 end
 
 return controls
