@@ -19,7 +19,7 @@ local dead = false
 local onDeathCallback = nil
 
 -- Firebase режим
-local mode = "offline"  -- "offline", "firebase_host", "firebase_client"
+local mode = "offline"
 local room_id = nil
 local player_id = nil
 local players = {}
@@ -92,8 +92,8 @@ local function drawRoomInfo()
         love.graphics.setColor(0, 1, 0, 0.8)
         love.graphics.setFont(font)
         love.graphics.print("🔥 Комната: " .. (room_id or "?"), 10, 60)
-        love.graphics.print("ID: " .. (player_id or "?"), 10, 80)
-        love.graphics.print("Игроков: " .. (#players + 1), 10, 100)
+        love.graphics.print("👤 ID: " .. (player_id or "?"), 10, 80)
+        love.graphics.print("👥 Игроков: " .. (#players + 1), 10, 100)
         if mode == "firebase_host" then
             love.graphics.setColor(1, 0.8, 0, 0.8)
             love.graphics.print("👑 ВЫ ХОСТ", 10, 120)
@@ -155,7 +155,6 @@ function game.hostGame()
     player_id = "host_" .. tostring(math.random(1000, 9999))
     
     print("🔥 Создание комнаты: " .. room_id)
-    print("👑 Хост: " .. player_id)
     
     local host_data = {
         playerId = player_id,
@@ -172,7 +171,44 @@ function game.hostGame()
             game.setMode("firebase_host")
             game.startListener()
         else
-            print("❌ Ошибка создания комнаты: " .. tostring(code))
+            print("❌ Ошибка: " .. tostring(code))
+        end
+    end)
+    
+    return true
+end
+
+function game.joinRandomRoom()
+    -- Получаем список всех комнат
+    firebase.get("rooms", function(data, code)
+        if code == 200 and data then
+            local rooms = json.decode(data)
+            local available_rooms = {}
+            
+            -- Ищем доступные комнаты
+            if rooms then
+                for id, room in pairs(rooms) do
+                    if room.status == "waiting" then
+                        table.insert(available_rooms, id)
+                    end
+                end
+            end
+            
+            if #available_rooms > 0 then
+                -- Заходим в первую доступную комнату
+                local room_id_input = available_rooms[1]
+                print("🎮 Найдена комната: " .. room_id_input)
+                game.joinRoom(room_id_input)
+            else
+                -- Нет комнат - создаем новую
+                print("🎮 Нет комнат, создаем новую...")
+                connect_error = "Нет комнат, создаём новую!"
+                game.hostGame()
+            end
+        else
+            -- Ошибка или нет данных - создаем комнату
+            print("🎮 Ошибка поиска, создаем комнату...")
+            game.hostGame()
         end
     end)
     
@@ -184,7 +220,6 @@ function game.joinRoom(room_id_input)
     player_id = "player_" .. tostring(math.random(1000, 9999))
     
     print("🔥 Подключение к комнате: " .. room_id)
-    print("👤 Игрок: " .. player_id)
     
     local player_data = {
         playerId = player_id,
@@ -202,6 +237,8 @@ function game.joinRoom(room_id_input)
             game.startListener()
         else
             print("❌ Ошибка подключения: " .. tostring(code))
+            -- Если не получилось, создаем новую комнату
+            game.hostGame()
         end
     end)
     
@@ -211,7 +248,6 @@ end
 function game.leaveRoom()
     if room_id and player_id then
         firebase.leaveRoom(room_id, player_id)
-        
         if mode == "firebase_host" then
             firebase.deleteRoom(room_id)
         end
