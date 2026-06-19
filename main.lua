@@ -13,17 +13,24 @@ local lastState = nil
 function love.load()
     love.graphics.setDefaultFilter("linear", "linear")
     
-    if game.setOnDeath then
-        game.setOnDeath(function()
-            GameState.current = "lobby"
-        end)
-    end
+    -- Защита от ошибок
+    local success, err = pcall(function()
+        if game.setOnDeath then
+            game.setOnDeath(function()
+                GameState.current = "lobby"
+            end)
+        end
+        
+        local current = states[GameState.current]
+        if current and current.load then
+            current.load()
+        end
+        lastState = GameState.current
+    end)
     
-    local current = states[GameState.current]
-    if current and current.load then
-        current.load()
+    if not success then
+        print("❌ Ошибка загрузки: " .. tostring(err))
     end
-    lastState = GameState.current
 end
 
 function love.update(dt)
