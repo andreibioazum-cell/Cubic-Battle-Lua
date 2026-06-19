@@ -16,7 +16,7 @@ local function hostGame()
     local g = tryLoadGame()
     if not g then return end
     
-    connect_error = "⏳ Создание комнаты..."
+    connect_error = "Creating room..."
     
     local success = g.hostGame()
     
@@ -24,7 +24,7 @@ local function hostGame()
         connect_error = ""
         GameState.current = "game"
     else
-        connect_error = "❌ Ошибка создания комнаты"
+        connect_error = "ERROR: Failed to create room"
     end
 end
 
@@ -32,16 +32,15 @@ local function joinRandomRoom()
     local g = tryLoadGame()
     if not g then return end
     
-    connect_error = "⏳ Поиск комнаты..."
+    connect_error = "Searching for room..."
     
-    -- Просто заходим в случайную комнату
     local success = g.joinRandomRoom()
     
     if success then
         connect_error = ""
         GameState.current = "game"
     else
-        connect_error = "❌ Нет доступных комнат, создайте новую!"
+        connect_error = "ERROR: No rooms found"
     end
 end
 
@@ -60,7 +59,7 @@ local function updateButtons()
     local h = love.graphics.getHeight()
     local startY = h/2 - 50
     
-    makeButton("🏠 OFFLINE GAME", startY, function()
+    makeButton("OFFLINE GAME", startY, function()
         local g = tryLoadGame()
         if g then
             g.leaveRoom()
@@ -70,15 +69,15 @@ local function updateButtons()
         end
     end, {0.2, 0.6, 0.8})
     
-    makeButton("🔥 СОЗДАТЬ КОМНАТУ", startY + 65, function()
+    makeButton("CREATE ROOM", startY + 65, function()
         hostGame()
     end, {0.8, 0.3, 0.1})
     
-    makeButton("🎮 НАЙТИ ИГРУ", startY + 130, function()
+    makeButton("FIND GAME", startY + 130, function()
         joinRandomRoom()
     end, {0.2, 0.7, 0.4})
     
-    makeButton("❌ ВЫЙТИ", startY + 195, function()
+    makeButton("QUIT", startY + 195, function()
         love.event.quit()
     end, {0.6, 0.2, 0.2})
 end
@@ -101,7 +100,6 @@ end
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
     
-    -- Градиент
     local gradientSteps = 60
     local stepH = h / gradientSteps
     for i = 0, gradientSteps - 1 do
@@ -113,7 +111,6 @@ function lobby.draw()
         love.graphics.rectangle("fill", 0, i * stepH, w, stepH + 1)
     end
     
-    -- Звёзды
     love.graphics.setColor(1, 1, 1, 0.35)
     for i = 1, 50 do
         local px = (math.sin(animTimer * 0.3 + i * 7.3) * 0.5 + 0.5) * w
@@ -122,17 +119,15 @@ function lobby.draw()
         love.graphics.circle("fill", px, py, size)
     end
     
-    -- Заголовок
     local titleY = h/2 - 180
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
-    love.graphics.printf("⚔ CUBIC BATTLE", 0, titleY, w, "center")
+    love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
     
     love.graphics.setColor(0.7, 0.7, 0.9, 0.5)
     love.graphics.setFont(fontSmall)
-    love.graphics.printf("🔥 МУЛЬТИПЛЕЕР БЕЗ РЕГИСТРАЦИИ", 0, titleY + 55, w, "center")
+    love.graphics.printf("Multiplayer Arena", 0, titleY + 55, w, "center")
     
-    -- Кнопки
     local bw, bh = 280, 55
     
     for _, btn in ipairs(buttons) do
@@ -163,7 +158,6 @@ function lobby.draw()
         love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
     end
     
-    -- Статус
     if connect_error ~= "" then
         love.graphics.setColor(1, 0.3, 0.3, 0.8)
         love.graphics.setFont(fontSmall)
