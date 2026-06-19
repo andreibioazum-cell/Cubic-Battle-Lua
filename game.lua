@@ -11,8 +11,14 @@ local selected_skin = "default"
 local dead = false
 local bg, playerImg, diamondImg
 
+-- Шрифт для кнопки меню
+local menuFont = nil
+
 function game.load()
-    controls.load()  -- <-- ВАЖНО! Загружаем шрифты для контролов
+    controls.load()
+    
+    -- Загружаем шрифт для кнопки
+    menuFont = love.graphics.newFont(16)
     
     cube.x, cube.y = 1500, 1500
     cube.hp = 5
@@ -103,10 +109,51 @@ function game.draw()
     love.graphics.rectangle("fill", 20, 20, 200, 20)
     love.graphics.setColor(0, 1, 0)
     love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
+    
+    -- КНОПКА ВЫХОДА В МЕНЮ (в правом верхнем углу)
+    local screenW, screenH = love.graphics.getDimensions()
+    local menuBtnX = screenW - 120
+    local menuBtnY = 15
+    local menuBtnW = 100
+    local menuBtnH = 35
+    
+    -- Тень кнопки
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 8)
+    
+    -- Основная кнопка
+    love.graphics.setColor(0.8, 0.2, 0.2, 0.85)
+    love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 8)
+    
+    -- Свечение
+    love.graphics.setColor(1, 0.3, 0.3, 0.2)
+    love.graphics.rectangle("fill", menuBtnX + 3, menuBtnY + 3, menuBtnW - 6, menuBtnH / 2 - 2, 6)
+    
+    -- Текст
+    love.graphics.setColor(1, 1, 1)
+    if menuFont then
+        love.graphics.setFont(menuFont)
+    end
+    love.graphics.printf("MENU", menuBtnX, menuBtnY + 8, menuBtnW, "center")
+    
     controls.draw()
 end
 
 function game.touchpressed(id, x, y)
+    -- Проверяем нажатие на кнопку MENU
+    local screenW, screenH = love.graphics.getDimensions()
+    local menuBtnX = screenW - 120
+    local menuBtnY = 15
+    local menuBtnW = 100
+    local menuBtnH = 35
+    
+    if x >= menuBtnX and x <= menuBtnX + menuBtnW and
+       y >= menuBtnY and y <= menuBtnY + menuBtnH then
+        playSound("click")
+        _G.GameState.current = "lobby"
+        return
+    end
+    
     controls.touchpressed(id, x, y)
 end
 
@@ -117,7 +164,7 @@ end
 function game.touchreleased(id, x, y)
     local shot, dx, dy = controls.touchreleased(id)
     if shot then
-        playSound("shot")  -- 🔊 Звук выстрела
+        playSound("shot")
         table.insert(bullets, {
             x = cube.x,
             y = cube.y,
