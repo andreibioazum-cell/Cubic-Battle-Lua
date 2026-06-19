@@ -1,9 +1,8 @@
 local lobby = {}
 
-local fontTitle, fontBtn, fontSmall
+local fontTitle, fontBtn
 local animTimer = 0
 local game = nil
-local connect_error = ""
 
 local function tryLoadGame()
     if not game then
@@ -12,36 +11,16 @@ local function tryLoadGame()
     return game
 end
 
-local function hostGame()
+local function startGame()
     local g = tryLoadGame()
-    if not g then return end
-    
-    connect_error = "Creating room..."
-    
-    local success = g.hostGame()
-    
-    if success then
-        connect_error = ""
+    if g then
+        g.load()
         GameState.current = "game"
-    else
-        connect_error = "ERROR: Failed to create room"
     end
 end
 
-local function joinRandomRoom()
-    local g = tryLoadGame()
-    if not g then return end
-    
-    connect_error = "Searching for room..."
-    
-    local success = g.joinRandomRoom()
-    
-    if success then
-        connect_error = ""
-        GameState.current = "game"
-    else
-        connect_error = "ERROR: No rooms found"
-    end
+local function quitGame()
+    love.event.quit()
 end
 
 local buttons = {}
@@ -59,38 +38,17 @@ local function updateButtons()
     local h = love.graphics.getHeight()
     local startY = h/2 - 50
     
-    makeButton("OFFLINE GAME", startY, function()
-        local g = tryLoadGame()
-        if g then
-            g.leaveRoom()
-            g.setMode("offline")
-            g.load()
-            GameState.current = "game"
-        end
-    end, {0.2, 0.6, 0.8})
-    
-    makeButton("CREATE ROOM", startY + 65, function()
-        hostGame()
-    end, {0.8, 0.3, 0.1})
-    
-    makeButton("FIND GAME", startY + 130, function()
-        joinRandomRoom()
-    end, {0.2, 0.7, 0.4})
-    
-    makeButton("QUIT", startY + 195, function()
-        love.event.quit()
-    end, {0.6, 0.2, 0.2})
+    makeButton("PLAY", startY, startGame, {0.2, 0.6, 0.8})
+    makeButton("QUIT", startY + 65, quitGame, {0.6, 0.2, 0.2})
 end
 
 function lobby.load()
     fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 48)
     fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 20)
-    fontSmall = fontSmall or love.graphics.newFont("Fredoka-Bold.ttf", 18)
     
     tryLoadGame()
     updateButtons()
     animTimer = 0
-    connect_error = ""
 end
 
 function lobby.update(dt)
@@ -119,16 +77,16 @@ function lobby.draw()
         love.graphics.circle("fill", px, py, size)
     end
     
-    local titleY = h/2 - 180
+    local titleY = h/2 - 100
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
     
     love.graphics.setColor(0.7, 0.7, 0.9, 0.5)
-    love.graphics.setFont(fontSmall)
-    love.graphics.printf("Multiplayer Arena", 0, titleY + 55, w, "center")
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("Singleplayer Arena", 0, titleY + 55, w, "center")
     
-    local bw, bh = 280, 55
+    local bw, bh = 240, 50
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
@@ -158,18 +116,12 @@ function lobby.draw()
         love.graphics.printf(btn.text, bx, by + bh/2 - 11, bw, "center")
     end
     
-    if connect_error ~= "" then
-        love.graphics.setColor(1, 0.3, 0.3, 0.8)
-        love.graphics.setFont(fontSmall)
-        love.graphics.printf(connect_error, 0, h - 40, w, "center")
-    end
-    
     love.graphics.setColor(1, 1, 1, 1)
 end
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    local bw, bh = 280, 55
+    local bw, bh = 240, 50
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
