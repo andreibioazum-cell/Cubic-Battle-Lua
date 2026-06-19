@@ -4,12 +4,10 @@ local server = require("server")
 
 local game = {}
 
--- Константы
 local PLAYER_SIZE = 55
 local PLAYER_HP_MAX = 5
 local BULLET_SPEED = 340 * 1.15
 
--- Локальные переменные
 local cube = { x = 0, y = 0, speed = 260, angle = 0, hp = PLAYER_HP_MAX, hit = 0 }
 local bullets = {}
 local bg, playerImg, font
@@ -17,8 +15,7 @@ local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
 
--- Онлайн переменные
-local mode = "offline"  -- "offline", "client", "host"
+local mode = "offline"
 local socket = nil
 local connected = false
 local player_id = 0
@@ -27,12 +24,7 @@ local last_send = 0
 local send_interval = 1 / 20
 local online_bullets = {}
 local kill_messages = {}
-local game_start_time = 0
 local connect_error = ""
-
--- ============================================================
--- ФУНКЦИИ ОТРИСОВКИ
--- ============================================================
 
 local function drawHPBar(x, y, w, h, hp, max, color)
     hp = math.max(0, hp)
@@ -49,18 +41,12 @@ end
 
 local function drawScoreboard()
     local w = love.graphics.getWidth()
-    
     local scores = {}
     for pid, p in pairs(players) do
         if p.alive ~= false then
-            table.insert(scores, {
-                id = pid,
-                kills = p.kills or 0,
-                name = "P" .. pid
-            })
+            table.insert(scores, { id = pid, kills = p.kills or 0, name = "P" .. pid })
         end
     end
-    
     table.sort(scores, function(a, b) return a.kills > b.kills end)
     
     local bx = w - 220
@@ -83,7 +69,6 @@ local function drawScoreboard()
         if i == 1 then color = {1, 0.8, 0} end
         if i == 2 then color = {0.8, 0.8, 0.8} end
         if i == 3 then color = {0.8, 0.6, 0.3} end
-        
         love.graphics.setColor(color[1], color[2], color[3], 0.7)
         love.graphics.print(i .. ". " .. s.name, bx + 10, y)
         love.graphics.print(s.kills, bx + bw - 40, y)
@@ -101,10 +86,6 @@ local function drawHostInfo()
     end
 end
 
--- ============================================================
--- СОЗДАНИЕ ПУЛИ
--- ============================================================
-
 local function spawnBullet(x, y, dx, dy)
     table.insert(bullets, {
         x = x,
@@ -121,10 +102,6 @@ local function spawnBullet(x, y, dx, dy)
     end
 end
 
--- ============================================================
--- ОБРАБОТЧИК УРОНА
--- ============================================================
-
 local function onHitPlayer(dmg)
     if dead then return end
     cube.hp = cube.hp - dmg
@@ -138,9 +115,9 @@ local function onHitPlayer(dmg)
     end
 end
 
--- ============================================================
--- РЕЖИМЫ ИГРЫ
--- ============================================================
+function game.setOnDeath(callback)
+    onDeathCallback = callback
+end
 
 function game.setMode(new_mode)
     mode = new_mode
@@ -151,22 +128,15 @@ function game.hostGame(port)
     print("👑 Запуск сервера...")
     
     local success = server.start(port)
-    
     if not success then
-        local info = server.getInfo()
-        if info.error then
-            connect_error = info.error
-            print(connect_error)
-        end
+        connect_error = "❌ Не удалось создать сервер"
         return false
     end
     
-    -- Даем серверу время запуститься
     local wait = 0.1
     local start = love.timer.getTime()
-    
-    -- Подключаемся как клиент
     local conn_success = false
+    
     while love.timer.getTime() - start < wait do
         conn_success = game.connect("127.0.0.1", port)
         if conn_success then break end
@@ -174,7 +144,6 @@ function game.hostGame(port)
     
     if conn_success then
         game.setMode("host")
-        game_start_time = love.timer.getTime()
         print("👑 Вы хост игры!")
         return true
     else
@@ -228,10 +197,6 @@ function game.getConnectError()
     return connect_error
 end
 
--- ============================================================
--- ЗАГРУЗКА
--- ============================================================
-
 function game.load()
     cube.x = 0
     cube.y = 0
@@ -276,10 +241,6 @@ function game.resize()
     controls.resize()
 end
 
--- ============================================================
--- ОБНОВЛЕНИЕ
--- ============================================================
-
 function game.update(dt)
     if dead then 
         controls.update(dt)
@@ -288,7 +249,6 @@ function game.update(dt)
     
     controls.update(dt)
     
-    -- Движение
     local dx, dy = controls.getMove()
     cube.x = cube.x + dx * cube.speed * dt
     cube.y = cube.y + dy * cube.speed * dt
@@ -299,14 +259,12 @@ function game.update(dt)
 
     cube.hit = math.max(0, cube.hit - dt * 3)
 
-    -- Камера
     local targetX = cube.x - love.graphics.getWidth() / 2
     local targetY = cube.y - love.graphics.getHeight() / 2
     local k = 1 - math.exp(-dt * 7.3)
     cam.x = cam.x + (targetX - cam.x) * k
     cam.y = cam.y + (targetY - cam.y) * k
 
-    -- Пули
     for i = #bullets, 1, -1 do
         local b = bullets[i]
         b.x = b.x + b.vx * dt
@@ -327,17 +285,14 @@ function game.update(dt)
         end
     end
 
-    -- Обновляем сервер
     if mode == "host" and server.isRunning() then
         server.update(dt)
     end
 
-    -- Оффлайн
     if mode == "offline" then
         enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
     end
     
-    -- Онлайн
     if mode == "client" or mode == "host" then
         if connected and socket then
             last_send = last_send + dt
@@ -358,10 +313,8 @@ function game.update(dt)
                 if data:sub(1, 10) == "CONNECTED:" then
                     player_id = tonumber(data:sub(11))
                     print("🎮 ID: " .. player_id)
-                    
                 elseif data:sub(1, 12) == "SERVER_INFO:" then
                     print("📱 " .. data:sub(13))
-                    
                 elseif data:sub(1, 12) == "PLAYER_JOIN:" then
                     local parts = {}
                     for part in data:gmatch("[^:]+") do
@@ -380,11 +333,9 @@ function game.update(dt)
                             }
                         end
                     end
-                    
                 elseif data:sub(1, 12) == "PLAYER_LEFT:" then
                     local pid = tonumber(data:sub(13))
                     players[pid] = nil
-                    
                 elseif data:sub(1, 7) == "BULLET:" then
                     local parts = {}
                     for part in data:gmatch("[^:]+") do
@@ -400,7 +351,6 @@ function game.update(dt)
                             life = 3.0
                         })
                     end
-                    
                 elseif data:sub(1, 4) == "HIT:" then
                     local parts = {}
                     for part in data:gmatch("[^:]+") do
@@ -413,7 +363,6 @@ function game.update(dt)
                             onHitPlayer(damage)
                         end
                     end
-                    
                 elseif data:sub(1, 5) == "KILL:" then
                     local parts = {}
                     for part in data:gmatch("[^:]+") do
@@ -430,7 +379,6 @@ function game.update(dt)
                             table.insert(kill_messages, {text = "💀 P" .. killer .. " убил P" .. victim, timer = 2})
                         end
                     end
-                    
                 elseif data:sub(1, 14) == "PLAYER_UPDATE:" then
                     local parts = {}
                     for part in data:gmatch("[^:]+") do
@@ -453,7 +401,6 @@ function game.update(dt)
         end
     end
     
-    -- Обновляем сообщения
     for i = #kill_messages, 1, -1 do
         kill_messages[i].timer = kill_messages[i].timer - dt
         if kill_messages[i].timer <= 0 then
@@ -461,10 +408,6 @@ function game.update(dt)
         end
     end
 end
-
--- ============================================================
--- ОТРИСОВКА
--- ============================================================
 
 function game.draw()
     love.graphics.setColor(1, 1, 1, 1)
@@ -484,7 +427,6 @@ function game.draw()
         end
     end
 
-    -- Пули
     for _, b in ipairs(bullets) do
         love.graphics.setColor(0, 0, 0, 1)
         love.graphics.circle("fill", b.x, b.y, 7)
@@ -495,7 +437,6 @@ function game.draw()
         love.graphics.circle("fill", b.x, b.y, 7)
     end
 
-    -- Прицел
     if controls.isAiming() then
         local ax, ay = controls.getAim()
         love.graphics.setColor(0, 0, 0, 0.5)
@@ -506,12 +447,10 @@ function game.draw()
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
     end
 
-    -- Оффлайн враг
     if mode == "offline" then
         enemy.draw()
     end
     
-    -- Онлайн игроки
     if mode == "client" or mode == "host" then
         for pid, p in pairs(players) do
             if pid ~= player_id and p.alive ~= false then
@@ -539,7 +478,6 @@ function game.draw()
         end
     end
 
-    -- Свой игрок
     if playerImg then
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.push()
@@ -563,7 +501,6 @@ function game.draw()
 
     love.graphics.pop()
 
-    -- HUD
     love.graphics.setColor(1, 1, 1, 1)
     if font then love.graphics.setFont(font) end
     
@@ -597,10 +534,6 @@ function game.draw()
 
     controls.draw()
 end
-
--- ============================================================
--- ВВОД
--- ============================================================
 
 function game.touchpressed(id, x, y)
     controls.touchpressed(id, x, y)
