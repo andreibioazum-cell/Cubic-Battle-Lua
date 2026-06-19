@@ -1,8 +1,6 @@
--- main.lua - точка входа Cubic Battle
 local lobby = require("lobby")
 local game = require("game")
 
--- Глобальное состояние для обратной совместимости
 GameState = { current = "lobby" }
 
 local states = {
@@ -22,7 +20,6 @@ function love.load()
         end)
     end
     
-    -- Загружаем начальное состояние
     local current = states[GameState.current]
     if current and current.load then
         current.load()
@@ -33,7 +30,6 @@ end
 function love.update(dt)
     if dt > 0.05 then dt = 0.05 end
     
-    -- Обработка смены состояния
     if GameState.current ~= lastState then
         local new_state = states[GameState.current]
         if new_state and new_state.load then
@@ -42,7 +38,6 @@ function love.update(dt)
         lastState = GameState.current
     end
     
-    -- Обновление текущего состояния
     local current = states[GameState.current]
     if current and current.update then
         current.update(dt)
@@ -81,16 +76,5 @@ function love.touchreleased(id, x, y, dx, dy, pressure)
     local current = states[GameState.current]
     if current and current.touchreleased then
         current.touchreleased(id, x, y, dx, dy, pressure)
-    end
-end
-
-function love.keypressed(key)
-    local current = states[GameState.current]
-    if current and current.keypressed then
-        current.keypressed(key)
-    end
-    
-    if key == "escape" then
-        love.event.quit()
     end
 end
