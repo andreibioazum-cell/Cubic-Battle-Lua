@@ -1,6 +1,6 @@
 function love.conf(t)
     t.identity = "cubicbattle"
-    t.version = "11.5"
+    t.version = "12.0"
     t.window.title = "Cubic Battle"
     t.window.fullscreen = true
     t.window.borderless = true
@@ -9,13 +9,4 @@ function love.conf(t)
     t.window.resizable = true
     t.modules.physics = false
     t.modules.video = false
-    
-    -- Для Android: разрешаем сеть
-    t.android = {
-        permissions = {
-            "android.permission.INTERNET",
-            "android.permission.ACCESS_NETWORK_STATE",
-            "android.permission.ACCESS_WIFI_STATE"
-        }
-    }
 end
