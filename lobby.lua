@@ -1,7 +1,7 @@
 local lobby = {}
 local game
 
-local bg, fontTitle, fontBtn, fontSmall
+local fontTitle, fontBtn
 local online = { connected = false, socket = nil, connecting = false }
 local animTimer = 0
 
@@ -12,7 +12,6 @@ local function tryLoadGame()
     return game
 end
 
--- ===== СЕТЬ =====
 local function loadSocket()
     local success, socket = pcall(require, "socket")
     if success then return socket end
@@ -46,18 +45,17 @@ local function connectToServer(ip, port)
     end
 end
 
--- ===== КНОПКИ =====
 local buttons = {}
 local function makeButton(text, y, action)
-    table.insert(buttons, { text=text, y=y, action=action })
+    table.insert(buttons, { text = text, y = y, action = action })
 end
 
 local function updateButtons()
     buttons = {}
     local h = love.graphics.getHeight()
     
-    -- Считаем от центра экрана
-    local startY = h/2 + 30
+    -- Кнопки ВЫШЕ (минус 100 от центра)
+    local startY = h/2 - 100
     
     makeButton("LOCAL GAME", startY, function()
         local g = tryLoadGame()
@@ -68,14 +66,14 @@ local function updateButtons()
     end)
     
     if online.connected then
-        makeButton("ONLINE GAME", startY + 75, function()
+        makeButton("ONLINE GAME", startY + 80, function()
             local g = tryLoadGame()
             if g then
                 g.setOnlineMode(true, online.socket)
                 GameState.current = "game"
             end
         end)
-        makeButton("DISCONNECT", startY + 150, function()
+        makeButton("DISCONNECT", startY + 160, function()
             if online.socket then
                 online.socket:close()
             end
@@ -84,24 +82,20 @@ local function updateButtons()
             updateButtons()
         end)
     else
-        makeButton("CONNECT ONLINE", startY + 75, function()
+        makeButton("CONNECT ONLINE", startY + 80, function()
             connectToServer("192.168.1.100", 4080)
             updateButtons()
         end)
     end
     
-    makeButton("QUIT", startY + 225, function()
+    makeButton("QUIT", startY + 240, function()
         love.event.quit()
     end)
 end
 
 function lobby.load()
-    bg = bg or love.graphics.newImage("grass.png")
-    if bg then bg:setWrap("repeat", "repeat") end
-    
-    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 52)
+    fontTitle = fontTitle or love.graphics.newFont("Fredoka-Bold.ttf", 56)
     fontBtn = fontBtn or love.graphics.newFont("Fredoka-Bold.ttf", 26)
-    fontSmall = fontSmall or love.graphics.newFont("Fredoka-Bold.ttf", 18)
     
     tryLoadGame()
     updateButtons()
@@ -121,13 +115,23 @@ function lobby.update(dt)
             updateButtons()
         end
     end
+    
+    if online.connecting then
+        -- Ждём подключения
+        local data, err = online.socket:receive("*l")
+        if data then
+            print("Server: " .. data)
+            online.connected = true
+            online.connecting = false
+            updateButtons()
+        end
+    end
 end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
     
-    -- ===== ГРАДИЕНТНЫЙ ФОН =====
-    -- Верх - тёмно-фиолетовый, низ - тёмно-синий
+    -- Градиентный фон
     local gradientSteps = 60
     local stepH = h / gradientSteps
     for i = 0, gradientSteps - 1 do
@@ -139,99 +143,67 @@ function lobby.draw()
         love.graphics.rectangle("fill", 0, i * stepH, w, stepH + 1)
     end
     
-    -- Трава с низкой прозрачностью для текстуры
-    if bg then
-        love.graphics.setColor(1, 1, 1, 0.08)
-        local tw, th = bg:getWidth(), bg:getHeight()
-        for x = 0, w, tw do
-            for y = 0, h, th do
-                love.graphics.draw(bg, x, y)
-            end
-        end
-    end
-    
-    -- Частицы на фоне (звёздочки)
-    love.graphics.setColor(1, 1, 1, 0.4)
-    for i = 1, 30 do
+    -- Звёздочки
+    love.graphics.setColor(1, 1, 1, 0.3)
+    for i = 1, 20 do
         local px = (math.sin(animTimer * 0.3 + i * 7.3) * 0.5 + 0.5) * w
         local py = (math.cos(animTimer * 0.5 + i * 4.7) * 0.5 + 0.5) * h
-        local size = 1 + math.sin(animTimer * 2 + i) * 0.5
-        love.graphics.circle("fill", px, py, size)
+        love.graphics.circle("fill", px, py, 1.5)
     end
     
-    -- ===== ЗАГОЛОВОК =====
-    local titleY = h/2 - 180
-    
-    -- Свечение заголовка
-    love.graphics.setColor(0.55, 0.20, 0.85, 0.3)
-    love.graphics.setFont(fontTitle)
-    love.graphics.printf("CUBIC BATTLE", -3, titleY - 3, w, "center")
-    love.graphics.printf("CUBIC BATTLE", 3, titleY + 3, w, "center")
-    love.graphics.printf("CUBIC BATTLE", -3, titleY + 3, w, "center")
-    love.graphics.printf("CUBIC BATTLE", 3, titleY - 3, w, "center")
-    
-    -- Основной заголовок
+    -- Заголовок (БЕЗ обводки)
+    local titleY = h/2 - 220
     love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, titleY, w, "center")
     
-    -- Подзаголовок
-    love.graphics.setColor(0.7, 0.7, 1.0, 0.8)
-    love.graphics.setFont(fontSmall)
-    love.graphics.printf("HARDCORE CUBE SHOOTER", 0, titleY + 55, w, "center")
-    
-    -- Статус подключения
-    if online.connecting then
-        love.graphics.setColor(1, 0.9, 0, 0.9)
-        love.graphics.printf("CONNECTING...", 0, titleY + 80, w, "center")
-    elseif online.connected then
-        love.graphics.setColor(0, 1, 0.3, 0.9)
-        love.graphics.printf("ONLINE - READY", 0, titleY + 80, w, "center")
-    else
-        love.graphics.setColor(1, 0.3, 0.3, 0.7)
-        love.graphics.printf("OFFLINE MODE", 0, titleY + 80, w, "center")
-    end
-    
-    -- ===== КНОПКИ =====
-    local bw, bh = 280, 60
+    -- Кнопки
+    local bw, bh = 280, 62
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
         local by = btn.y
         
-        -- Тень кнопки
-        love.graphics.setColor(0, 0, 0, 0.4)
-        love.graphics.rectangle("fill", bx + 5, by + 5, bw, bh, 16, 16)
+        -- Тень
+        love.graphics.setColor(0, 0, 0, 0.3)
+        love.graphics.rectangle("fill", bx + 4, by + 4, bw, bh, 14, 14)
         
-        -- Тело кнопки (градиент)
-        love.graphics.setColor(0.45, 0.12, 0.75, 1)
-        love.graphics.rectangle("fill", bx, by, bw, bh, 16, 16)
+        -- Кнопка
+        love.graphics.setColor(0.45, 0.15, 0.75, 1)
+        love.graphics.rectangle("fill", bx, by, bw, bh, 14, 14)
         
-        -- Блик сверху
-        love.graphics.setColor(0.6, 0.3, 0.9, 0.5)
-        love.graphics.rectangle("fill", bx + 4, by + 2, bw - 8, bh/2, 16, 16)
+        -- Блик
+        love.graphics.setColor(0.6, 0.3, 0.9, 0.4)
+        love.graphics.rectangle("fill", bx + 3, by + 2, bw - 6, bh/2, 14, 14)
         
         -- Обводка
-        love.graphics.setColor(0.8, 0.6, 1, 0.8)
-        love.graphics.setLineWidth(2.5)
-        love.graphics.rectangle("line", bx, by, bw, bh, 16, 16)
+        love.graphics.setColor(0.8, 0.7, 1, 0.6)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", bx, by, bw, bh, 14, 14)
         
-        -- Текст кнопки
+        -- Текст
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.setFont(fontBtn)
         love.graphics.printf(btn.text, bx, by + bh/2 - 14, bw, "center")
     end
     
-    -- ===== ФУТЕР =====
-    love.graphics.setColor(0.5, 0.5, 0.6, 0.6)
-    love.graphics.setFont(fontSmall)
-    love.graphics.printf("v11.5 | TAP TO START", 0, h - 50, w, "center")
+    -- Статус подключения (маленький)
+    if online.connecting then
+        love.graphics.setColor(1, 0.9, 0, 0.7)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf("Connecting...", 0, h - 100, w, "center")
+    elseif online.connected then
+        love.graphics.setColor(0, 1, 0.3, 0.5)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf("ONLINE", 0, h - 100, w, "center")
+    end
     
     love.graphics.setColor(1, 1, 1, 1)
 end
 
 function lobby.touchpressed(id, x, y)
     local w = love.graphics.getWidth()
-    local bw, bh = 280, 60
+    local bw, bh = 280, 62
     
     for _, btn in ipairs(buttons) do
         local bx = w/2 - bw/2
