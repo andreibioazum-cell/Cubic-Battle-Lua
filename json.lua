@@ -1,5 +1,5 @@
 -- json.lua
--- Простой парсер JSON для LÖVE
+-- Простой парсер JSON
 
 local json = {}
 
