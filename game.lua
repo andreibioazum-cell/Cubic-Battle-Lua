@@ -12,6 +12,8 @@ local dead = false
 local bg, playerImg, diamondImg
 
 function game.load()
+    controls.load()  -- <-- ВАЖНО! Загружаем шрифты для контролов
+    
     cube.x, cube.y = 1500, 1500
     cube.hp = 5
     dead = false
@@ -62,7 +64,7 @@ function game.update(dt)
             if game.onDeath then
                 game.onDeath()
             end
-            _G.GameState.current = "lobby"  -- Сразу в лобби
+            _G.GameState.current = "lobby"
         end
     end)
 end
