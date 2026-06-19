@@ -151,7 +151,6 @@ function controls.touchreleased(id)
 end
 
 function controls.draw()
-    -- Джойстик
     love.graphics.setColor(0, 0, 0, 0.5)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
     love.graphics.setColor(0, 0, 0, 0.9)
@@ -160,7 +159,6 @@ function controls.draw()
     love.graphics.setColor(0, 0, 0, 1)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
     
-    -- Кнопка Shot
     local scale = 1 - atk.press * 0.12
     local r = atk.r * scale
     local textScale = 1 - atk.press * 0.18
@@ -177,7 +175,6 @@ function controls.draw()
     drawSpacedText("Shot", -atk.r, -12, atk.r * 2, "center", font, font:getWidth("A") * 0.05, 1)
     love.graphics.pop()
 
-    -- Back
     local bw, bh = back.w, back.h
     local bx, by = back.x, back.y
     
