@@ -38,37 +38,13 @@ local bg, playerImg, diamondImg, font
 local cam = { x = 0, y = 0 }
 local dead = false
 local onDeathCallback = nil
-local shop_open = false
 
 -- ═══════════════════════════════════════════════════════════
--- МАГАЗИН И ДЕНЬГИ
+-- ДЕНЬГИ И СКИНЫ (только данные, магазина в игре нет)
 -- ═══════════════════════════════════════════════════════════
 
 local coins = 0
 local selected_skin = "default"
-
--- Скины
-local skins = {
-    default = {
-        name = "Default Cube",
-        color = {1, 1, 1},
-        ability = nil,
-        ability_name = "None",
-        price = 0,
-        owned = true
-    },
-    diamond = {
-        name = "Diamond Cube",
-        color = {0.2, 0.8, 1},
-        ability = "shield",
-        ability_name = "Shield",
-        ability_desc = "Blocks 1 hit every 10 sec",
-        price = 100,
-        owned = false
-    }
-}
-
--- Способности
 local abilities = {
     shield = {
         cooldown = 10,
@@ -177,14 +153,9 @@ function game.load()
     bullets = {}
     cam.x = cube.x - love.graphics.getWidth() / 2
     cam.y = cube.y - love.graphics.getHeight() / 2
-    shop_open = false
     
     coins = coins_from_lobby
     selected_skin = skin_from_lobby
-    
-    if selected_skin == "diamond" then
-        skins.diamond.owned = true
-    end
 
     -- Загрузка текстур
     bg = loadTexture("grass.png")
@@ -298,6 +269,7 @@ function game.draw()
         love.graphics.line(cube.x, cube.y, cube.x + ax * 180, cube.y + ay * 180)
     end
 
+    -- 🔥 ВСЕГДА РИСУЕМ ВРАГА
     enemy.draw()
 
     -- Отрисовка игрока
@@ -359,7 +331,6 @@ function game.draw()
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("HP " .. math.max(0, cube.hp), margin, margin + barH + 4)
 
-    -- Cubicoins
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.print("Cubicoins: " .. coins, margin, margin + barH + 30)
 
@@ -372,29 +343,10 @@ function game.draw()
         love.graphics.print("BOSS " .. math.max(0, e_obj.hp), ex, margin + barH + 4)
     end
 
-    -- Кнопка SHOP
-    local shop_btn_x = love.graphics.getWidth() / 2 - 60
-    local shop_btn_y = 10
-    love.graphics.setColor(0.4, 0.2, 0.8, 0.9)
-    love.graphics.rectangle("fill", shop_btn_x, shop_btn_y, 120, 35, 8, 8)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("SHOP", shop_btn_x + 35, shop_btn_y + 8)
-
     controls.draw()
 end
 
 function game.touchpressed(id, x, y)
-    local w = love.graphics.getWidth()
-    local h = love.graphics.getHeight()
-    
-    -- Кнопка SHOP
-    local shop_btn_x = w/2 - 60
-    local shop_btn_y = 10
-    if x >= shop_btn_x and x <= shop_btn_x + 120 and y >= shop_btn_y and y <= shop_btn_y + 35 then
-        shop_open = not shop_open
-        return
-    end
-    
     controls.touchpressed(id, x, y)
 end
 
