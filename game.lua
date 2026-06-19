@@ -117,6 +117,7 @@ end
 function game.touchreleased(id, x, y)
     local shot, dx, dy = controls.touchreleased(id)
     if shot then
+        playSound("shot")  -- 🔊 Звук выстрела
         table.insert(bullets, {
             x = cube.x,
             y = cube.y,
