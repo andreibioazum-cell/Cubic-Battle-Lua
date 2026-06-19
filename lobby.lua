@@ -34,8 +34,7 @@ local function updateButtons()
     local h = love.graphics.getHeight()
     local startY = h/2 - 50
     
-    makeButton("PLAY", startY, startGame, {0.2, 0.6, 0.8})
-    -- ❌ КНОПКА ВЫЙТИ УДАЛЕНА
+    makeButton("⚔ PLAY", startY, startGame, {0.2, 0.6, 0.8})
 end
 
 function lobby.load()
