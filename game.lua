@@ -1,5 +1,6 @@
 local controls = require("controls")
 local enemy = require("enemy")
+local modSystem = require("mod_system")
 local game = {}
 
 local WORLD_SIZE = 3000
@@ -10,14 +11,11 @@ local coins = 0
 local selected_skin = "default"
 local dead = false
 local bg, playerImg, diamondImg
-
--- Шрифт для кнопки меню
 local menuFont = nil
 
 function game.load()
     controls.load()
     
-    -- Загружаем шрифт для кнопки
     menuFont = love.graphics.newFont(16)
     
     cube.x, cube.y = 1500, 1500
@@ -34,7 +32,11 @@ function game.load()
     enemy.setDeathCallback(function()
         coins = coins + 50
         _G.GameState.current = "lobby"
+        modSystem.gameDeath()  -- Вызываем событие смерти врага для модов
     end)
+    
+    -- Вызываем событие загрузки для модов
+    modSystem.gameLoad()
 end
 
 function game.update(dt)
@@ -48,7 +50,6 @@ function game.update(dt)
         cube.angle = math.atan2(dy, dx) + math.pi / 2
     end
 
-    -- Плавная камера
     local sw, sh = love.graphics.getDimensions()
     cam.x = cam.x + (cube.x - sw / 2 - cam.x) * 5 * dt
     cam.y = cam.y + (cube.y - sh / 2 - cam.y) * 5 * dt
@@ -70,6 +71,7 @@ function game.update(dt)
             if game.onDeath then
                 game.onDeath()
             end
+            modSystem.gameDeath()  -- Вызываем событие смерти для модов
             _G.GameState.current = "lobby"
         end
     end)
@@ -110,26 +112,20 @@ function game.draw()
     love.graphics.setColor(0, 1, 0)
     love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
     
-    -- КНОПКА ВЫХОДА В МЕНЮ (в правом верхнем углу)
+    -- Кнопка MENU
     local screenW, screenH = love.graphics.getDimensions()
     local menuBtnX = screenW - 120
     local menuBtnY = 15
     local menuBtnW = 100
     local menuBtnH = 35
     
-    -- Тень кнопки
     love.graphics.setColor(0, 0, 0, 0.3)
     love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 8)
-    
-    -- Основная кнопка
     love.graphics.setColor(0.8, 0.2, 0.2, 0.85)
     love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 8)
-    
-    -- Свечение
     love.graphics.setColor(1, 0.3, 0.3, 0.2)
     love.graphics.rectangle("fill", menuBtnX + 3, menuBtnY + 3, menuBtnW - 6, menuBtnH / 2 - 2, 6)
     
-    -- Текст
     love.graphics.setColor(1, 1, 1)
     if menuFont then
         love.graphics.setFont(menuFont)
@@ -140,7 +136,6 @@ function game.draw()
 end
 
 function game.touchpressed(id, x, y)
-    -- Проверяем нажатие на кнопку MENU
     local screenW, screenH = love.graphics.getDimensions()
     local menuBtnX = screenW - 120
     local menuBtnY = 15
@@ -165,11 +160,15 @@ function game.touchreleased(id, x, y)
     local shot, dx, dy = controls.touchreleased(id)
     if shot then
         playSound("shot")
+        
+        -- Модифицируем пулю через систему модов
+        local modified = modSystem.gameShoot(cube.x, cube.y, dx, dy)
+        
         table.insert(bullets, {
-            x = cube.x,
-            y = cube.y,
-            vx = dx * 400,
-            vy = dy * 400
+            x = modified.x or cube.x,
+            y = modified.y or cube.y,
+            vx = (modified.dx or dx) * 400,
+            vy = (modified.dy or dy) * 400
         })
     end
 end
