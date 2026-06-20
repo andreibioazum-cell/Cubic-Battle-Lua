@@ -4,6 +4,9 @@ local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
 local aim = { x = 0, y = -1 }
 local font = nil
 
+-- Флаг для предотвращения двойного выстрела
+local shotFired = false
+
 function controls.load()
     local success, err = pcall(function()
         font = love.graphics.newFont(20)
@@ -12,6 +15,7 @@ function controls.load()
         font = love.graphics.newFont(20)
     end
     controls.resize()
+    shotFired = false
 end
 
 function controls.resize()
@@ -44,6 +48,7 @@ function controls.touchpressed(id, x, y)
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
         joy.sx, joy.sy = x, y
+        return
     end
     
     -- Attack button
@@ -51,6 +56,7 @@ function controls.touchpressed(id, x, y)
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
+        shotFired = false
         local len = math.sqrt(ax*ax + ay*ay)
         if len > 5 then
             aim.x = ax / len
@@ -93,10 +99,15 @@ function controls.touchreleased(id)
     if id == atk.id then
         atk.id = nil
         atk.hold = false
-        shot = true
-        dx, dy = aim.x, aim.y
-        if dx == 0 and dy == 0 then
-            dy = -1
+        
+        -- СТРЕЛЬБА ТОЛЬКО ЕСЛИ НЕ БЫЛО ВЫСТРЕЛА
+        if not shotFired then
+            shot = true
+            dx, dy = aim.x, aim.y
+            if dx == 0 and dy == 0 then
+                dy = -1
+            end
+            shotFired = true
         end
     end
     
