@@ -75,12 +75,15 @@ function love.load()
 
     -- Загрузка состояний
     local success, err = xpcall(function()
-        if game.setOnDeath then
-            game.setOnDeath(function()
+        -- Настраиваем колбэк смерти для игры
+        local g = require("game")
+        if g.setOnDeath then
+            g.setOnDeath(function()
                 _G.GameState.current = "lobby"
             end)
         end
 
+        -- Загружаем текущее состояние
         local current = states[_G.GameState.current]
         if current and current.load then 
             current.load() 
@@ -88,7 +91,8 @@ function love.load()
         lastState = _G.GameState.current
         
     end, function(err)
-        -- Обработка ошибок без вывода в консоль
+        -- Обработка ошибок
+        print("Error in love.load: " .. tostring(err))
     end)
 end
 
@@ -185,7 +189,9 @@ function love.keyreleased(key)
     end
 end
 
--- Изменение размера окна
+-- ============================================================
+-- ИЗМЕНЕНИЕ РАЗМЕРА ОКНА
+-- ============================================================
 function love.resize(w, h)
     for _, s in pairs(states) do
         if s.resize then 
@@ -194,9 +200,21 @@ function love.resize(w, h)
     end
 end
 
--- Обработка текстового ввода (для экранной клавиатуры)
+-- ============================================================
+-- ОБРАБОТКА ТЕКСТОВОГО ВВОДА (ДЛЯ ЭКРАННОЙ КЛАВИАТУРЫ)
+-- ============================================================
 function love.textinput(text)
     if keyboard.isActive() then
         keyboard.handleTextInput(text)
     end
+end
+
+-- ============================================================
+-- ОБРАБОТКА ОШИБОК
+-- ============================================================
+function love.errhand(msg)
+    print("Error: " .. tostring(msg))
+    -- Показываем ошибку на экране
+    love.graphics.setColor(1, 0, 0)
+    love.graphics.print("Error: " .. tostring(msg), 10, 10)
 end
