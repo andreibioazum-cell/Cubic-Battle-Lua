@@ -32,10 +32,9 @@ function game.load()
     enemy.setDeathCallback(function()
         coins = coins + 50
         _G.GameState.current = "lobby"
-        modSystem.gameDeath()  -- Вызываем событие смерти врага для модов
+        modSystem.gameDeath()
     end)
     
-    -- Вызываем событие загрузки для модов
     modSystem.gameLoad()
 end
 
@@ -57,8 +56,13 @@ function game.update(dt)
     -- Пули игрока
     for i = #bullets, 1, -1 do
         local b = bullets[i]
-        b.x, b.y = b.x + b.vx * dt, b.y + b.vy * dt
-        if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
+        if b and type(b.x) == "number" and type(b.y) == "number" then
+            b.x = b.x + b.vx * dt
+            b.y = b.y + b.vy * dt
+            if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
+                table.remove(bullets, i)
+            end
+        else
             table.remove(bullets, i)
         end
     end
@@ -71,7 +75,7 @@ function game.update(dt)
             if game.onDeath then
                 game.onDeath()
             end
-            modSystem.gameDeath()  -- Вызываем событие смерти для модов
+            modSystem.gameDeath()
             _G.GameState.current = "lobby"
         end
     end)
@@ -102,7 +106,9 @@ function game.draw()
     )
 
     for _, b in ipairs(bullets) do
-        love.graphics.circle("fill", b.x, b.y, 5)
+        if b and type(b.x) == "number" and type(b.y) == "number" then
+            love.graphics.circle("fill", b.x, b.y, 5)
+        end
     end
     love.graphics.pop()
 
@@ -112,7 +118,7 @@ function game.draw()
     love.graphics.setColor(0, 1, 0)
     love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
     
-    -- Кнопка MENU
+    -- Кнопка меню
     local screenW, screenH = love.graphics.getDimensions()
     local menuBtnX = screenW - 120
     local menuBtnY = 15
@@ -164,12 +170,15 @@ function game.touchreleased(id, x, y)
         -- Модифицируем пулю через систему модов
         local modified = modSystem.gameShoot(cube.x, cube.y, dx, dy)
         
-        table.insert(bullets, {
-            x = modified.x or cube.x,
-            y = modified.y or cube.y,
-            vx = (modified.dx or dx) * 400,
-            vy = (modified.dy or dy) * 400
-        })
+        -- Создаём пулю с правильными типами данных
+        local bullet = {
+            x = tonumber(modified.x) or tonumber(cube.x) or 0,
+            y = tonumber(modified.y) or tonumber(cube.y) or 0,
+            vx = (tonumber(modified.dx) or tonumber(dx) or 0) * 400,
+            vy = (tonumber(modified.dy) or tonumber(dy) or 0) * 400
+        }
+        
+        table.insert(bullets, bullet)
     end
 end
 
