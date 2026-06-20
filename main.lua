@@ -2,9 +2,15 @@
 local lobby = require("lobby")
 local game = require("game")
 local keyboard = require("game_keyboard")
+local shop = require("shop")
+local sights = require("sights")
+local joystick_custom = require("joystick_custom")
 
 -- Глобальное состояние игры
 _G.GameState = { current = "lobby" }
+_G.shop = shop
+_G.sights = sights
+_G.joystick = joystick_custom
 
 -- Таблица состояний
 local states = {
@@ -82,6 +88,9 @@ function love.load()
                 _G.GameState.current = "lobby"
             end)
         end
+        
+        -- Инициализация новых компонентов
+        joystick_custom.load()
 
         -- Загружаем текущее состояние
         local current = states[_G.GameState.current]
@@ -111,12 +120,21 @@ function love.update(dt)
     if current and current.update then 
         current.update(dt) 
     end
+    
+    -- Обновляем компоненты
+    joystick_custom.update(dt)
 end
 
 function love.draw()
     local current = states[_G.GameState.current]
     if current and current.draw then 
         current.draw() 
+    end
+    
+    -- Отрисовываем компоненты (если в режиме игры)
+    if _G.GameState.current == "game" then
+        sights.draw()
+        joystick_custom.draw()
     end
 end
 
@@ -128,6 +146,11 @@ function love.touchpressed(id, x, y)
     if current and current.touchpressed then 
         current.touchpressed(id, x, y) 
     end
+    
+    -- Пробросим событие к joystick
+    if _G.GameState.current == "game" and joystick_custom.touchpressed then
+        joystick_custom.touchpressed(id, x, y)
+    end
 end
 
 function love.touchmoved(id, x, y)
@@ -135,12 +158,22 @@ function love.touchmoved(id, x, y)
     if current and current.touchmoved then 
         current.touchmoved(id, x, y) 
     end
+    
+    -- Пробросим событие к joystick
+    if _G.GameState.current == "game" and joystick_custom.touchmoved then
+        joystick_custom.touchmoved(id, x, y)
+    end
 end
 
 function love.touchreleased(id, x, y)
     local current = states[_G.GameState.current]
     if current and current.touchreleased then 
         current.touchreleased(id, x, y) 
+    end
+    
+    -- Пробросим событие к joystick
+    if _G.GameState.current == "game" and joystick_custom.touchreleased then
+        joystick_custom.touchreleased(id, x, y)
     end
 end
 
