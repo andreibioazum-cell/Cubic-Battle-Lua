@@ -1,5 +1,4 @@
-local lobby = {}
-local promoSystem = require("promo_codes")
+ local lobby = {}
 local keyboard = require("game_keyboard")
 
 local fontTitle, fontBtn
@@ -20,6 +19,19 @@ local promoActive = false
 local promoResult = ""
 local promoResultColor = {1, 1, 1}
 local promoCooldown = 0
+
+-- ВСТРОЕННЫЕ ПРОМО-КОДЫ (без отдельного модуля)
+local promoCodes = {
+    ["KAKAK"] = { reward = 100, description = "KAKAK!", maxUses = 999, used = 0 },
+    ["KAKAK2026"] = { reward = 100, description = "Godzilla KAKAK!", maxUses = 999, used = 0 },
+    ["CUBIC"] = { reward = 50, description = "Cubic", maxUses = 999, used = 0 },
+    ["BETA2026"] = { reward = 200, description = "Beta tester", maxUses = 100, used = 0 },
+    ["FURRY"] = { reward = 150, description = "Furry", maxUses = 50, used = 0 },
+    ["GODZILLA"] = { reward = 500, description = "Godzilla!", maxUses = 10, used = 0 },
+    ["PLATI"] = { reward = 1000, description = "Pay or no badge!", maxUses = 5, used = 0 }
+}
+
+local usedByPlayer = {}
 
 local function saveGame()
     local data = string.format("%d\n%s\n%s", coins, skins.diamond.owned and "diamond" or "default", selected_skin)
@@ -53,14 +65,33 @@ local function createBG()
     love.graphics.setCanvas()
 end
 
+-- ЗАГРУЗКА ПРОМО-КОДОВ
+local function loadPromoCodes()
+    local stats = love.filesystem.read("promo_stats.txt")
+    if stats then
+        for line in stats:gmatch("[^\r\n]+") do
+            local code, uses = line:match("([^:]+):(%d+)")
+            if code and uses and promoCodes[code] then
+                promoCodes[code].used = tonumber(uses) or 0
+            end
+        end
+    end
+end
+
+local function savePromoCodes()
+    local stats = ""
+    for code, info in pairs(promoCodes) do
+        stats = stats .. code .. ":" .. info.used .. "\n"
+    end
+    love.filesystem.write("promo_stats.txt", stats)
+end
+
 function lobby.load()
-    -- CUSTOM FONT FOR LOBBY
     local success1, err1 = pcall(function()
         fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 48)
     end)
     if not success1 then
         fontTitle = love.graphics.newFont(48)
-        print("Fredoka-Bold.ttf not found, using default font")
     end
     
     local success2, err2 = pcall(function()
@@ -68,20 +99,17 @@ function lobby.load()
     end)
     if not success2 then
         fontBtn = love.graphics.newFont(20)
-        print("Fredoka-Bold.ttf not found, using default font")
     end
     
     loadSave()
+    loadPromoCodes()
     createBG()
     stars = {}
     for i = 1, 50 do
         table.insert(stars, { x = math.random(), y = math.random(), s = 0.1 + math.random() * 0.4 })
     end
     
-    promoSystem.load()
     keyboard.init()
-    
-    print("Lobby loaded with custom font!")
 end
 
 function lobby.update(dt)
@@ -381,29 +409,49 @@ function activatePromoCode()
         return
     end
     
-    local success, result, description = promoSystem.useCode(code, "player")
-    
-    if success then
-        coins = coins + result
-        saveGame()
-        
-        promoResult = description .. " +" .. result .. " coins!"
-        promoResultColor = {0.3, 1, 0.3}
-        playSound("success")
-        
-        promoInput = ""
-        promoCooldown = 2
-        
-        if keyboard.isActive() then
-            keyboard.hide()
-        end
-    else
-        promoResult = result
+    -- Проверка кода
+    if not promoCodes[code] then
+        promoResult = "Invalid promo code!"
         promoResultColor = {1, 0.3, 0.3}
         playSound("error")
+        return
     end
     
-    print("Promo code activated: " .. code)
+    local promo = promoCodes[code]
+    
+    -- Проверка использовался ли уже
+    if usedByPlayer[code] then
+        promoResult = "You already used this code!"
+        promoResultColor = {1, 0.3, 0.3}
+        playSound("error")
+        return
+    end
+    
+    -- Проверка лимита
+    if promo.used >= promo.maxUses then
+        promoResult = "This code is no longer active!"
+        promoResultColor = {1, 0.3, 0.3}
+        playSound("error")
+        return
+    end
+    
+    -- Активация
+    promo.used = promo.used + 1
+    usedByPlayer[code] = true
+    coins = coins + promo.reward
+    saveGame()
+    savePromoCodes()
+    
+    promoResult = promo.description .. " +" .. promo.reward .. " coins!"
+    promoResultColor = {0.3, 1, 0.3}
+    playSound("success")
+    
+    promoInput = ""
+    promoCooldown = 2
+    
+    if keyboard.isActive() then
+        keyboard.hide()
+    end
 end
 
 function lobby.handleTextInput(text)
