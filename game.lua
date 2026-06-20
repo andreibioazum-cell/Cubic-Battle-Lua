@@ -137,7 +137,7 @@ function game.draw()
 
     enemy.draw()
 
-    -- Рисуем игрока (без дополнительных надписей)
+    -- Рисуем игрока
     love.graphics.setColor(1, 1, 1)
     local img = selected_skin == "diamond" and diamondImg or playerImg
     if img then
@@ -154,16 +154,21 @@ function game.draw()
         love.graphics.rectangle("fill", cube.x - 27, cube.y - 27, 54, 54)
     end
 
-    -- Линия направления
-    love.graphics.setColor(1, 1, 1, 0.2)
+    -- ПРИЦЕЛ (линия направления, куда смотрит игрок)
+    love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setLineWidth(2)
     local aimX, aimY = controls.getAim()
-    local len = 40
+    local len = 45
     love.graphics.line(
         cube.x, cube.y,
         cube.x + aimX * len,
         cube.y + aimY * len
     )
+    -- Точка прицела
+    love.graphics.setColor(1, 0, 0, 0.6)
+    love.graphics.circle("fill", cube.x + aimX * len, cube.y + aimY * len, 4)
+    love.graphics.setColor(1, 0, 0, 0.2)
+    love.graphics.circle("fill", cube.x + aimX * len, cube.y + aimY * len, 8)
 
     -- Пули
     for _, b in ipairs(bullets) do
@@ -177,7 +182,7 @@ function game.draw()
     love.graphics.pop()
 
     -- ============================================================
-    -- UI (ТОЛЬКО HP И МОНЕТЫ)
+    -- UI (ТОЛЬКО HP И МОНЕТЫ, БЕЗ ПОДСКАЗОК)
     -- ============================================================
     local screenW, screenH = love.graphics.getDimensions()
     
@@ -247,13 +252,15 @@ function game.draw()
     love.graphics.setFont(menuFont or love.graphics.newFont(12))
     love.graphics.printf("MENU", menuBtnX, menuBtnY + 10, menuBtnW, "center")
     
-    -- Нижняя панель
+    -- НИЖНЯЯ ПАНЕЛЬ (ТОЛЬКО ОДНА ПОДСКАЗКА, БЕЗ ДУБЛИРОВАНИЯ)
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", 0, screenH - 28, screenW, 28)
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(uiFont or love.graphics.newFont(11))
     love.graphics.printf("WASD - Move | SPACE - Attack | ESC - Menu", 0, screenH - 22, screenW, "center")
     
+    -- РИСУЕМ КНОПКИ УПРАВЛЕНИЯ (БЕЗ ДУБЛИРОВАНИЯ ПОДСКАЗОК)
+    -- Убираем подсказку из controls.draw() или закомментируем её
     controls.draw()
 end
 
