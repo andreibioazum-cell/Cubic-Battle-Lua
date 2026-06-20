@@ -1,151 +1,142 @@
 local enemy = {}
-local e = nil
-local bullets = {}
-local onDeath = nil
+
+local SIZE = 55
+local SPEED = 140
+local SIGHT = 650
+local ATTACK_RANGE = 65
+local KEEP_DIST = 55
+local MAX_HP = 5
+local RESPAWN = 2
+local ATTACK_CD = 1.0
+local DAMAGE = 1
+
+local e
+local timer = 0
 local img
+
+local function spawn(px, py)
+    local w, h = love.graphics.getDimensions()
+    local minR = math.min(w, h) * 0.30
+    local maxR = math.min(w, h) * 0.45
+    local a = math.random() * math.pi * 2
+    local dist = minR + math.random() * (maxR - minR)
+    e = {
+        x = px + math.cos(a) * dist,
+        y = py + math.sin(a) * dist,
+        hp = MAX_HP,
+        hit = 0,
+        angle = 0,
+        state = "wander",
+        wanderT = 0,
+        wanderDX = 0,
+        wanderDY = 0,
+        atkT = 0
+    }
+end
 
 function enemy.load()
     img = love.graphics.newImage("player.png")
+    img:setFilter("nearest","nearest")
 end
 
 function enemy.reset()
     e = nil
-    bullets = {}
-end
-
-function enemy.spawnNow(x, y)
-    e = { 
-        x = x, 
-        y = y, 
-        hp = 5, 
-        maxHp = 5,
-        shootT = 0,
-        angle = 0
-    }
-    local modSystem = require("mod_system")
-    modSystem.trigger("onEnemySpawn", e)
+    timer = 0
 end
 
 function enemy.get()
-    return e
+    return e, SIZE, MAX_HP
 end
 
-function enemy.update(dt, px, py, pBullets, onHitPlayer)
+function enemy.update(dt, px, py, bullets, onHitPlayer)
     if not e then
+        timer = timer + dt
+        if timer >= RESPAWN then
+            timer = 0
+            spawn(px, py)
+        end
         return
     end
 
-    local dx, dy = px - e.x, py - e.y
-    local dist = math.sqrt(dx * dx + dy * dy)
-    
-    if dist > 1 then
-        e.angle = math.atan2(dy, dx) + math.pi / 2
-    end
-    
-    if dist > 100 then
-        e.x = e.x + (dx / dist) * 150 * dt
-        e.y = e.y + (dy / dist) * 150 * dt
-    end
+    local dx = px - e.x
+    local dy = py - e.y
+    local dist = math.sqrt(dx*dx + dy*dy) + 0.0001
+    local nx, ny = dx/dist, dy/dist
 
-    e.shootT = e.shootT - dt
-    if e.shootT <= 0 then
-        if dist > 0 then
-            table.insert(bullets, {
-                x = e.x, y = e.y,
-                vx = (dx / dist) * 250,
-                vy = (dy / dist) * 250,
-                life = 3
-            })
+    if dist < SIGHT then
+        if dist > ATTACK_RANGE then
+            e.state = "chase"
+        elseif dist < KEEP_DIST then
+            e.state = "retreat"
         else
-            table.insert(bullets, {
-                x = e.x, y = e.y,
-                vx = 0, vy = -250,
-                life = 3
-            })
+            e.state = "attack"
         end
-        e.shootT = 1.5
+    else
+        e.state = "wander"
     end
 
-    for i = #pBullets, 1, -1 do
-        local b = pBullets[i]
-        if math.abs(b.x - e.x) < 30 and math.abs(b.y - e.y) < 30 then
+    if e.state == "chase" then
+        e.x = e.x + nx * SPEED * dt
+        e.y = e.y + ny * SPEED * dt
+    elseif e.state == "retreat" then
+        e.x = e.x - nx * SPEED * 0.8 * dt
+        e.y = e.y - ny * SPEED * 0.8 * dt
+    elseif e.state == "attack" then
+        e.atkT = e.atkT - dt
+        if e.atkT <= 0 then
+            e.atkT = ATTACK_CD
+            if onHitPlayer then onHitPlayer(DAMAGE) end
+        end
+    elseif e.state == "wander" then
+        e.wanderT = e.wanderT - dt
+        if e.wanderT <= 0 then
+            e.wanderT = 1 + math.random() * 2
+            local a = math.random() * math.pi * 2
+            e.wanderDX = math.cos(a)
+            e.wanderDY = math.sin(a)
+        end
+        e.x = e.x + e.wanderDX * SPEED * 0.35 * dt
+        e.y = e.y + e.wanderDY * SPEED * 0.35 * dt
+    end
+
+    e.angle = math.atan2(dy, dx) + math.pi/2
+    e.hit = math.max(0, e.hit - dt*3)
+
+    for i=#bullets,1,-1 do
+        local b = bullets[i]
+        local bx = b.x - e.x
+        local by = b.y - e.y
+        if bx*bx + by*by <= (SIZE*0.55)^2 then
             e.hp = e.hp - 1
-            table.remove(pBullets, i)
-            
-            local modSystem = require("mod_system")
-            modSystem.gameHit(e, 1)
-            
+            e.hit = 1
+            table.remove(bullets, i)
             if e.hp <= 0 then
                 e = nil
-                if onDeath then onDeath() end
                 return
             end
-        end
-    end
-
-    for i = #bullets, 1, -1 do
-        local b = bullets[i]
-        b.x = b.x + b.vx * dt
-        b.y = b.y + b.vy * dt
-        b.life = b.life - dt
-
-        if math.abs(b.x - px) < 30 and math.abs(b.y - py) < 30 then
-            onHitPlayer(1)
-            table.remove(bullets, i)
-        elseif b.life <= 0 then
-            table.remove(bullets, i)
         end
     end
 end
 
 function enemy.draw()
     if not e then return end
-    
-    love.graphics.setColor(1, 0, 0)
-    love.graphics.draw(
-        img, e.x, e.y,
-        e.angle,
-        55 / img:getWidth(), 55 / img:getHeight(),
-        img:getWidth() / 2, img:getHeight() / 2
-    )
-    
-    local barWidth = 40
-    local barHeight = 5
-    local barX = e.x - barWidth / 2
-    local barY = e.y - 40
-    
-    love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
-    love.graphics.rectangle("fill", barX, barY, barWidth, barHeight)
-    
-    local hpPercent = e.hp / e.maxHp
-    if hpPercent > 0.6 then
-        love.graphics.setColor(0, 1, 0)
-    elseif hpPercent > 0.3 then
-        love.graphics.setColor(1, 1, 0)
-    else
-        love.graphics.setColor(1, 0, 0)
-    end
-    love.graphics.rectangle("fill", barX, barY, barWidth * hpPercent, barHeight)
-    
-    love.graphics.setColor(1, 1, 1, 0.5)
-    love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", barX, barY, barWidth, barHeight)
-    
-    love.graphics.setColor(1, 1, 1, 0.9)
-    love.graphics.setFont(love.graphics.newFont(12))
-    love.graphics.printf(
-        tostring(e.hp) .. "/" .. tostring(e.maxHp),
-        e.x - 15, barY - 15, 30, "center"
-    )
-    
-    for _, b in ipairs(bullets) do
-        love.graphics.setColor(1, 0.5, 0)
-        love.graphics.circle("fill", b.x, b.y, 6)
-    end
-end
 
-function enemy.setDeathCallback(fn)
-    onDeath = fn
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.push()
+    love.graphics.translate(e.x + 6, e.y + 8)
+    love.graphics.rotate(e.angle)
+    love.graphics.draw(img, -SIZE/2, -SIZE/2)
+    love.graphics.pop()
+
+    love.graphics.push()
+    love.graphics.translate(e.x, e.y)
+    love.graphics.rotate(e.angle)
+    local t = e.hit
+    love.graphics.setColor(1, 1 - t*0.5, 1 - t*0.5, 1)
+    love.graphics.draw(img, -SIZE/2, -SIZE/2)
+    love.graphics.pop()
+
+    love.graphics.setColor(1,1,1,1)
 end
 
 return enemy

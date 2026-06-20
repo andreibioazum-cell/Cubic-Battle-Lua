@@ -1,243 +1,193 @@
 local controls = require("controls")
 local enemy = require("enemy")
-local modSystem = require("mod_system")
+
 local game = {}
 
-local WORLD_SIZE = 3000
-local cube = { x = 1500, y = 1500, speed = 260, hp = 5, angle = 0, hit = 0 }
-local cam = { x = 0, y = 0 }
+local PLAYER_SIZE = 55
+local PLAYER_HP_MAX = 5
+local BULLET_SPEED = 340 * 1.15
+
+local cube = { x=0, y=0, speed=260, angle=0, hp=PLAYER_HP_MAX, hit=0 }
 local bullets = {}
-local coins = 0
-local selected_skin = "default"
+local bg, playerImg, font
+local cam = { x=0, y=0 }
 local dead = false
-local bg, playerImg, diamondImg
-local menuFont = nil
-local gameOverShown = false
+
+local function spawnBullet(x, y, dx, dy)
+    table.insert(bullets, {
+        x=x, y=y,
+        vx=dx*BULLET_SPEED,
+        vy=dy*BULLET_SPEED,
+        life=3
+    })
+end
+
+local function drawHPBar(x, y, w, h, hp, max, color)
+    if hp < 0 then hp = 0 end
+    love.graphics.setColor(0,0,0,0.5)
+    love.graphics.rectangle("fill", x-2, y-2, w+4, h+4, 6, 6)
+    love.graphics.setColor(0.15,0.15,0.15,1)
+    love.graphics.rectangle("fill", x, y, w, h, 4, 4)
+    love.graphics.setColor(color[1], color[2], color[3], 1)
+    love.graphics.rectangle("fill", x, y, w * (hp/max), h, 4, 4)
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", x, y, w, h, 4, 4)
+end
+
+local function onHitPlayer(dmg)
+    if dead then return end
+    cube.hp = cube.hp - dmg
+    cube.hit = 1
+    if cube.hp <= 0 then
+        cube.hp = 0
+        dead = true
+        GameState.current = "lobby"
+    end
+end
 
 function game.load()
-    controls.load()
-    
-    menuFont = love.graphics.newFont(16)
-    
-    cube.x, cube.y = 1500, 1500
-    cube.hp = 5
+    cube.x, cube.y = 0, 0
+    cube.angle = 0
+    cube.hp = PLAYER_HP_MAX
+    cube.hit = 0
     dead = false
-    gameOverShown = false
     bullets = {}
-    
-    -- Загрузка изображений с проверкой
-    local function loadImage(name)
-        local success, img = pcall(love.graphics.newImage, name)
-        if success then return img end
-        -- Создаем заглушку
-        local canvas = love.graphics.newCanvas(32, 32)
-        love.graphics.setCanvas(canvas)
-        love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.rectangle("fill", 0, 0, 32, 32)
-        love.graphics.setCanvas()
-        return canvas
-    end
-    
-    bg = loadImage("grass.png")
-    playerImg = loadImage("player.png")
-    diamondImg = loadImage("player_diamond.png")
-    
+    cam.x, cam.y = -love.graphics.getWidth()/2, -love.graphics.getHeight()/2
+
+    bg = bg or love.graphics.newImage("grass.png")
+    bg:setWrap("repeat","repeat")
+
+    playerImg = playerImg or love.graphics.newImage("player.png")
+    playerImg:setFilter("nearest","nearest")
+
+    font = font or love.graphics.newFont("Fredoka-Bold.ttf", 18)
+
+    controls.load()
     enemy.load()
     enemy.reset()
-    enemy.spawnNow(cube.x + 300, cube.y + 300)
-    enemy.setDeathCallback(function()
-        coins = coins + 50
-        modSystem.gameDeath()
-    end)
-    
-    modSystem.gameLoad()
+end
+
+function game.resize()
+    controls.resize()
 end
 
 function game.update(dt)
     if dead then return end
+
     controls.update(dt)
 
     local dx, dy = controls.getMove()
+    cube.x = cube.x + dx * cube.speed * dt
+    cube.y = cube.y + dy * cube.speed * dt
+
     if dx ~= 0 or dy ~= 0 then
-        cube.x = math.max(0, math.min(WORLD_SIZE, cube.x + dx * cube.speed * dt))
-        cube.y = math.max(0, math.min(WORLD_SIZE, cube.y + dy * cube.speed * dt))
-        cube.angle = math.atan2(dy, dx) + math.pi / 2
+        cube.angle = math.atan2(dy, dx) + math.pi/2
     end
 
-    local sw, sh = love.graphics.getDimensions()
-    cam.x = cam.x + (cube.x - sw / 2 - cam.x) * 5 * dt
-    cam.y = cam.y + (cube.y - sh / 2 - cam.y) * 5 * dt
+    cube.hit = math.max(0, cube.hit - dt*3)
 
-    -- Обновление пуль
-    for i = #bullets, 1, -1 do
+    local targetX = cube.x - love.graphics.getWidth()/2
+    local targetY = cube.y - love.graphics.getHeight()/2
+    local k = 1 - math.exp(-dt * 7.3)
+    cam.x = cam.x + (targetX - cam.x) * k
+    cam.y = cam.y + (targetY - cam.y) * k
+
+    for i=#bullets,1,-1 do
         local b = bullets[i]
-        if b and type(b.x) == "number" and type(b.y) == "number" then
-            b.x = b.x + b.vx * dt
-            b.y = b.y + b.vy * dt
-            if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
-                table.remove(bullets, i)
-            end
-        else
-            table.remove(bullets, i)
-        end
+        b.x = b.x + b.vx*dt
+        b.y = b.y + b.vy*dt
+        b.life = b.life - dt
+        if b.life <= 0 then table.remove(bullets,i) end
     end
 
-    -- Обновление врага
-    enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
-        cube.hp = cube.hp - dmg
-        if cube.hp <= 0 then
-            dead = true
-            gameOverShown = false
-            if game.onDeath then
-                game.onDeath()
-            end
-            modSystem.gameDeath()
-        end
-    end)
+    enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
 end
 
 function game.draw()
+    love.graphics.setColor(1,1,1,1)
+
     love.graphics.push()
     love.graphics.translate(-cam.x, -cam.y)
 
-    local sw, sh = love.graphics.getDimensions()
-    
-    -- Рисуем фон
-    if bg then
-        local tw, th = bg:getDimensions()
-        for x = math.floor(cam.x / tw) * tw, cam.x + sw, tw do
-            for y = math.floor(cam.y / th) * th, cam.y + sh, th do
-                love.graphics.draw(bg, x, y)
-            end
+    local w,h = love.graphics.getDimensions()
+    local tw,th = bg:getWidth(), bg:getHeight()
+    local sX = math.floor(cam.x/tw)*tw
+    local sY = math.floor(cam.y/th)*th
+    for x=sX, sX+w+tw, tw do
+        for y=sY, sY+h+th, th do
+            love.graphics.draw(bg, x, y)
         end
-    else
-        -- Запасной фон
-        love.graphics.setColor(0.2, 0.4, 0.2)
-        love.graphics.rectangle("fill", cam.x, cam.y, sw, sh)
+    end
+
+    love.graphics.setColor(0,0,0,1)
+    for _,b in ipairs(bullets) do
+        love.graphics.circle("fill", b.x, b.y, 8)
+    end
+
+    if controls.isAiming() then
+        local ax, ay = controls.getAim()
+        love.graphics.setColor(0,0,0,0.55)
+        love.graphics.setLineWidth(16)
+        love.graphics.line(
+            cube.x, cube.y,
+            cube.x + ax*180,
+            cube.y + ay*180
+        )
     end
 
     enemy.draw()
 
-    -- Рисуем игрока
-    love.graphics.setColor(1, 1, 1)
-    local img = selected_skin == "diamond" and diamondImg or playerImg
-    if img then
-        love.graphics.draw(
-            img, cube.x, cube.y,
-            cube.angle,
-            55 / img:getWidth(), 55 / img:getHeight(),
-            img:getWidth() / 2, img:getHeight() / 2
-        )
-    else
-        -- Запасной куб
-        love.graphics.setColor(0, 0.5, 1)
-        love.graphics.rectangle("fill", cube.x - 25, cube.y - 25, 50, 50)
+    local e = enemy.get()
+    if e then
+        drawHPBar(e.x - 28, e.y - 45, 56, 8, e.hp, 5, {0.9,0.2,0.2})
     end
 
-    -- Рисуем пули
-    for _, b in ipairs(bullets) do
-        if b and type(b.x) == "number" and type(b.y) == "number" then
-            love.graphics.setColor(1, 1, 0)
-            love.graphics.circle("fill", b.x, b.y, 5)
-        end
-    end
+    love.graphics.setColor(0,0,0,0.4)
+    love.graphics.push()
+    love.graphics.translate(cube.x + 6, cube.y + 8)
+    love.graphics.rotate(cube.angle)
+    love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
     love.graphics.pop()
 
-    -- HP бар
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", 20, 20, 200, 20)
-    love.graphics.setColor(0, 1, 0)
-    love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.print("HP: " .. cube.hp .. "/5", 25, 22)
+    love.graphics.push()
+    love.graphics.translate(cube.x, cube.y)
+    love.graphics.rotate(cube.angle)
+    local t = cube.hit
+    love.graphics.setColor(1, 1 - t*0.6, 1 - t*0.6, 1)
+    love.graphics.draw(playerImg, -PLAYER_SIZE/2, -PLAYER_SIZE/2)
+    love.graphics.pop()
 
-    -- Меню кнопка
-    local screenW, screenH = love.graphics.getDimensions()
-    local menuBtnX = screenW - 120
-    local menuBtnY = 15
-    local menuBtnW = 100
-    local menuBtnH = 35
-    
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 8)
-    love.graphics.setColor(0.8, 0.2, 0.2, 0.85)
-    love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 8)
-    love.graphics.setColor(1, 1, 1)
-    if menuFont then
-        love.graphics.setFont(menuFont)
-    end
-    love.graphics.printf("MENU", menuBtnX, menuBtnY + 8, menuBtnW, "center")
-    
+    love.graphics.pop()
+
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.setFont(font)
+
+    local barW, barH = 200, 18
+    local px = love.graphics.getWidth() - barW - 20
+    local py = 20
+    drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
+
+    love.graphics.setColor(1,1,1,1)
+    love.graphics.printf("HP " .. math.max(0,cube.hp) .. " / " .. PLAYER_HP_MAX,
+        px, py + 22, barW, "right")
+
     controls.draw()
-    
-    -- Game Over
-    if dead and not gameOverShown then
-        gameOverShown = true
-        love.graphics.setColor(0, 0, 0, 0.7)
-        love.graphics.rectangle("fill", screenW/2 - 100, screenH/2 - 50, 200, 80)
-        love.graphics.setColor(1, 0, 0)
-        love.graphics.setFont(love.graphics.newFont(30))
-        love.graphics.printf("GAME OVER", screenW/2 - 100, screenH/2 - 30, 200, "center")
-        love.graphics.setFont(love.graphics.newFont(16))
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.printf("Tap to continue", screenW/2 - 100, screenH/2 + 10, 200, "center")
-    end
 end
 
-function game.touchpressed(id, x, y)
-    if dead then
-        _G.GameState.current = "lobby"
-        return
-    end
-    
-    local screenW, screenH = love.graphics.getDimensions()
-    local menuBtnX = screenW - 120
-    local menuBtnY = 15
-    local menuBtnW = 100
-    local menuBtnH = 35
-    
-    if x >= menuBtnX and x <= menuBtnX + menuBtnW and
-       y >= menuBtnY and y <= menuBtnY + menuBtnH then
-        playSound("click")
-        _G.GameState.current = "lobby"
-        return
-    end
-    
-    controls.touchpressed(id, x, y)
+function game.touchpressed(id,x,y)
+    controls.touchpressed(id,x,y)
 end
 
-function game.touchmoved(id, x, y)
-    controls.touchmoved(id, x, y)
+function game.touchmoved(id,x,y)
+    controls.touchmoved(id,x,y)
 end
 
-function game.touchreleased(id, x, y)
+function game.touchreleased(id,x,y)
     local shot, dx, dy = controls.touchreleased(id)
     if shot then
-        playSound("shot")
-        
-        local modified = modSystem.gameShoot(cube.x, cube.y, dx, dy)
-        
-        local bullet = {
-            x = tonumber(modified.x) or cube.x or 0,
-            y = tonumber(modified.y) or cube.y or 0,
-            vx = (tonumber(modified.dx) or dx or 0) * 400,
-            vy = (tonumber(modified.dy) or dy or 0) * 400
-        }
-        
-        table.insert(bullets, bullet)
+        spawnBullet(cube.x, cube.y, dx, dy)
     end
-end
-
-function game.setOnDeath(fn)
-    game.onDeath = fn
-end
-
-function game.setCoins(c)
-    coins = c
-end
-
-function game.setSkin(s)
-    selected_skin = s
 end
 
 return game

@@ -1,10 +1,7 @@
-name: Build_Cubic_Battle_3
+name: Build_Cubic_Battle_FAST
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -13,28 +10,21 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout game code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           path: game
-          fetch-depth: 1
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
 
-      - name: Cache NDK
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ${{ env.ANDROID_HOME }}/ndk/25.2.9519653
-          key: ndk-25.2.9519653-v7
-          restore-keys: |
-            ndk-25.2.9519653-
+          key: ndk-25.2.9519653-v5
 
       - name: Install NDK
         run: |
@@ -47,13 +37,10 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
-      - name: Cache love-android
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: love-android
-          key: love-android-src-v10-${{ hashFiles('love-android/.git') }}
-          restore-keys: |
-            love-android-src-v10-
+          key: love-android-src-v5
 
       - name: Clone love-android
         run: |
@@ -61,224 +48,55 @@ jobs:
             git clone --recursive --depth 1 https://github.com/love2d/love-android.git
           fi
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            love-android/.gradle
-          key: gradle-v10-${{ hashFiles('love-android/build.gradle', 'love-android/app/build.gradle') }}
-          restore-keys: |
-            gradle-v10-
+          key: gradle-v5
 
-      - name: Cache Native Builds
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: |
             love-android/app/.cxx
             love-android/app/build
-            love-android/app/build/intermediates
-          key: native-v10-${{ hashFiles('love-android/app/src/main/cpp/*') }}
-          restore-keys: |
-            native-v10-
+          key: native-v5
 
-      # ========== ПОДГОТОВКА ИГРЫ С МОДАМИ ==========
-      - name: Create mods directory
-        run: |
-          mkdir -p game/mods
-          mkdir -p game/temp
-          
-      - name: Create default mods
-        run: |
-          # Создаём пример мода
-          cat > game/mods/example_mod.lua << 'EOF'
-          -- Пример мода для Cubic Battle 3
-          local mod = {}
-          mod.title = "Пример мода"
-          mod.author = "CubicBattle3"
-          mod.version = "1.0"
-          mod.description = "Базовый пример мода"
-          
-          function mod.onLoad()
-              print("✅ Пример мода загружен!")
-          end
-          
-          function mod.onDraw()
-              local w, h = love.graphics.getDimensions()
-              love.graphics.setColor(0, 1, 1, 0.3)
-              love.graphics.print("Моды активны!", 10, 30)
-          end
-          
-          return mod
-          EOF
-          
-          # Создаём супер мод
-          cat > game/mods/super_mod.lua << 'EOF'
-          -- Супер мод с дополнительными функциями
-          local mod = {}
-          mod.title = "Super Mod"
-          mod.author = "Community"
-          mod.version = "2.0"
-          mod.description = "Добавляет эффекты и улучшения"
-          
-          local particles = {}
-          
-          function mod.onLoad()
-              print("🚀 Super Mod загружен!")
-          end
-          
-          function mod.onUpdate(dt)
-              for i = #particles, 1, -1 do
-                  local p = particles[i]
-                  p.x = p.x + p.vx * dt
-                  p.y = p.y + p.vy * dt
-                  p.life = p.life - dt
-                  if p.life <= 0 then
-                      table.remove(particles, i)
-                  end
-              end
-          end
-          
-          function mod.onDraw()
-              for _, p in ipairs(particles) do
-                  love.graphics.setColor(p.r, p.g, p.b, p.life)
-                  love.graphics.circle("fill", p.x, p.y, p.size)
-              end
-          end
-          
-          function mod.onShoot(x, y, dx, dy)
-              for i = 1, 5 do
-                  table.insert(particles, {
-                      x = x,
-                      y = y,
-                      vx = (dx + (math.random()-0.5)*2) * 100,
-                      vy = (dy + (math.random()-0.5)*2) * 100,
-                      size = 2 + math.random() * 3,
-                      life = 0.5 + math.random() * 0.5,
-                      r = 1,
-                      g = 0.8 + math.random() * 0.2,
-                      b = 0
-                  })
-              end
-              return { x = x, y = y, dx = dx, dy = dy }
-          end
-          
-          return mod
-          EOF
-          
-          echo "✅ Моды созданы!"
-
-      - name: Package game.love with mods
+      - name: Package game.love
         run: |
           cd game
-          zip -9 -r ../game.love . \
-            -x "*.git*" \
-            -x ".github/*" \
-            -x "*.md" \
-            -x "*.txt" \
-            -x ".gitignore" \
-            -x "*.yml" \
-            -x ".git/*"
-          
-          ls -lh ../game.love
+          zip -9 -r ../game.love . -x "*.git*" -x ".github/*"
 
-      - name: Embed game with mods
+      - name: Embed game
         run: |
           mkdir -p love-android/app/src/embed/assets
           cp game.love love-android/app/src/embed/assets/game.love
-          
-          echo "Build: $(date +'%Y%m%d-%H%M%S')" > love-android/app/src/embed/assets/version.txt
-          echo "Mods included: yes" >> love-android/app/src/embed/assets/version.txt
 
-      # ========== НАСТРОЙКА ANDROID ==========
-      - name: Force arm64 only
+      - name: Force arm64
         run: |
           sed -i '/abiFilters/d' love-android/app/build.gradle
           sed -i '/defaultConfig {/a\        ndk { abiFilters "arm64-v8a" }' love-android/app/build.gradle
 
-      - name: Change app name
-        run: |
-          if [ -f "love-android/app/src/main/res/values/strings.xml" ]; then
-            sed -i 's/LOVE/Cubic Battle 3/g' love-android/app/src/main/res/values/strings.xml
-          fi
-          
-          if [ -f "game/icon.png" ]; then
-            cp game/icon.png love-android/app/src/main/res/drawable/icon.png || true
-          fi
-
       - name: Optimize Gradle
         run: |
           cat >> love-android/gradle.properties << 'EOF'
-          org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g
+          org.gradle.jvmargs=-Xmx6g
           org.gradle.parallel=true
           org.gradle.caching=true
           org.gradle.daemon=false
-          org.gradle.configureondemand=true
-          android.enableDexingArtifactTransformDesugaring=false
-          android.disableCompileSdkCheck=true
-          android.enableResourceOptimizations=true
-          android.useAndroidX=true
           EOF
 
-      - name: Clean previous builds
+      - name: Build
         working-directory: love-android
-        run: |
-          ./gradlew clean --no-daemon || true
+        run: ./gradlew assembleEmbedNoRecordDebug --no-daemon --parallel --console=plain
 
-      - name: Build APK
-        working-directory: love-android
+      - name: Collect APK
         run: |
-          chmod +x gradlew
-          ./gradlew assembleEmbedNoRecordDebug \
-            --no-daemon \
-            --parallel \
-            --console=plain \
-            --max-workers=4 \
-            --stacktrace
+          APK=$(find love-android -name "*.apk" | head -1)
+          cp "$APK" CubicBattle.apk
 
-      - name: Find and rename APK
-        run: |
-          APK=$(find love-android -name "*.apk" -type f | grep -v "unaligned" | head -1)
-          if [ -z "$APK" ]; then
-            echo "❌ APK не найден!"
-            exit 1
-          fi
-          echo "✅ APK найден: $APK"
-          cp "$APK" CubicBattle3_$(date +'%Y%m%d').apk
-          ls -lh CubicBattle3_*.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: CubicBattle3_APK_${{ github.run_number }}
-          path: CubicBattle3_*.apk
+          name: CubicBattle_APK
+          path: CubicBattle.apk
           compression-level: 0
-          retention-days: 30
-
-      - name: Upload game.love for debugging
-        uses: actions/upload-artifact@v4
-        with:
-          name: game_with_mods
-          path: game.love
-          compression-level: 0
-          retention-days: 7
-
-      - name: Generate build info
-        run: |
-          cat > build_info.txt << EOF
-          Build: $(date)
-          Commit: ${GITHUB_SHA:0:7}
-          Run: ${GITHUB_RUN_NUMBER}
-          Mods included: yes
-          APK size: $(du -h CubicBattle3_*.apk | cut -f1)
-          EOF
-          echo "📦 Build info:"
-          cat build_info.txt
-
-      - name: Upload build info
-        uses: actions/upload-artifact@v4
-        with:
-          name: build_info
-          path: build_info.txt
-          retention-days: 7
