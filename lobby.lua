@@ -9,7 +9,7 @@ local stars = {}
 
 local skins = {
     default = { name = "Default Cube", price = 0, owned = true },
-    diamond = { name = "Diamond Cube", price = 100, owned = false }
+    diamond = { name = "Diamond Cube", price = 20, owned = false }
 }
 local selected_skin = "default"
 
