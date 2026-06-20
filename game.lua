@@ -16,7 +16,6 @@ local menuFont = nil
 function game.load()
     controls.load()
     
-    -- STANDARD FONT FOR GAME
     menuFont = love.graphics.newFont(16)
     
     cube.x, cube.y = 1500, 1500
