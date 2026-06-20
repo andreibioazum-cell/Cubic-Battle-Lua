@@ -2,10 +2,20 @@ local enemy = {}
 local e = nil
 local bullets = {}
 local onDeath = nil
-local img
+local img = nil
 
 function enemy.load()
-    img = love.graphics.newImage("player.png")
+    local success, err = pcall(function()
+        img = love.graphics.newImage("player.png")
+    end)
+    if not success or not img then
+        -- Создаем красный квадрат, если изображение не загрузилось
+        img = love.graphics.newCanvas(64, 64)
+        love.graphics.setCanvas(img)
+        love.graphics.clear(1, 0, 0, 1)
+        love.graphics.setCanvas()
+        print("Warning: player.png not found, using fallback")
+    end
 end
 
 function enemy.reset()
@@ -96,13 +106,19 @@ end
 function enemy.draw()
     if not e then return end
     
-    love.graphics.setColor(1, 0, 0)
-    love.graphics.draw(
-        img, e.x, e.y,
-        e.angle,
-        55 / img:getWidth(), 55 / img:getHeight(),
-        img:getWidth() / 2, img:getHeight() / 2
-    )
+    if img then
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(
+            img, e.x, e.y,
+            e.angle,
+            55 / (img:getWidth() or 64), 55 / (img:getHeight() or 64),
+            (img:getWidth() or 64) / 2, (img:getHeight() or 64) / 2
+        )
+    else
+        -- Если изображения нет, рисуем красный круг
+        love.graphics.setColor(1, 0, 0)
+        love.graphics.circle("fill", e.x, e.y, 30)
+    end
     
     local barWidth = 40
     local barHeight = 5
@@ -127,7 +143,8 @@ function enemy.draw()
     love.graphics.rectangle("line", barX, barY, barWidth, barHeight)
     
     love.graphics.setColor(1, 1, 1, 0.9)
-    love.graphics.setFont(love.graphics.newFont(12))
+    local font = love.graphics.newFont(12)
+    love.graphics.setFont(font)
     love.graphics.printf(
         tostring(e.hp) .. "/" .. tostring(e.maxHp),
         e.x - 15, barY - 15, 30, "center"
