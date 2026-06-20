@@ -137,6 +137,7 @@ function game.draw()
 
     enemy.draw()
 
+    -- Рисуем игрока (без дополнительных надписей)
     love.graphics.setColor(1, 1, 1)
     local img = selected_skin == "diamond" and diamondImg or playerImg
     if img then
@@ -176,29 +177,28 @@ function game.draw()
     love.graphics.pop()
 
     -- ============================================================
-    -- УЛУЧШЕННЫЙ UI (БЕЗ ЭМОДЗИ)
+    -- UI (ТОЛЬКО HP И МОНЕТЫ)
     -- ============================================================
     local screenW, screenH = love.graphics.getDimensions()
     
     -- Верхняя панель
     love.graphics.setColor(0, 0, 0, 0.75)
-    love.graphics.rectangle("fill", 0, 0, screenW, 65)
+    love.graphics.rectangle("fill", 0, 0, screenW, 50)
     love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
-    love.graphics.rectangle("fill", 0, 63, screenW, 2)
+    love.graphics.rectangle("fill", 0, 48, screenW, 2)
     
-    -- HP Бар
-    -- Иконка сердца (рисуем вручную)
+    -- HP Бар (сердце)
     love.graphics.setColor(1, 0.2, 0.2)
-    love.graphics.circle("fill", 30, 22, 8)
-    love.graphics.circle("fill", 44, 22, 8)
+    love.graphics.circle("fill", 25, 20, 8)
+    love.graphics.circle("fill", 39, 20, 8)
     love.graphics.polygon("fill",
-        30, 18,
-        37, 30,
-        44, 18
+        25, 16,
+        32, 28,
+        39, 16
     )
     
     love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
-    love.graphics.rectangle("fill", 58, 12, 150, 20, 10)
+    love.graphics.rectangle("fill", 53, 12, 150, 18, 9)
     
     local hpPercent = cube.hp / 5
     if hpPercent > 0.6 then
@@ -208,79 +208,61 @@ function game.draw()
     else
         love.graphics.setColor(1, 0, 0)
     end
-    love.graphics.rectangle("fill", 58, 12, 150 * hpPercent, 20, 10)
+    love.graphics.rectangle("fill", 53, 12, 150 * hpPercent, 18, 9)
     
     love.graphics.setColor(1, 1, 1, 0.5)
     love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", 58, 12, 150, 20, 10)
+    love.graphics.rectangle("line", 53, 12, 150, 18, 9)
     
-    -- Текст HP
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(uiFont or love.graphics.newFont(12))
-    love.graphics.printf(math.ceil(cube.hp) .. "/5", 58, 15, 150, "center")
+    love.graphics.setFont(uiFont or love.graphics.newFont(11))
+    love.graphics.printf(math.ceil(cube.hp) .. "/5", 53, 14, 150, "center")
     
-    -- Монеты (БЕЗ ЭМОДЗИ)
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.setFont(uiFont or love.graphics.newFont(16))
-    love.graphics.printf("COINS: " .. coins, 230, 8, 200, "left")
-    
-    -- Рисуем монетку (круг)
+    -- МОНЕТЫ
     love.graphics.setColor(1, 0.8, 0)
-    love.graphics.circle("fill", 220, 18, 10)
+    love.graphics.circle("fill", 225, 19, 10)
     love.graphics.setColor(1, 0.9, 0.2)
-    love.graphics.circle("fill", 220, 18, 6)
+    love.graphics.circle("fill", 225, 19, 6)
     love.graphics.setColor(1, 0.7, 0)
-    love.graphics.circle("fill", 220, 18, 3)
+    love.graphics.circle("fill", 225, 19, 3)
     
-    -- Название скина
-    if selected_skin == "diamond" then
-        love.graphics.setColor(0, 1, 1)
-        love.graphics.setFont(uiFont or love.graphics.newFont(14))
-        love.graphics.printf("DIAMOND", screenW - 180, 10, 150, "left")
-        -- Рисуем бриллиант
-        love.graphics.setColor(0, 1, 1)
-        love.graphics.polygon("fill",
-            screenW - 190, 18,
-            screenW - 185, 10,
-            screenW - 175, 10,
-            screenW - 170, 18,
-            screenW - 180, 30
-        )
-    end
+    love.graphics.setColor(1, 1, 0)
+    love.graphics.setFont(uiFont or love.graphics.newFont(14))
+    love.graphics.printf(coins, 242, 12, 100, "left")
     
     -- КНОПКА MENU
-    local menuBtnX = screenW - 100
-    local menuBtnY = 10
-    local menuBtnW = 85
-    local menuBtnH = 40
+    local menuBtnX = screenW - 90
+    local menuBtnY = 8
+    local menuBtnW = 75
+    local menuBtnH = 34
     
     love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 10)
+    love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 8)
     love.graphics.setColor(0.8, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 10)
+    love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 8)
     love.graphics.setColor(1, 0.3, 0.3, 0.2)
-    love.graphics.rectangle("fill", menuBtnX + 3, menuBtnY + 3, menuBtnW - 6, 15, 8)
+    love.graphics.rectangle("fill", menuBtnX + 3, menuBtnY + 3, menuBtnW - 6, 12, 6)
     
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(menuFont or love.graphics.newFont(14))
-    love.graphics.printf("MENU", menuBtnX, menuBtnY + 12, menuBtnW, "center")
+    love.graphics.setFont(menuFont or love.graphics.newFont(12))
+    love.graphics.printf("MENU", menuBtnX, menuBtnY + 10, menuBtnW, "center")
     
     -- Нижняя панель
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", 0, screenH - 30, screenW, 30)
-    love.graphics.setColor(1, 1, 1, 0.4)
-    love.graphics.setFont(uiFont or love.graphics.newFont(12))
-    love.graphics.printf("WASD - Move | SPACE - Attack | ESC - Menu", 10, screenH - 24, screenW - 20, "center")
+    love.graphics.setColor(0, 0, 0, 0.4)
+    love.graphics.rectangle("fill", 0, screenH - 28, screenW, 28)
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.setFont(uiFont or love.graphics.newFont(11))
+    love.graphics.printf("WASD - Move | SPACE - Attack | ESC - Menu", 0, screenH - 22, screenW, "center")
     
     controls.draw()
 end
 
 function game.touchpressed(id, x, y)
     local screenW, screenH = love.graphics.getDimensions()
-    local menuBtnX = screenW - 100
-    local menuBtnY = 10
-    local menuBtnW = 85
-    local menuBtnH = 40
+    local menuBtnX = screenW - 90
+    local menuBtnY = 8
+    local menuBtnW = 75
+    local menuBtnH = 34
     
     if x >= menuBtnX and x <= menuBtnX + menuBtnW and
        y >= menuBtnY and y <= menuBtnY + menuBtnH then
