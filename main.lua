@@ -116,7 +116,9 @@ function love.draw()
     end
 end
 
--- ТОЛЬКО СЕНСОРНОЕ УПРАВЛЕНИЕ (МОБИЛЬНЫЕ)
+-- ============================================================
+-- ПОДДЕРЖКА СЕНСОРНОГО УПРАВЛЕНИЯ (МОБИЛЬНЫЕ)
+-- ============================================================
 function love.touchpressed(id, x, y)
     local current = states[_G.GameState.current]
     if current and current.touchpressed then 
@@ -135,6 +137,51 @@ function love.touchreleased(id, x, y)
     local current = states[_G.GameState.current]
     if current and current.touchreleased then 
         current.touchreleased(id, x, y) 
+    end
+end
+
+-- ============================================================
+-- ПОДДЕРЖКА МЫШИ (ПК)
+-- ============================================================
+function love.mousepressed(x, y, button, istouch)
+    local current = states[_G.GameState.current]
+    if current and current.touchpressed then 
+        current.touchpressed(-1, x, y) 
+    end
+end
+
+function love.mousemoved(x, y, dx, dy, istouch)
+    local current = states[_G.GameState.current]
+    if current and current.touchmoved then 
+        current.touchmoved(-1, x, y) 
+    end
+end
+
+function love.mousereleased(x, y, button, istouch)
+    local current = states[_G.GameState.current]
+    if current and current.touchreleased then 
+        current.touchreleased(-1, x, y) 
+    end
+end
+
+-- ============================================================
+-- ПОДДЕРЖКА КЛАВИАТУРЫ (ПК)
+-- ============================================================
+function love.keypressed(key)
+    local current = states[_G.GameState.current]
+    if current and current.keypressed then 
+        current.keypressed(key) 
+    end
+    
+    if key == "escape" then
+        _G.GameState.current = "lobby"
+    end
+end
+
+function love.keyreleased(key)
+    local current = states[_G.GameState.current]
+    if current and current.keyreleased then 
+        current.keyreleased(key) 
     end
 end
 
