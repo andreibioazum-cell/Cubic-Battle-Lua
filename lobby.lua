@@ -316,10 +316,17 @@ function lobby.touchpressed(id, x, y)
     if x >= bx and x <= bx + 240 then
         if y >= h / 2 - 20 and y <= h / 2 + 30 then
             playSound("click")
+            -- Загружаем game и передаем данные
             local g = require("game")
-            g.setCoins(coins)
-            g.setSkin(selected_skin)
-            g.load()
+            if g.setCoins then
+                g.setCoins(coins)
+            end
+            if g.setSkin then
+                g.setSkin(selected_skin)
+            end
+            if g.load then
+                g.load()
+            end
             _G.GameState.current = "game"
             return
         end
