@@ -14,7 +14,6 @@ local playerImg = nil
 local diamondImg = nil
 local menuFont = nil
 
--- Безопасная загрузка изображений
 local function safeLoadImage(name, fallbackColor)
     local success, img = pcall(function()
         return love.graphics.newImage(name)
@@ -22,12 +21,10 @@ local function safeLoadImage(name, fallbackColor)
     if success and img then
         return img
     else
-        -- Создаем цветной квадрат
         local canvas = love.graphics.newCanvas(64, 64)
         love.graphics.setCanvas(canvas)
         love.graphics.clear(fallbackColor or {1, 1, 1, 1})
         love.graphics.setCanvas()
-        print("Warning: Could not load " .. name .. ", using fallback")
         return canvas
     end
 end
@@ -42,7 +39,6 @@ function game.load()
     dead = false
     bullets = {}
     
-    -- Загружаем изображения с fallback
     bg = safeLoadImage("grass.png", {0.2, 0.5, 0.2, 1})
     if bg.setWrap then
         bg:setWrap("repeat", "repeat")
@@ -56,6 +52,7 @@ function game.load()
     enemy.spawnNow(cube.x + 300, cube.y + 300)
     enemy.setDeathCallback(function()
         coins = coins + 50
+        print("Enemy killed! Coins: " .. coins)
         _G.GameState.current = "lobby"
     end)
 end
@@ -115,7 +112,6 @@ function game.draw()
             end
         end
     else
-        -- Если нет фона, рисуем зеленый
         love.graphics.setColor(0.2, 0.5, 0.2)
         love.graphics.rectangle("fill", 0, 0, WORLD_SIZE, WORLD_SIZE)
     end
@@ -134,12 +130,10 @@ function game.draw()
             w / 2, h / 2
         )
     else
-        -- Если нет изображения, рисуем синий квадрат
         love.graphics.setColor(0, 0.5, 1)
         love.graphics.rectangle("fill", cube.x - 27, cube.y - 27, 54, 54)
     end
 
-    -- Рисуем линию направления
     love.graphics.setColor(1, 1, 1, 0.2)
     love.graphics.setLineWidth(2)
     local aimX, aimY = controls.getAim()
@@ -272,11 +266,12 @@ function game.setOnDeath(fn)
 end
 
 function game.setCoins(c)
-    coins = c
+    coins = c or 0
+    print("Game set coins: " .. coins)
 end
 
 function game.setSkin(s)
-    selected_skin = s
+    selected_skin = s or "default"
 end
 
 return game
