@@ -16,6 +16,7 @@ local menuFont = nil
 function game.load()
     controls.load()
     
+    -- STANDARD FONT FOR GAME
     menuFont = love.graphics.newFont(16)
     
     cube.x, cube.y = 1500, 1500
@@ -53,7 +54,6 @@ function game.update(dt)
     cam.x = cam.x + (cube.x - sw / 2 - cam.x) * 5 * dt
     cam.y = cam.y + (cube.y - sh / 2 - cam.y) * 5 * dt
 
-    -- Пули игрока
     for i = #bullets, 1, -1 do
         local b = bullets[i]
         if b and type(b.x) == "number" and type(b.y) == "number" then
@@ -67,7 +67,6 @@ function game.update(dt)
         end
     end
 
-    -- Обновление врага
     enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
         cube.hp = cube.hp - dmg
         if cube.hp <= 0 then
@@ -85,7 +84,6 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-cam.x, -cam.y)
 
-    -- Фон
     local sw, sh = love.graphics.getDimensions()
     local tw, th = bg:getDimensions()
     for x = math.floor(cam.x / tw) * tw, cam.x + sw, tw do
@@ -112,13 +110,11 @@ function game.draw()
     end
     love.graphics.pop()
 
-    -- HUD
     love.graphics.setColor(0, 0, 0, 0.5)
     love.graphics.rectangle("fill", 20, 20, 200, 20)
     love.graphics.setColor(0, 1, 0)
     love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
     
-    -- Кнопка меню
     local screenW, screenH = love.graphics.getDimensions()
     local menuBtnX = screenW - 120
     local menuBtnY = 15
@@ -167,10 +163,8 @@ function game.touchreleased(id, x, y)
     if shot then
         playSound("shot")
         
-        -- Модифицируем пулю через систему модов
         local modified = modSystem.gameShoot(cube.x, cube.y, dx, dy)
         
-        -- Создаём пулю с правильными типами данных
         local bullet = {
             x = tonumber(modified.x) or tonumber(cube.x) or 0,
             y = tonumber(modified.y) or tonumber(cube.y) or 0,
