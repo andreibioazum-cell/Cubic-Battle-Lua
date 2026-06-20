@@ -152,30 +152,16 @@ end
 -- ЗАГРУЗКА ЛОББИ
 -- ============================================================
 function lobby.load()
-    -- Пробуем загрузить шрифт с кириллицей
     local success, err = pcall(function()
-        -- Сначала пробуем системный шрифт
-        fontTitle = love.graphics.newFont("Arial.ttf", 48)
+        fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 48)
     end)
     if not success then
-        success, err = pcall(function()
-            -- Пробуем Fredoka (если есть)
-            fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 48)
-        end)
-    end
-    if not success then
-        -- Если ничего нет, используем стандартный шрифт
         fontTitle = love.graphics.newFont(48)
     end
     
     success, err = pcall(function()
-        fontBtn = love.graphics.newFont("Arial.ttf", 20)
+        fontBtn = love.graphics.newFont("Fredoka-Bold.ttf", 20)
     end)
-    if not success then
-        success, err = pcall(function()
-            fontBtn = love.graphics.newFont("Fredoka-Bold.ttf", 20)
-        end)
-    end
     if not success then
         fontBtn = love.graphics.newFont(20)
     end
@@ -360,33 +346,33 @@ function drawShop()
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12)
     
-    -- Заголовок
+    -- Заголовок SHOP (слева)
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.setFont(fontTitle)
-    love.graphics.printf("SHOP", shop_x + 20, shop_y + 15, 200, "left")
+    love.graphics.printf("SHOP", shop_x + 20, shop_y + 15, 150, "left")
+    
+    -- Баланс (справа)
+    love.graphics.setColor(1, 1, 0)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("Balance: " .. coins, shop_x + shop_w - 160, shop_y + 22, 140, "right")
     
     -- Кнопка закрыть
     love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", shop_x + shop_w - 77, shop_y + 13, 62, 30, 8)
+    love.graphics.rectangle("fill", shop_x + shop_w - 57, shop_y + 8, 42, 30, 8)
     love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + 10, 60, 30, 8)
+    love.graphics.rectangle("fill", shop_x + shop_w - 60, shop_y + 5, 40, 30, 8)
     love.graphics.setColor(1, 0.3, 0.3, 0.2)
-    love.graphics.rectangle("fill", shop_x + shop_w - 77, shop_y + 13, 54, 12, 4)
+    love.graphics.rectangle("fill", shop_x + shop_w - 57, shop_y + 8, 34, 12, 4)
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fontBtn)
-    love.graphics.printf("X", shop_x + shop_w - 78, shop_y + 17, 56, "center")
+    love.graphics.printf("X", shop_x + shop_w - 58, shop_y + 12, 36, "center")
     
     -- Линия
     love.graphics.setColor(0.5, 0.2, 1, 0.2)
-    love.graphics.rectangle("fill", shop_x + 20, shop_y + 70, shop_w - 40, 2)
-    
-    -- Баланс
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("Balance: " .. coins, shop_x + shop_w - 180, shop_y + 15, 150, "right")
+    love.graphics.rectangle("fill", shop_x + 20, shop_y + 60, shop_w - 40, 2)
     
     -- ТОВАР
-    local item_x, item_y = shop_x + 20, shop_y + 85
+    local item_x, item_y = shop_x + 20, shop_y + 75
     local item_w, item_h = shop_w - 40, 70
     
     -- Фон товара
@@ -423,48 +409,48 @@ function drawShop()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("Diamond Cube", item_x + 80, item_y + 12, 150, "left")
     
-    -- Цена
+    -- Цена/статус
     love.graphics.setColor(1, 1, 0)
     love.graphics.setFont(fontBtn)
     if skins.diamond.owned then
-        love.graphics.printf("OWNED", item_x + 80, item_y + 35, 150, "left")
+        love.graphics.printf("OWNED", item_x + 80, item_y + 38, 150, "left")
     else
-        love.graphics.printf("100 coins", item_x + 80, item_y + 35, 150, "left")
+        love.graphics.printf("100 coins", item_x + 80, item_y + 38, 150, "left")
     end
     
-    -- Кнопка
+    -- Кнопка действия
     if skins.diamond.owned then
         if selected_skin == "diamond" then
             love.graphics.setColor(0, 0, 0, 0.3)
-            love.graphics.rectangle("fill", item_x + item_w - 77, item_y + 18, 62, 30, 8)
+            love.graphics.rectangle("fill", item_x + item_w - 57, item_y + 18, 42, 30, 8)
             love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
-            love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 15, 60, 30, 8)
+            love.graphics.rectangle("fill", item_x + item_w - 60, item_y + 15, 40, 30, 8)
             love.graphics.setColor(0.3, 1, 0.3, 0.2)
-            love.graphics.rectangle("fill", item_x + item_w - 77, item_y + 18, 54, 12, 4)
+            love.graphics.rectangle("fill", item_x + item_w - 57, item_y + 18, 34, 12, 4)
             love.graphics.setColor(1, 1, 1)
             love.graphics.setFont(fontBtn)
-            love.graphics.printf("ON", item_x + item_w - 78, item_y + 22, 56, "center")
+            love.graphics.printf("ON", item_x + item_w - 58, item_y + 22, 36, "center")
         else
             love.graphics.setColor(0, 0, 0, 0.3)
-            love.graphics.rectangle("fill", item_x + item_w - 77, item_y + 18, 62, 30, 8)
+            love.graphics.rectangle("fill", item_x + item_w - 57, item_y + 18, 42, 30, 8)
             love.graphics.setColor(0.2, 0.6, 1, 0.9)
-            love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 15, 60, 30, 8)
+            love.graphics.rectangle("fill", item_x + item_w - 60, item_y + 15, 40, 30, 8)
             love.graphics.setColor(0.3, 0.8, 1, 0.2)
-            love.graphics.rectangle("fill", item_x + item_w - 77, item_y + 18, 54, 12, 4)
+            love.graphics.rectangle("fill", item_x + item_w - 57, item_y + 18, 34, 12, 4)
             love.graphics.setColor(1, 1, 1)
             love.graphics.setFont(fontBtn)
-            love.graphics.printf("EQUIP", item_x + item_w - 78, item_y + 22, 56, "center")
+            love.graphics.printf("EQ", item_x + item_w - 58, item_y + 22, 36, "center")
         end
     else
         love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", item_x + item_w - 77, item_y + 18, 62, 30, 8)
+        love.graphics.rectangle("fill", item_x + item_w - 57, item_y + 18, 42, 30, 8)
         love.graphics.setColor(1, 0.8, 0.2, 0.9)
-        love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 15, 60, 30, 8)
+        love.graphics.rectangle("fill", item_x + item_w - 60, item_y + 15, 40, 30, 8)
         love.graphics.setColor(1, 0.9, 0.3, 0.2)
-        love.graphics.rectangle("fill", item_x + item_w - 77, item_y + 18, 54, 12, 4)
+        love.graphics.rectangle("fill", item_x + item_w - 57, item_y + 18, 34, 12, 4)
         love.graphics.setColor(1, 1, 1)
         love.graphics.setFont(fontBtn)
-        love.graphics.printf("BUY", item_x + item_w - 78, item_y + 22, 56, "center")
+        love.graphics.printf("BUY", item_x + item_w - 58, item_y + 22, 36, "center")
     end
 end
 
@@ -529,16 +515,16 @@ function lobby.touchpressed(id, x, y)
         local shop_w, shop_h = 420, 320
         local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
         
-        if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and
-           y >= shop_y + 10 and y <= shop_y + 40 then
+        if x >= shop_x + shop_w - 60 and x <= shop_x + shop_w - 20 and
+           y >= shop_y + 5 and y <= shop_y + 35 then
             shop_open = false
             playSound("click")
             return
         end
         
-        local item_x, item_y = shop_x + 20, shop_y + 85
+        local item_x, item_y = shop_x + 20, shop_y + 75
         local item_w, item_h = shop_w - 40, 70
-        if x >= item_x + item_w - 80 and x <= item_x + item_w - 20 and
+        if x >= item_x + item_w - 60 and x <= item_x + item_w - 20 and
            y >= item_y + 15 and y <= item_y + 45 then
             playSound("click")
             if not skins.diamond.owned and coins >= 100 then
