@@ -168,6 +168,38 @@ function game.touchreleased(id, x, y)
     end
 end
 
+-- ============================================================
+-- ПОДДЕРЖКА КЛАВИАТУРЫ В ИГРЕ
+-- ============================================================
+function game.keypressed(key)
+    if key == "escape" then
+        playSound("click")
+        _G.GameState.current = "lobby"
+        return
+    end
+    
+    -- Передаем в controls
+    if controls.keypressed then
+        controls.keypressed(key)
+    end
+end
+
+function game.keyreleased(key)
+    if controls.keyreleased then
+        local shot, dx, dy = controls.keyreleased(key)
+        if shot then
+            playSound("shot")
+            local bullet = {
+                x = cube.x or 0,
+                y = cube.y or 0,
+                vx = (dx or 0) * 400,
+                vy = (dy or 0) * 400
+            }
+            table.insert(bullets, bullet)
+        end
+    end
+end
+
 function game.setOnDeath(fn)
     game.onDeath = fn
 end
