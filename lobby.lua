@@ -3,14 +3,33 @@ local lobby = {}
 local btn = { w=220, h=75, x=0, y=0 }
 local grad, lastW, lastH = nil, 0, 0
 local fontTitle, fontSub, fontBtn
+local stars = {}
 
 local function mkGrad(w, h)
     return love.graphics.newMesh({
-        {0,0, 0,0, 0.45,0.15,0.80,1},
-        {w,0, 1,0, 0.55,0.20,0.85,1},
-        {w,h, 1,1, 0.85,0.30,0.65,1},
-        {0,h, 0,1, 0.80,0.25,0.70,1},
+        {0,0, 0,0, 0.02,0.02,0.08,1},
+        {w,0, 1,0, 0.10,0.05,0.20,1},
+        {w,h, 1,1, 0.15,0.08,0.25,1},
+        {0,h, 0,1, 0.05,0.03,0.12,1},
     }, "fan", "static")
+end
+
+local function generateStars(w, h)
+    stars = {}
+    math.randomseed(42) -- фиксированный seed для консистентности
+    for i = 1, 150 do
+        local x = love.math.random(0, w)
+        local y = love.math.random(0, h)
+        local size = love.math.random(1, 3)
+        local brightness = 0.4 + love.math.random() * 0.6
+        stars[#stars + 1] = {
+            x = x,
+            y = y,
+            size = size,
+            brightness = brightness,
+            twinkle = love.math.random() * math.pi * 2
+        }
+    end
 end
 
 local function place()
@@ -69,11 +88,15 @@ function lobby.load()
     fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 64)
     fontSub   = love.graphics.newFont("Fredoka-Bold.ttf", 22)
     fontBtn   = love.graphics.newFont("Fredoka-Bold.ttf", 30)
+    local w, h = love.graphics.getDimensions()
+    generateStars(w, h)
     place()
 end
 
 function lobby.resize()
     grad = nil
+    local w, h = love.graphics.getDimensions()
+    generateStars(w, h)
     place()
 end
 
@@ -84,25 +107,52 @@ function lobby.draw()
 
     if not grad or w ~= lastW or h ~= lastH then
         grad = mkGrad(w, h)
+        generateStars(w, h)
         lastW, lastH = w, h
     end
 
+    -- Фон с градиентом
     love.graphics.setColor(1,1,1,1)
     love.graphics.draw(grad, 0, 0)
 
+    -- Рисуем звёзды
+    for i = 1, #stars do
+        local star = stars[i]
+        local twinkle = math.sin(love.timer.getTime() * 2 + star.twinkle) * 0.3 + 0.7
+        local brightness = star.brightness * twinkle
+        love.graphics.setColor(1, 1, 1, brightness)
+        love.graphics.circle("fill", star.x, star.y, star.size)
+    end
+
+    -- Текст игры
+    love.graphics.setColor(1,1,1,1)
     drawSpacedText("Cubic Battle", 0, h/2 - 150, w, "center", fontTitle, fontTitle:getWidth("A")*0.05)
     drawSpacedText("Touch & Dodge", 0, h/2 - 60, w, "center", fontSub, fontSub:getWidth("A")*0.05)
 
-    love.graphics.setColor(0,0,0,0.20)
-    love.graphics.rectangle("fill", btn.x+5, btn.y+6, btn.w, btn.h, 16, 16)
+    -- Тень кнопки
+    love.graphics.setColor(0,0,0,0.40)
+    love.graphics.rectangle("fill", btn.x+6, btn.y+7, btn.w, btn.h, 18, 18)
 
-    love.graphics.setColor(0.55, 0.20, 0.85, 1)
-    love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 16, 16)
+    -- Основная кнопка (тёмная)
+    love.graphics.setColor(0.08, 0.04, 0.12, 1)
+    love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 18, 18)
 
-    love.graphics.setColor(0,0,0,1)
-    love.graphics.setLineWidth(3.4)
-    love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 16, 16)
+    -- Градиентная полоса на кнопке
+    local gradient = love.graphics.newMesh({
+        {btn.x, btn.y, 0, 0, 0.30, 0.15, 0.40, 0.5},
+        {btn.x + btn.w, btn.y, 1, 0, 0.35, 0.18, 0.45, 0.5},
+        {btn.x + btn.w, btn.y + btn.h, 1, 1, 0.25, 0.12, 0.35, 0.3},
+        {btn.x, btn.y + btn.h, 0, 1, 0.28, 0.14, 0.38, 0.3},
+    }, "fan", "static")
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.draw(gradient, 0, 0)
 
+    -- Граница кнопки (яркая)
+    love.graphics.setColor(0.60, 0.30, 0.80, 1)
+    love.graphics.setLineWidth(2.5)
+    love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 18, 18)
+
+    -- Текст кнопки
     drawSpacedText("Play", btn.x, btn.y + 20, btn.w, "center", fontBtn, fontBtn:getWidth("A")*0.05)
 end
 
