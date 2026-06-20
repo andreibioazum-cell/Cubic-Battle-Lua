@@ -17,23 +17,19 @@ local states = {
 local lastState = nil
 
 -- ============================================================
--- ИСПРАВЛЕННАЯ ФУНКЦИЯ ВОСПРОИЗВЕДЕНИЯ ЗВУКА
+-- ФУНКЦИЯ ВОСПРОИЗВЕДЕНИЯ ЗВУКА
 -- ============================================================
 function playSound(name)
     if _G.sounds and _G.sounds[name] then
         local source = _G.sounds[name]
-        -- Проверяем, есть ли метод clone
         if source and source.clone then
             local clone = source:clone()
             if clone then
                 clone:setVolume(source:getVolume() or 0.5)
                 clone:setLooping(false)
                 clone:play()
-                -- Автоматически останавливаем через 0.5 секунды
                 love.timer.after(0.5, function()
-                    if clone and clone.isPlaying then
-                        clone:stop()
-                    end
+                    if clone then clone:stop() end
                 end)
             end
         elseif source and source.play then
@@ -58,7 +54,6 @@ function love.load()
     
     -- Проверка безопасного режима
     if gameInstaller.checkSafeMode() then
-        print("Безопасный режим активирован!")
         gameInstaller.restoreBackup()
     end
     
@@ -88,7 +83,6 @@ function love.load()
         end
     end)
     if not soundSuccess then
-        print("Предупреждение: звуки не загружены: " .. tostring(soundErr))
         _G.sounds = {}
     end
 
@@ -112,22 +106,17 @@ function love.load()
         -- Показываем информацию об установленном моде
         local installedMod = gameInstaller.getInstalledMod()
         if installedMod then
-            print("Установлен мод: " .. installedMod.title)
-            print("  Автор: " .. installedMod.author)
-            print("  Версия: " .. installedMod.version)
+            -- Без вывода в консоль
         end
         
     end, function(err)
-        print("Ошибка: " .. tostring(err))
-        print(debug.traceback())
+        -- Обработка ошибок без вывода в консоль
     end)
 end
 
 function love.update(dt)
-    -- Ограничиваем дельту времени
     if dt > 0.05 then dt = 0.05 end
 
-    -- Проверяем смену состояния
     if _G.GameState.current ~= lastState then
         local new_state = states[_G.GameState.current]
         if new_state and new_state.load then 
@@ -136,35 +125,30 @@ function love.update(dt)
         lastState = _G.GameState.current
     end
 
-    -- Обновляем текущее состояние
     local current = states[_G.GameState.current]
     if current and current.update then 
         current.update(dt) 
     end
     
-    -- Обновляем моды
     modSystem.gameUpdate(dt)
 end
 
 function love.draw()
-    -- Рисуем текущее состояние
     local current = states[_G.GameState.current]
     if current and current.draw then 
         current.draw() 
     end
     
-    -- Рисуем поверх всё моды
     modSystem.gameDraw()
     
-    -- Показываем статус установки
     local status = gameInstaller.getInstallStatus()
     if status.isInstalling then
         love.graphics.setColor(1, 1, 0, 0.8)
-        love.graphics.print("Установка мода...", 10, love.graphics.getHeight() - 30)
+        love.graphics.print("Installing mod...", 10, love.graphics.getHeight() - 30)
     end
 end
 
--- Обработка касаний (для мобильных устройств)
+-- ТОЛЬКО СЕНСОРНОЕ УПРАВЛЕНИЕ (МОБИЛЬНЫЕ)
 function love.touchpressed(id, x, y)
     local current = states[_G.GameState.current]
     if current and current.touchpressed then 
@@ -186,19 +170,6 @@ function love.touchreleased(id, x, y)
     end
 end
 
--- Обработка мыши (для ПК)
-function love.mousepressed(x, y, button)
-    love.touchpressed(1, x, y)
-end
-
-function love.mousemoved(x, y)
-    love.touchmoved(1, x, y)
-end
-
-function love.mousereleased(x, y, button)
-    love.touchreleased(1, x, y)
-end
-
 -- Изменение размера окна
 function love.resize(w, h)
     for _, s in pairs(states) do
@@ -208,18 +179,8 @@ function love.resize(w, h)
     end
 end
 
--- Обработка клавиш
-function love.keypressed(key)
-    if key == "escape" then 
-        love.event.quit() 
-    end
-end
-
--- ============================================================
--- ОБРАБОТКА ТЕКСТОВОГО ВВОДА (ДЛЯ КЛАВИАТУРЫ)
--- ============================================================
+-- Обработка текстового ввода (для экранной клавиатуры)
 function love.textinput(text)
-    -- Если клавиатура активна, передаём текст в лобби
     if keyboard.isActive() then
         keyboard.handleTextInput(text)
     end
