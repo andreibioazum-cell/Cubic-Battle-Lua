@@ -1,197 +1,427 @@
-local controls = require("controls")
-local enemy = require("enemy")
-local modSystem = require("mod_system")
-local game = {}
+local lobby = {}
+local promoSystem = require("promo_codes")
+local keyboard = require("game_keyboard")
 
-local WORLD_SIZE = 3000
-local cube = { x = 1500, y = 1500, speed = 260, hp = 5, angle = 0, hit = 0 }
-local cam = { x = 0, y = 0 }
-local bullets = {}
+local fontTitle, fontBtn
+local animTimer = 0
 local coins = 0
+local shop_open = false
+local bgCanvas = nil
+local stars = {}
+
+local skins = {
+    default = { name = "Default Cube", price = 0, owned = true },
+    diamond = { name = "Diamond Cube", price = 100, owned = false }
+}
 local selected_skin = "default"
-local dead = false
-local bg, playerImg, diamondImg
-local menuFont = nil
 
-function game.load()
-    controls.load()
-    
-    menuFont = love.graphics.newFont(16)
-    
-    cube.x, cube.y = 1500, 1500
-    cube.hp = 5
-    dead = false
-    bullets = {}
-    bg = love.graphics.newImage("grass.png")
-    bg:setWrap("repeat", "repeat")
-    playerImg = love.graphics.newImage("player.png")
-    diamondImg = love.graphics.newImage("player_diamond.png")
-    enemy.load()
-    enemy.reset()
-    enemy.spawnNow(cube.x + 300, cube.y + 300)
-    enemy.setDeathCallback(function()
-        coins = coins + 50
-        _G.GameState.current = "lobby"
-        modSystem.gameDeath()
-    end)
-    
-    modSystem.gameLoad()
+local promoInput = ""
+local promoActive = false
+local promoResult = ""
+local promoResultColor = {1, 1, 1}
+local promoCooldown = 0
+
+local function saveGame()
+    local data = string.format("%d\n%s\n%s", coins, skins.diamond.owned and "diamond" or "default", selected_skin)
+    love.filesystem.write("save.txt", data)
 end
 
-function game.update(dt)
-    if dead then return end
-    controls.update(dt)
-
-    local dx, dy = controls.getMove()
-    cube.x = math.max(0, math.min(WORLD_SIZE, cube.x + dx * cube.speed * dt))
-    cube.y = math.max(0, math.min(WORLD_SIZE, cube.y + dy * cube.speed * dt))
-    if dx ~= 0 or dy ~= 0 then
-        cube.angle = math.atan2(dy, dx) + math.pi / 2
-    end
-
-    local sw, sh = love.graphics.getDimensions()
-    cam.x = cam.x + (cube.x - sw / 2 - cam.x) * 5 * dt
-    cam.y = cam.y + (cube.y - sh / 2 - cam.y) * 5 * dt
-
-    -- Пули игрока
-    for i = #bullets, 1, -1 do
-        local b = bullets[i]
-        if b and type(b.x) == "number" and type(b.y) == "number" then
-            b.x = b.x + b.vx * dt
-            b.y = b.y + b.vy * dt
-            if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
-                table.remove(bullets, i)
-            end
-        else
-            table.remove(bullets, i)
+local function loadSave()
+    local data = love.filesystem.read("save.txt")
+    if data then
+        local lines = {}
+        for line in data:gmatch("[^\r\n]+") do
+            table.insert(lines, line)
         end
-    end
-
-    -- Обновление врага
-    enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
-        cube.hp = cube.hp - dmg
-        if cube.hp <= 0 then
-            dead = true
-            if game.onDeath then
-                game.onDeath()
-            end
-            modSystem.gameDeath()
-            _G.GameState.current = "lobby"
+        coins = tonumber(lines[1]) or 0
+        if lines[2] == "diamond" then
+            skins.diamond.owned = true
         end
-    end)
+        selected_skin = lines[3] or "default"
+    end
 end
 
-function game.draw()
-    love.graphics.push()
-    love.graphics.translate(-cam.x, -cam.y)
+local function createBG()
+    local w, h = love.graphics.getDimensions()
+    bgCanvas = love.graphics.newCanvas(w, h)
+    love.graphics.setCanvas(bgCanvas)
+    for i = 0, 60 do
+        local t = i / 60
+        love.graphics.setColor(0.08 + t * 0.07, 0.02 + t * 0.05, 0.18 + t * 0.3)
+        love.graphics.rectangle("fill", 0, i * (h / 60), w, h / 60 + 1)
+    end
+    love.graphics.setCanvas()
+end
 
-    -- Фон
-    local sw, sh = love.graphics.getDimensions()
-    local tw, th = bg:getDimensions()
-    for x = math.floor(cam.x / tw) * tw, cam.x + sw, tw do
-        for y = math.floor(cam.y / th) * th, cam.y + sh, th do
-            love.graphics.draw(bg, x, y)
-        end
+function lobby.load()
+    -- CUSTOM FONT FOR LOBBY
+    local success1, err1 = pcall(function()
+        fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 48)
+    end)
+    if not success1 then
+        fontTitle = love.graphics.newFont(48)
+        print("Fredoka-Bold.ttf not found, using default font")
+    end
+    
+    local success2, err2 = pcall(function()
+        fontBtn = love.graphics.newFont("Fredoka-Bold.ttf", 20)
+    end)
+    if not success2 then
+        fontBtn = love.graphics.newFont(20)
+        print("Fredoka-Bold.ttf not found, using default font")
+    end
+    
+    loadSave()
+    createBG()
+    stars = {}
+    for i = 1, 50 do
+        table.insert(stars, { x = math.random(), y = math.random(), s = 0.1 + math.random() * 0.4 })
+    end
+    
+    promoSystem.load()
+    keyboard.init()
+    
+    print("Lobby loaded with custom font!")
+end
+
+function lobby.update(dt)
+    animTimer = animTimer + dt
+    
+    if promoCooldown > 0 then
+        promoCooldown = promoCooldown - dt
+    end
+    
+    if keyboard.isActive() then
+        keyboard.update(dt)
+    end
+end
+
+function lobby.draw()
+    local w, h = love.graphics.getDimensions()
+    love.graphics.setColor(1, 1, 1)
+    if bgCanvas then
+        love.graphics.draw(bgCanvas)
     end
 
-    enemy.draw()
+    for _, s in ipairs(stars) do
+        love.graphics.setColor(1, 1, 1, 0.3 + 0.3 * math.sin(animTimer * 2 + s.x * 10))
+        love.graphics.circle("fill",
+            (s.x * w + animTimer * 20 * s.s) % w,
+            (s.y * h + animTimer * 10 * s.s) % h,
+            1.5 + s.s
+        )
+    end
 
     love.graphics.setColor(1, 1, 1)
-    local img = selected_skin == "diamond" and diamondImg or playerImg
-    love.graphics.draw(
-        img, cube.x, cube.y,
-        cube.angle,
-        55 / img:getWidth(), 55 / img:getHeight(),
-        img:getWidth() / 2, img:getHeight() / 2
+    love.graphics.setFont(fontTitle)
+    love.graphics.printf("CUBIC BATTLE 3", 0, h / 2 - 180, w, "center")
+
+    love.graphics.setColor(1, 1, 0)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("Cubicoins: " .. coins, 0, h / 2 - 80, w, "center")
+
+    local bx = w / 2 - 120
+    
+    -- PLAY
+    love.graphics.setColor(0.2, 0.6, 0.8, 0.9)
+    love.graphics.rectangle("fill", bx, h / 2 - 20, 240, 50, 10)
+    love.graphics.setColor(0.3, 0.8, 1, 0.3)
+    love.graphics.rectangle("fill", bx + 5, h / 2 - 15, 230, 40, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("PLAY", bx, h / 2 - 5, 240, "center")
+
+    -- SHOP
+    love.graphics.setColor(0.4, 0.2, 0.8, 0.9)
+    love.graphics.rectangle("fill", bx, h / 2 + 45, 240, 50, 10)
+    love.graphics.setColor(0.6, 0.3, 1, 0.3)
+    love.graphics.rectangle("fill", bx + 5, h / 2 + 50, 230, 40, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("SHOP", bx, h / 2 + 60, 240, "center")
+
+    -- PROMO CODE
+    love.graphics.setColor(0.8, 0.2, 0.8, 0.8)
+    love.graphics.rectangle("fill", bx, h / 2 + 110, 240, 40, 10)
+    love.graphics.setColor(0.9, 0.3, 0.9, 0.3)
+    love.graphics.rectangle("fill", bx + 5, h / 2 + 115, 230, 30, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("PROMO CODE", bx, h / 2 + 123, 240, "center")
+
+    if promoActive then
+        local inputX = bx
+        local inputY = h / 2 + 160
+        local inputW = 240
+        local inputH = 40
+        
+        love.graphics.setColor(0.1, 0.05, 0.2, 0.95)
+        love.graphics.rectangle("fill", inputX, inputY, inputW, inputH, 8)
+        
+        love.graphics.setColor(0.5, 0.2, 1, 0.5)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", inputX, inputY, inputW, inputH, 8)
+        
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(fontBtn)
+        local displayText = promoInput or ""
+        if displayText == "" then
+            love.graphics.setColor(0.5, 0.5, 0.5)
+            love.graphics.printf("Tap to enter code...", inputX + 10, inputY + 10, inputW - 20, "left")
+        else
+            love.graphics.setColor(1, 1, 0)
+            love.graphics.printf(displayText, inputX + 10, inputY + 10, inputW - 20, "left")
+        end
+        
+        love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
+        love.graphics.rectangle("fill", inputX + inputW - 60, inputY + 5, 55, 30, 6)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf("OK", inputX + inputW - 60, inputY + 10, 55, "center")
+        
+        if promoResult ~= "" then
+            love.graphics.setColor(promoResultColor)
+            love.graphics.setFont(fontBtn)
+            love.graphics.printf(promoResult, inputX, inputY + 50, inputW, "center")
+        end
+    end
+
+    if shop_open then
+        drawShop()
+    end
+    
+    if keyboard.isActive() then
+        keyboard.draw()
+    end
+end
+
+function drawShop()
+    local w, h = love.graphics.getDimensions()
+    local shop_w, shop_h = 400, 300
+    local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
+
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", shop_x + 10, shop_y + 10, shop_w, shop_h, 15)
+
+    love.graphics.setColor(0.1, 0.05, 0.2, 0.95)
+    love.graphics.rectangle("fill", shop_x, shop_y, shop_w, shop_h, 15)
+
+    love.graphics.setColor(0.5, 0.2, 1, 0.3)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12)
+
+    love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
+    love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + 10, 60, 30, 8)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("X", shop_x + shop_w - 78, shop_y + 17, 56, "center")
+
+    love.graphics.setColor(1, 1, 0, 0.9)
+    love.graphics.setFont(fontTitle)
+    love.graphics.printf("SHOP", shop_x + 20, shop_y + 15, 200, "left")
+
+    love.graphics.setColor(0.5, 0.2, 1, 0.2)
+    love.graphics.rectangle("fill", shop_x + 20, shop_y + 70, shop_w - 40, 2)
+
+    local item_x, item_y = shop_x + 20, shop_y + 85
+    local item_w, item_h = shop_w - 40, 60
+
+    love.graphics.setColor(0.2, 0.1, 0.4, 0.8)
+    love.graphics.rectangle("fill", item_x, item_y, item_w, item_h, 8)
+
+    love.graphics.setColor(0, 0.8, 1, 0.8)
+    love.graphics.polygon("fill",
+        item_x + 30, item_y + 15,
+        item_x + 45, item_y + 5,
+        item_x + 60, item_y + 15,
+        item_x + 45, item_y + 50,
+        item_x + 30, item_y + 15
     )
 
-    for _, b in ipairs(bullets) do
-        if b and type(b.x) == "number" and type(b.y) == "number" then
-            love.graphics.circle("fill", b.x, b.y, 5)
-        end
-    end
-    love.graphics.pop()
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("Diamond Cube", item_x + 70, item_y + 12, 150, "left")
+    love.graphics.setColor(0.7, 0.7, 0.7, 0.8)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("100 Cubicoins", item_x + 70, item_y + 35, 150, "left")
 
-    -- HUD
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", 20, 20, 200, 20)
-    love.graphics.setColor(0, 1, 0)
-    love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
-    
-    -- Кнопка меню
-    local screenW, screenH = love.graphics.getDimensions()
-    local menuBtnX = screenW - 120
-    local menuBtnY = 15
-    local menuBtnW = 100
-    local menuBtnH = 35
-    
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 8)
-    love.graphics.setColor(0.8, 0.2, 0.2, 0.85)
-    love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 8)
-    love.graphics.setColor(1, 0.3, 0.3, 0.2)
-    love.graphics.rectangle("fill", menuBtnX + 3, menuBtnY + 3, menuBtnW - 6, menuBtnH / 2 - 2, 6)
-    
-    love.graphics.setColor(1, 1, 1)
-    if menuFont then
-        love.graphics.setFont(menuFont)
+    if skins.diamond.owned then
+        if selected_skin == "diamond" then
+            love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
+            love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 15, 60, 30, 8)
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.setFont(fontBtn)
+            love.graphics.printf("ON", item_x + item_w - 78, item_y + 22, 56, "center")
+        else
+            love.graphics.setColor(0.2, 0.6, 1, 0.9)
+            love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 15, 60, 30, 8)
+            love.graphics.setColor(1, 1, 1, 1)
+            love.graphics.setFont(fontBtn)
+            love.graphics.printf("EQUIP", item_x + item_w - 78, item_y + 22, 56, "center")
+        end
+    else
+        love.graphics.setColor(1, 0.8, 0.2, 0.9)
+        love.graphics.rectangle("fill", item_x + item_w - 80, item_y + 15, 60, 30, 8)
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf("BUY", item_x + item_w - 78, item_y + 22, 56, "center")
     end
-    love.graphics.printf("MENU", menuBtnX, menuBtnY + 8, menuBtnW, "center")
-    
-    controls.draw()
 end
 
-function game.touchpressed(id, x, y)
-    local screenW, screenH = love.graphics.getDimensions()
-    local menuBtnX = screenW - 120
-    local menuBtnY = 15
-    local menuBtnW = 100
-    local menuBtnH = 35
+function lobby.touchpressed(id, x, y)
+    local w, h = love.graphics.getDimensions()
+
+    if keyboard.isActive() then
+        if keyboard.handleTouch(x, y) then
+            promoInput = keyboard.getInput()
+            return
+        end
+    end
+
+    local bx = w / 2 - 120
     
-    if x >= menuBtnX and x <= menuBtnX + menuBtnW and
-       y >= menuBtnY and y <= menuBtnY + menuBtnH then
-        playSound("click")
-        _G.GameState.current = "lobby"
+    -- PLAY
+    if x >= bx and x <= bx + 240 then
+        if y >= h / 2 - 20 and y <= h / 2 + 30 then
+            playSound("click")
+            local g = require("game")
+            g.setCoins(coins)
+            g.setSkin(selected_skin)
+            g.load()
+            _G.GameState.current = "game"
+            return
+        end
+        
+        -- SHOP
+        if y >= h / 2 + 45 and y <= h / 2 + 95 then
+            playSound("click")
+            shop_open = not shop_open
+            return
+        end
+        
+        -- PROMO CODE
+        if y >= h / 2 + 110 and y <= h / 2 + 150 then
+            playSound("click")
+            promoActive = not promoActive
+            if promoActive then
+                promoInput = ""
+                promoResult = ""
+                love.keyboard.setTextInput(true)
+            else
+                love.keyboard.setTextInput(false)
+            end
+            return
+        end
+    end
+    
+    -- PROMO CODE INPUT
+    if promoActive then
+        local inputX = bx
+        local inputY = h / 2 + 160
+        local inputW = 240
+        local inputH = 40
+        
+        if x >= inputX and x <= inputX + inputW - 60 and y >= inputY and y <= inputY + inputH then
+            love.keyboard.setTextInput(true)
+            return
+        end
+        
+        if x >= inputX + inputW - 60 and x <= inputX + inputW and y >= inputY + 5 and y <= inputY + 35 then
+            if promoCooldown <= 0 then
+                activatePromoCode()
+            end
+            return
+        end
+    end
+
+    -- SHOP
+    if shop_open then
+        local shop_w, shop_h = 400, 300
+        local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
+
+        if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and
+           y >= shop_y + 10 and y <= shop_y + 40 then
+            shop_open = false
+            playSound("click")
+            return
+        end
+
+        local item_x, item_y = shop_x + 20, shop_y + 85
+        local item_w, item_h = shop_w - 40, 60
+        if x >= item_x + item_w - 80 and x <= item_x + item_w - 20 and
+           y >= item_y + 15 and y <= item_y + 45 then
+            playSound("click")
+            if not skins.diamond.owned and coins >= 100 then
+                coins = coins - 100
+                skins.diamond.owned = true
+                selected_skin = "diamond"
+                saveGame()
+            elseif skins.diamond.owned then
+                selected_skin = "diamond"
+                saveGame()
+            end
+            return
+        end
+    end
+end
+
+function lobby.touchreleased(id, x, y)
+end
+
+function lobby.resize()
+    createBG()
+end
+
+function activatePromoCode()
+    local code = string.upper(promoInput or "")
+    
+    if code == "" then
+        promoResult = "Please enter a code!"
+        promoResultColor = {1, 0.3, 0.3}
         return
     end
     
-    controls.touchpressed(id, x, y)
+    local success, result, description = promoSystem.useCode(code, "player")
+    
+    if success then
+        coins = coins + result
+        saveGame()
+        
+        promoResult = description .. " +" .. result .. " coins!"
+        promoResultColor = {0.3, 1, 0.3}
+        playSound("success")
+        
+        promoInput = ""
+        promoCooldown = 2
+        
+        if keyboard.isActive() then
+            keyboard.hide()
+        end
+    else
+        promoResult = result
+        promoResultColor = {1, 0.3, 0.3}
+        playSound("error")
+    end
+    
+    print("Promo code activated: " .. code)
 end
 
-function game.touchmoved(id, x, y)
-    controls.touchmoved(id, x, y)
-end
-
-function game.touchreleased(id, x, y)
-    local shot, dx, dy = controls.touchreleased(id)
-    if shot then
-        playSound("shot")
-        
-        -- Модифицируем пулю через систему модов
-        local modified = modSystem.gameShoot(cube.x, cube.y, dx, dy)
-        
-        -- Создаём пулю с правильными типами данных
-        local bullet = {
-            x = tonumber(modified.x) or tonumber(cube.x) or 0,
-            y = tonumber(modified.y) or tonumber(cube.y) or 0,
-            vx = (tonumber(modified.dx) or tonumber(dx) or 0) * 400,
-            vy = (tonumber(modified.dy) or tonumber(dy) or 0) * 400
-        }
-        
-        table.insert(bullets, bullet)
+function lobby.handleTextInput(text)
+    if promoActive then
+        promoInput = promoInput .. text
     end
 end
 
-function game.setOnDeath(fn)
-    game.onDeath = fn
+function lobby.keypressed(key)
+    if key == "backspace" and promoActive then
+        promoInput = promoInput:sub(1, -2)
+    end
+    
+    if key == "return" or key == "enter" then
+        if promoActive and promoCooldown <= 0 then
+            activatePromoCode()
+        end
+    end
 end
 
-function game.setCoins(c)
-    coins = c
-end
-
-function game.setSkin(s)
-    selected_skin = s
-end
-
-return game
+return lobby
