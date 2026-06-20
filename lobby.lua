@@ -1,5 +1,6 @@
- local lobby = {}
+local lobby = {}
 local keyboard = require("game_keyboard")
+local gameInstaller = require("game_installer")
 
 local fontTitle, fontBtn
 local animTimer = 0
@@ -7,6 +8,14 @@ local coins = 0
 local shop_open = false
 local bgCanvas = nil
 local stars = {}
+
+-- Загрузка модов
+local modUploadOpen = false
+local modUploadStatus = ""
+local modUploadStatusColor = {1, 1, 1}
+local selectedModFile = nil
+local modUploadProgress = 0
+local modUploading = false
 
 local skins = {
     default = { name = "Default Cube", price = 0, owned = true },
@@ -20,7 +29,6 @@ local promoResult = ""
 local promoResultColor = {1, 1, 1}
 local promoCooldown = 0
 
--- ВСТРОЕННЫЕ ПРОМО-КОДЫ (без отдельного модуля)
 local promoCodes = {
     ["KAKAK"] = { reward = 100, description = "KAKAK!", maxUses = 999, used = 0 },
     ["KAKAK2026"] = { reward = 100, description = "Godzilla KAKAK!", maxUses = 999, used = 0 },
@@ -65,7 +73,6 @@ local function createBG()
     love.graphics.setCanvas()
 end
 
--- ЗАГРУЗКА ПРОМО-КОДОВ
 local function loadPromoCodes()
     local stats = love.filesystem.read("promo_stats.txt")
     if stats then
@@ -84,6 +91,68 @@ local function savePromoCodes()
         stats = stats .. code .. ":" .. info.used .. "\n"
     end
     love.filesystem.write("promo_stats.txt", stats)
+end
+
+function lobby.installModFromZIP(zipData, filename)
+    if modUploading then
+        modUploadStatus = "Already installing!"
+        modUploadStatusColor = {1, 0.3, 0.3}
+        return
+    end
+    
+    modUploading = true
+    modUploadProgress = 0
+    modUploadStatus = "Installing mod..."
+    modUploadStatusColor = {1, 1, 0}
+    
+    local function doInstall()
+        local success, result = pcall(function()
+            return gameInstaller.installModFromZIP(zipData, filename, {
+                title = "User Mod",
+                author = "Unknown",
+                version = "1.0"
+            })
+        end)
+        
+        modUploading = false
+        modUploadProgress = 100
+        
+        if success and result then
+            modUploadStatus = "✅ Mod installed! Restarting..."
+            modUploadStatusColor = {0.3, 1, 0.3}
+            playSound("success")
+            
+            love.timer.after(1.5, function()
+                love.event.quit("restart")
+            end)
+        else
+            modUploadStatus = "❌ Failed to install mod!"
+            modUploadStatusColor = {1, 0.3, 0.3}
+            playSound("error")
+        end
+    end
+    
+    local co = coroutine.create(doInstall)
+    coroutine.resume(co)
+end
+
+function lobby.filedropped(file)
+    if file:lower():match("%.zip$") then
+        local content = love.filesystem.read(file)
+        if content and #content > 0 then
+            modUploadStatus = "📦 Mod ready: " .. file
+            modUploadStatusColor = {0.3, 1, 0.3}
+            selectedModFile = { data = content, name = file }
+            modUploadOpen = true
+            playSound("click")
+            return true
+        end
+    else
+        modUploadStatus = "⚠️ Only .zip files supported!"
+        modUploadStatusColor = {1, 0.5, 0}
+        playSound("error")
+    end
+    return false
 end
 
 function lobby.load()
@@ -110,6 +179,13 @@ function lobby.load()
     end
     
     keyboard.init()
+    gameInstaller.init()
+    
+    local queueStatus = gameInstaller.getInstallStatus()
+    if queueStatus.installedMod then
+        modUploadStatus = "✅ Mod installed: " .. queueStatus.installedMod.title
+        modUploadStatusColor = {0.3, 1, 0.3}
+    end
 end
 
 function lobby.update(dt)
@@ -121,6 +197,10 @@ function lobby.update(dt)
     
     if keyboard.isActive() then
         keyboard.update(dt)
+    end
+    
+    if modUploading then
+        modUploadProgress = math.min(100, modUploadProgress + dt * 15)
     end
 end
 
@@ -168,50 +248,46 @@ function lobby.draw()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("SHOP", bx, h / 2 + 60, 240, "center")
 
-    -- PROMO CODE
-    love.graphics.setColor(0.8, 0.2, 0.8, 0.8)
+    -- LOAD MOD
+    love.graphics.setColor(0.8, 0.4, 0.2, 0.9)
     love.graphics.rectangle("fill", bx, h / 2 + 110, 240, 40, 10)
-    love.graphics.setColor(0.9, 0.3, 0.9, 0.3)
+    love.graphics.setColor(1, 0.5, 0.3, 0.3)
     love.graphics.rectangle("fill", bx + 5, h / 2 + 115, 230, 30, 8)
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fontBtn)
-    love.graphics.printf("PROMO CODE", bx, h / 2 + 123, 240, "center")
+    love.graphics.printf("📦 LOAD MOD", bx, h / 2 + 123, 240, "center")
+
+    -- PROMO CODE
+    love.graphics.setColor(0.8, 0.2, 0.8, 0.8)
+    love.graphics.rectangle("fill", bx, h / 2 + 165, 240, 40, 10)
+    love.graphics.setColor(0.9, 0.3, 0.9, 0.3)
+    love.graphics.rectangle("fill", bx + 5, h / 2 + 170, 230, 30, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("PROMO CODE", bx, h / 2 + 178, 240, "center")
+
+    if modUploadStatus ~= "" then
+        love.graphics.setColor(modUploadStatusColor)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf(modUploadStatus, bx, h / 2 + 155, 240, "center")
+    end
+    
+    if modUploading then
+        love.graphics.setColor(0, 0, 0, 0.7)
+        love.graphics.rectangle("fill", bx, h / 2 + 175, 240, 20, 5)
+        love.graphics.setColor(0.3, 1, 0.3, 0.8)
+        love.graphics.rectangle("fill", bx + 2, h / 2 + 177, (238 * modUploadProgress / 100), 16, 4)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf(math.floor(modUploadProgress) .. "%", bx, h / 2 + 178, 240, "center")
+    end
+
+    if modUploadOpen and selectedModFile then
+        drawModInstallConfirm(w, h)
+    end
 
     if promoActive then
-        local inputX = bx
-        local inputY = h / 2 + 160
-        local inputW = 240
-        local inputH = 40
-        
-        love.graphics.setColor(0.1, 0.05, 0.2, 0.95)
-        love.graphics.rectangle("fill", inputX, inputY, inputW, inputH, 8)
-        
-        love.graphics.setColor(0.5, 0.2, 1, 0.5)
-        love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", inputX, inputY, inputW, inputH, 8)
-        
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.setFont(fontBtn)
-        local displayText = promoInput or ""
-        if displayText == "" then
-            love.graphics.setColor(0.5, 0.5, 0.5)
-            love.graphics.printf("Tap to enter code...", inputX + 10, inputY + 10, inputW - 20, "left")
-        else
-            love.graphics.setColor(1, 1, 0)
-            love.graphics.printf(displayText, inputX + 10, inputY + 10, inputW - 20, "left")
-        end
-        
-        love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
-        love.graphics.rectangle("fill", inputX + inputW - 60, inputY + 5, 55, 30, 6)
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.setFont(fontBtn)
-        love.graphics.printf("OK", inputX + inputW - 60, inputY + 10, 55, "center")
-        
-        if promoResult ~= "" then
-            love.graphics.setColor(promoResultColor)
-            love.graphics.setFont(fontBtn)
-            love.graphics.printf(promoResult, inputX, inputY + 50, inputW, "center")
-        end
+        drawPromoInput(bx, h)
     end
 
     if shop_open then
@@ -220,6 +296,85 @@ function lobby.draw()
     
     if keyboard.isActive() then
         keyboard.draw()
+    end
+end
+
+function drawModInstallConfirm(w, h)
+    local sw, sh = 400, 220
+    local sx, sy = w / 2 - sw / 2, h / 2 - sh / 2
+    
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", sx + 10, sy + 10, sw, sh, 15)
+    
+    love.graphics.setColor(0.1, 0.05, 0.25, 0.95)
+    love.graphics.rectangle("fill", sx, sy, sw, sh, 15)
+    
+    love.graphics.setColor(0.8, 0.4, 1, 0.3)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", sx + 5, sy + 5, sw - 10, sh - 10, 12)
+    
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontTitle)
+    love.graphics.printf("📦 Install Mod", sx, sy + 15, sw, "center")
+    
+    love.graphics.setColor(1, 1, 0)
+    love.graphics.setFont(fontBtn)
+    local fname = selectedModFile.name or "mod.zip"
+    if #fname > 20 then fname = fname:sub(1, 18) .. "..." end
+    love.graphics.printf("File: " .. fname, sx + 20, sy + 70, sw - 40, "center")
+    
+    love.graphics.setColor(0.7, 0.7, 0.7)
+    love.graphics.printf("This will replace game files!", sx + 20, sy + 100, sw - 40, "center")
+    love.graphics.setColor(1, 0.5, 0.3)
+    love.graphics.printf("⚠️ Make sure it's safe!", sx + 20, sy + 125, sw - 40, "center")
+    
+    love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
+    love.graphics.rectangle("fill", sx + 30, sy + 160, 150, 40, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("✅ INSTALL", sx + 30, sy + 170, 150, "center")
+    
+    love.graphics.setColor(0.8, 0.2, 0.2, 0.9)
+    love.graphics.rectangle("fill", sx + sw - 180, sy + 160, 150, 40, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("❌ CANCEL", sx + sw - 180, sy + 170, 150, "center")
+end
+
+function drawPromoInput(bx, h)
+    local inputX = bx
+    local inputY = h / 2 + 215
+    local inputW = 240
+    local inputH = 40
+    
+    love.graphics.setColor(0.1, 0.05, 0.2, 0.95)
+    love.graphics.rectangle("fill", inputX, inputY, inputW, inputH, 8)
+    
+    love.graphics.setColor(0.5, 0.2, 1, 0.5)
+    love.graphics.setLineWidth(2)
+    love.graphics.rectangle("line", inputX, inputY, inputW, inputH, 8)
+    
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    local displayText = promoInput or ""
+    if displayText == "" then
+        love.graphics.setColor(0.5, 0.5, 0.5)
+        love.graphics.printf("Tap to enter code...", inputX + 10, inputY + 10, inputW - 20, "left")
+    else
+        love.graphics.setColor(1, 1, 0)
+        love.graphics.printf(displayText, inputX + 10, inputY + 10, inputW - 20, "left")
+    end
+    
+    love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
+    love.graphics.rectangle("fill", inputX + inputW - 60, inputY + 5, 55, 30, 6)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("OK", inputX + inputW - 60, inputY + 10, 55, "center")
+    
+    if promoResult ~= "" then
+        love.graphics.setColor(promoResultColor)
+        love.graphics.setFont(fontBtn)
+        love.graphics.printf(promoResult, inputX, inputY + 50, inputW, "center")
     end
 end
 
@@ -306,10 +461,34 @@ function lobby.touchpressed(id, x, y)
         end
     end
 
+    if modUploadOpen and selectedModFile then
+        local sw, sh = 400, 220
+        local sx, sy = w / 2 - sw / 2, h / 2 - sh / 2
+        
+        if x >= sx + 30 and x <= sx + 180 and y >= sy + 160 and y <= sy + 200 then
+            playSound("click")
+            modUploadOpen = false
+            lobby.installModFromZIP(selectedModFile.data, selectedModFile.name)
+            selectedModFile = nil
+            return
+        end
+        
+        if x >= sx + sw - 180 and x <= sx + sw - 30 and y >= sy + 160 and y <= sy + 200 then
+            playSound("click")
+            modUploadOpen = false
+            selectedModFile = nil
+            modUploadStatus = "Cancelled"
+            modUploadStatusColor = {1, 0.5, 0}
+            return
+        end
+        
+        return
+    end
+
     local bx = w / 2 - 120
     
-    -- PLAY
     if x >= bx and x <= bx + 240 then
+        -- PLAY
         if y >= h / 2 - 20 and y <= h / 2 + 30 then
             playSound("click")
             local g = require("game")
@@ -327,8 +506,16 @@ function lobby.touchpressed(id, x, y)
             return
         end
         
-        -- PROMO CODE
+        -- LOAD MOD
         if y >= h / 2 + 110 and y <= h / 2 + 150 then
+            playSound("click")
+            modUploadStatus = "📂 Drag & drop .zip file"
+            modUploadStatusColor = {0.3, 1, 1}
+            return
+        end
+        
+        -- PROMO CODE
+        if y >= h / 2 + 165 and y <= h / 2 + 205 then
             playSound("click")
             promoActive = not promoActive
             if promoActive then
@@ -342,10 +529,9 @@ function lobby.touchpressed(id, x, y)
         end
     end
     
-    -- PROMO CODE INPUT
     if promoActive then
         local inputX = bx
-        local inputY = h / 2 + 160
+        local inputY = h / 2 + 215
         local inputW = 240
         local inputH = 40
         
@@ -362,7 +548,6 @@ function lobby.touchpressed(id, x, y)
         end
     end
 
-    -- SHOP
     if shop_open then
         local shop_w, shop_h = 400, 300
         local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
@@ -409,7 +594,6 @@ function activatePromoCode()
         return
     end
     
-    -- Проверка кода
     if not promoCodes[code] then
         promoResult = "Invalid promo code!"
         promoResultColor = {1, 0.3, 0.3}
@@ -419,7 +603,6 @@ function activatePromoCode()
     
     local promo = promoCodes[code]
     
-    -- Проверка использовался ли уже
     if usedByPlayer[code] then
         promoResult = "You already used this code!"
         promoResultColor = {1, 0.3, 0.3}
@@ -427,7 +610,6 @@ function activatePromoCode()
         return
     end
     
-    -- Проверка лимита
     if promo.used >= promo.maxUses then
         promoResult = "This code is no longer active!"
         promoResultColor = {1, 0.3, 0.3}
@@ -435,7 +617,6 @@ function activatePromoCode()
         return
     end
     
-    -- Активация
     promo.used = promo.used + 1
     usedByPlayer[code] = true
     coins = coins + promo.reward
