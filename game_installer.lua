@@ -1,7 +1,6 @@
 -- ============================================================
 -- MODULE: game_installer.lua
 -- Full game replacement system through mods
--- Version: 1.0
 -- ============================================================
 
 local gameInstaller = {}
@@ -33,16 +32,9 @@ local backupFiles = {}
 local installLog = {}
 local isInitialized = false
 
--- ============================================================
--- 1. INITIALIZATION
--- ============================================================
-
 function gameInstaller.init()
     if isInitialized then return true end
     
-    print("Initializing mod installation system...")
-    
-    -- Create folders
     local folders = {
         CONFIG.backupFolder,
         CONFIG.tempFolder,
@@ -52,65 +44,45 @@ function gameInstaller.init()
     for _, folder in ipairs(folders) do
         if not love.filesystem.getInfo(folder) then
             love.filesystem.createDirectory(folder)
-            print("Created folder: " .. folder)
         end
     end
     
-    -- Check install queue
     gameInstaller.checkInstallQueue()
     
-    -- Check restart flag
     if gameInstaller.checkForRestart() then
-        print("Game restarted with new mod!")
         gameInstaller.log("Game restarted", "INFO")
     end
     
-    -- Check safe mode
     if gameInstaller.checkSafeMode() then
-        print("Safe mode activated!")
         gameInstaller.log("Safe mode activated", "WARNING")
     end
     
     isInitialized = true
-    print("Mod installation system initialized!")
     return true
 end
 
--- ============================================================
--- 2. INSTALL MOD FROM ZIP
--- ============================================================
-
 function gameInstaller.installModFromZIP(zipData, zipName, modInfo)
     if isInstalling then
-        print("Already installing!")
         gameInstaller.log("Attempted install during another install", "WARNING")
         return false
     end
     
     isInstalling = true
     gameInstaller.log("Starting install: " .. zipName, "INFO")
-    print("Installing mod: " .. zipName)
     
-    -- Create temp file
     local tempPath = CONFIG.tempFolder .. zipName
     love.filesystem.write(tempPath, zipData)
-    print("Temp file created: " .. tempPath)
     
-    -- Unzip
     local success, files = pcall(function()
         return gameInstaller.unzip(tempPath)
     end)
     
     if not success or not files then
-        print("Failed to unzip")
         gameInstaller.log("Failed to unzip", "ERROR")
         isInstalling = false
         return false
     end
     
-    print("Unzipped files: " .. gameInstaller.tableLength(files))
-    
-    -- Check for main game files
     local hasGame = false
     for filename, _ in pairs(files) do
         if filename:match("main%.lua$") or 
@@ -122,31 +94,22 @@ function gameInstaller.installModFromZIP(zipData, zipName, modInfo)
     end
     
     if not hasGame then
-        print("Mod missing main.lua, game.lua or conf.lua!")
         gameInstaller.log("Mod missing main game files", "ERROR")
         isInstalling = false
         return false
     end
     
-    -- Create backup
     gameInstaller.createBackup()
     
-    -- Install files
     success = gameInstaller.installFiles(files, modInfo)
     
     if success then
-        print("Mod installed! Restarting game...")
         gameInstaller.log("Mod installed: " .. zipName, "SUCCESS")
         isInstalling = false
-        
-        -- Save install info
         gameInstaller.saveInstallInfo(zipName, modInfo)
-        
-        -- Restart game
         gameInstaller.restartGame()
         return true
     else
-        print("Install failed! Restoring...")
         gameInstaller.log("Install failed, restoring", "ERROR")
         gameInstaller.restoreBackup()
         isInstalling = false
@@ -154,15 +117,9 @@ function gameInstaller.installModFromZIP(zipData, zipName, modInfo)
     end
 end
 
--- ============================================================
--- 3. FILE OPERATIONS
--- ============================================================
-
 function gameInstaller.createBackup()
-    print("Creating backup...")
     backupFiles = {}
     
-    -- Get all files in root
     local files = love.filesystem.getDirectoryItems(".")
     
     for _, file in ipairs(files) do
@@ -175,21 +132,17 @@ function gameInstaller.createBackup()
         end
     end
     
-    -- Save backup to file
     local backupData = love.data.encode("json", backupFiles)
     local backupName = "backup_" .. os.time() .. ".json"
     love.filesystem.write(CONFIG.backupFolder .. backupName, backupData)
     
-    print("Backup created: " .. gameInstaller.tableLength(backupFiles) .. " files")
     gameInstaller.log("Backup created: " .. gameInstaller.tableLength(backupFiles) .. " files", "INFO")
     return backupName
 end
 
 function gameInstaller.restoreBackup()
-    print("Restoring from backup...")
     gameInstaller.log("Starting restore from backup", "INFO")
     
-    -- Find latest backup
     local backupFilesList = love.filesystem.getDirectoryItems(CONFIG.backupFolder)
     local latestBackup = nil
     local latestTime = 0
@@ -208,13 +161,9 @@ function gameInstaller.restoreBackup()
         local data = love.filesystem.read(CONFIG.backupFolder .. latestBackup)
         if data then
             backupFiles = love.data.decode("json", data)
-            if backupFiles then
-                print("Found backup: " .. latestBackup)
-            end
         end
     end
     
-    -- Delete all files (except protected)
     local files = love.filesystem.getDirectoryItems(".")
     local deleted = 0
     
@@ -239,16 +188,12 @@ function gameInstaller.restoreBackup()
         end
     end
     
-    print("Deleted files: " .. deleted)
-    
-    -- Restore from backup
     local restored = 0
     for filename, content in pairs(backupFiles) do
         love.filesystem.write(filename, content)
         restored = restored + 1
     end
     
-    print("Restored files: " .. restored)
     gameInstaller.log("Restored files: " .. restored, "INFO")
 end
 
@@ -267,13 +212,10 @@ function gameInstaller.removeDirectory(dir)
 end
 
 function gameInstaller.installFiles(files, modInfo)
-    print("Installing new files...")
     local installed = 0
     local skipped = 0
     
-    -- Write new files
     for filename, content in pairs(files) do
-        -- Check if protected
         local isProtected = false
         for _, p in ipairs(CONFIG.protectedFiles) do
             if filename:match(p) or filename:find(p) or filename == p then
@@ -283,7 +225,6 @@ function gameInstaller.installFiles(files, modInfo)
         end
         
         if not isProtected then
-            -- Create folders if needed
             local pathParts = {}
             for part in filename:gmatch("[^/]+") do
                 table.insert(pathParts, part)
@@ -295,7 +236,6 @@ function gameInstaller.installFiles(files, modInfo)
                     currentPath = currentPath .. pathParts[i] .. "/"
                     if not love.filesystem.getInfo(currentPath) then
                         love.filesystem.createDirectory(currentPath)
-                        print("Created folder: " .. currentPath)
                     end
                 end
             end
@@ -307,26 +247,18 @@ function gameInstaller.installFiles(files, modInfo)
         end
     end
     
-    print("Installed: " .. installed .. ", skipped: " .. skipped)
     gameInstaller.log("Installed: " .. installed .. ", skipped: " .. skipped, "INFO")
     return true
 end
 
--- ============================================================
--- 4. UNZIP
--- ============================================================
-
 function gameInstaller.unzip(zipPath)
-    print("Unzipping: " .. zipPath)
     local files = {}
     local content = love.filesystem.read(zipPath)
     
     if not content then
-        print("Failed to read ZIP")
         return false, nil
     end
     
-    -- Simple ZIP parser
     local pos = 1
     local fileCount = 0
     local maxPos = #content
@@ -335,7 +267,6 @@ function gameInstaller.unzip(zipPath)
         local sig = content:sub(pos, pos+3)
         
         if sig == "PK\3\4" then
-            -- File header
             local nameLen = string.byte(content, pos+26) or 0
             local extraLen = string.byte(content, pos+28) or 0
             local fileName = content:sub(pos+30, pos+30+nameLen-1)
@@ -349,9 +280,6 @@ function gameInstaller.unzip(zipPath)
                 if fileData and #fileData > 0 then
                     files[fileName] = fileData
                     fileCount = fileCount + 1
-                    if fileCount % 10 == 0 then
-                        print("Unzipped " .. fileCount .. " files...")
-                    end
                 end
             end
             
@@ -360,32 +288,23 @@ function gameInstaller.unzip(zipPath)
             pos = pos + 1
         end
         
-        -- Safety
         if pos > maxPos then break end
         if pos < 1 then break end
     end
     
-    -- Remove temp file
     love.filesystem.remove(zipPath)
     
-    print("Unzipped files: " .. fileCount)
     return true, files
 end
-
--- ============================================================
--- 5. INSTALL QUEUE
--- ============================================================
 
 function gameInstaller.checkInstallQueue()
     local installFile = "pending_install.json"
     local data = love.filesystem.read(installFile)
     
     if data then
-        print("Found install file!")
         local installData = love.data.decode("json", data)
         
         if installData and installData.modId then
-            print("Mod to install: " .. (installData.title or "No title"))
             gameInstaller.log("Found mod in queue: " .. installData.title, "INFO")
             
             local success = gameInstaller.installModFromZIP(
@@ -396,31 +315,20 @@ function gameInstaller.checkInstallQueue()
             
             if success then
                 love.filesystem.remove(installFile)
-                print("Mod installed from queue!")
                 gameInstaller.log("Mod installed from queue", "SUCCESS")
             else
-                print("Failed to install from queue!")
                 gameInstaller.log("Failed to install from queue", "ERROR")
             end
         else
             love.filesystem.remove(installFile)
-            print("Invalid install file")
         end
     end
 end
 
--- ============================================================
--- 6. RESTART GAME
--- ============================================================
-
 function gameInstaller.restartGame()
-    print("Restarting game...")
     gameInstaller.log("Restarting game", "INFO")
     
-    -- Save restart flag
     love.filesystem.write("restart.flag", "true")
-    
-    -- Quit game
     love.event.quit("restart")
 end
 
@@ -432,10 +340,6 @@ function gameInstaller.checkForRestart()
     end
     return false
 end
-
--- ============================================================
--- 7. MOD MANAGEMENT
--- ============================================================
 
 function gameInstaller.saveInstallInfo(zipName, modInfo)
     local info = {
@@ -451,7 +355,6 @@ function gameInstaller.saveInstallInfo(zipName, modInfo)
     local json = love.data.encode("json", info)
     love.filesystem.write("installed_mod.json", json)
     
-    print("Mod info saved: " .. info.title)
     gameInstaller.log("Saved mod info: " .. info.title, "INFO")
 end
 
@@ -466,21 +369,15 @@ end
 function gameInstaller.uninstallMod()
     local modInfo = gameInstaller.getInstalledMod()
     if not modInfo then
-        print("No mod installed")
         gameInstaller.log("Attempted uninstall but no mod", "WARNING")
         return false
     end
     
-    print("Uninstalling mod: " .. modInfo.title)
     gameInstaller.log("Uninstalling mod: " .. modInfo.title, "INFO")
     
-    -- Restore backup
     gameInstaller.restoreBackup()
-    
-    -- Remove info file
     love.filesystem.remove("installed_mod.json")
     
-    print("Mod uninstalled!")
     gameInstaller.log("Mod uninstalled", "INFO")
     return true
 end
@@ -510,28 +407,18 @@ function gameInstaller.getInstalledMods()
     return mods
 end
 
--- ============================================================
--- 8. SAFE MODE
--- ============================================================
-
 function gameInstaller.enterSafeMode()
-    print("Entering safe mode...")
     gameInstaller.log("Entering safe mode", "WARNING")
     
-    -- Create backup
     gameInstaller.createBackup()
     
-    -- Delete all mods
     local mods = love.filesystem.getDirectoryItems(CONFIG.modsFolder)
     for _, mod in ipairs(mods) do
         love.filesystem.remove(CONFIG.modsFolder .. mod)
-        print("Deleted mod: " .. mod)
     end
     
-    -- Create safe mode flag
     love.filesystem.write("safe_mode.flag", "true")
     
-    print("Safe mode activated!")
     gameInstaller.log("Safe mode activated", "INFO")
     gameInstaller.restartGame()
 end
@@ -544,10 +431,6 @@ function gameInstaller.checkSafeMode()
     end
     return false
 end
-
--- ============================================================
--- 9. LOGGING
--- ============================================================
 
 function gameInstaller.log(message, level)
     level = level or "INFO"
@@ -566,10 +449,6 @@ function gameInstaller.clearLog()
     installLog = {}
     love.filesystem.remove("install_log.txt")
 end
-
--- ============================================================
--- 10. HELPER FUNCTIONS
--- ============================================================
 
 function gameInstaller.tableLength(t)
     local count = 0
@@ -597,12 +476,7 @@ function gameInstaller.getFileSize(filename)
     return 0
 end
 
--- ============================================================
--- 11. API
--- ============================================================
-
 function gameInstaller.installFromURL(url)
-    print("Downloading mod from: " .. url)
     gameInstaller.log("Downloading mod: " .. url, "INFO")
     love.system.openURL(url)
 end
@@ -619,7 +493,6 @@ end
 
 function gameInstaller.exportBackup()
     if gameInstaller.tableLength(backupFiles) == 0 then
-        print("No backup")
         return nil
     end
     
@@ -627,7 +500,6 @@ function gameInstaller.exportBackup()
     local filename = "backup_export_" .. os.time() .. ".json"
     love.filesystem.write(filename, backupData)
     
-    print("Backup exported: " .. filename)
     gameInstaller.log("Backup exported: " .. filename, "INFO")
     return filename
 end
@@ -635,60 +507,29 @@ end
 function gameInstaller.importBackup(filename)
     local data = love.filesystem.read(filename)
     if not data then
-        print("File not found")
         return false
     end
     
     local backupData = love.data.decode("json", data)
     if not backupData then
-        print("Failed to read backup")
         return false
     end
     
     backupFiles = backupData
-    print("Backup imported: " .. gameInstaller.tableLength(backupFiles) .. " files")
     gameInstaller.log("Backup imported: " .. gameInstaller.tableLength(backupFiles) .. " files", "INFO")
     return true
 end
 
--- ============================================================
--- 12. DIAGNOSTICS
--- ============================================================
-
 function gameInstaller.diagnose()
-    print("========== INSTALLER DIAGNOSTICS ==========")
-    print("Initialized: " .. tostring(isInitialized))
-    print("Installing: " .. tostring(isInstalling))
-    print("Backup count: " .. gameInstaller.tableLength(backupFiles))
-    print("Log size: " .. #installLog)
-    
-    local installed = gameInstaller.getInstalledMod()
-    if installed then
-        print("Installed mod: " .. installed.title)
-        print("  Author: " .. installed.author)
-        print("  Version: " .. installed.version)
-        print("  Date: " .. installed.date)
-    else
-        print("No mod installed")
-    end
-    
-    print("Folders:")
-    local folders = {"", CONFIG.modsFolder, CONFIG.backupFolder, CONFIG.tempFolder}
-    for _, folder in ipairs(folders) do
-        local exists = love.filesystem.getInfo(folder)
-        print("  " .. folder .. ": " .. (exists and "OK" or "MISSING"))
-    end
-    
-    print("============================================")
+    return {
+        initialized = isInitialized,
+        installing = isInstalling,
+        backupCount = gameInstaller.tableLength(backupFiles),
+        logSize = #installLog,
+        installedMod = gameInstaller.getInstalledMod()
+    }
 end
-
--- ============================================================
--- 13. AUTO INIT
--- ============================================================
 
 gameInstaller.init()
 
--- ============================================================
--- RETURN MODULE
--- ============================================================
 return gameInstaller
