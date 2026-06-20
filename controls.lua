@@ -1,8 +1,10 @@
 local controls = {}
 local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
 local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
-local aim = { x = 0, y = -1 }
 local font = nil
+
+-- Направление движения (для стрельбы)
+local moveDir = { x = 0, y = -1 }
 
 -- Клавиатурное управление
 local keys = {
@@ -39,7 +41,9 @@ function controls.getMove()
         local dx, dy = joy.sx - joy.cx, joy.sy - joy.cy
         local len = math.sqrt(dx*dx + dy*dy)
         if len == 0 then return 0, 0 end
-        return dx/len, dy/len
+        moveDir.x = dx/len
+        moveDir.y = dy/len
+        return moveDir.x, moveDir.y
     end
     
     -- Потом клавиатуру
@@ -56,14 +60,22 @@ function controls.getMove()
         dy = dy / len
     end
     
+    if dx ~= 0 or dy ~= 0 then
+        moveDir.x = dx
+        moveDir.y = dy
+    end
+    
     return dx, dy
 end
 
 function controls.getAim()
-    return aim.x, aim.y
+    -- Возвращаем направление движения
+    return moveDir.x, moveDir.y
 end
 
-function controls.isAiming() return atk.hold end
+function controls.isAiming() 
+    return atk.hold 
+end
 
 function controls.touchpressed(id, x, y)
     -- Joystick
@@ -71,6 +83,12 @@ function controls.touchpressed(id, x, y)
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
         joy.sx, joy.sy = x, y
+        -- Обновляем направление при касании джойстика
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len > 5 then
+            moveDir.x = dx / len
+            moveDir.y = dy / len
+        end
     end
     
     -- Attack button
@@ -78,13 +96,6 @@ function controls.touchpressed(id, x, y)
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
-        local len = math.sqrt(ax*ax + ay*ay)
-        if len > 5 then
-            aim.x = ax / len
-            aim.y = ay / len
-        else
-            aim.x, aim.y = 0, -1
-        end
     end
 end
 
@@ -96,15 +107,16 @@ function controls.touchmoved(id, x, y)
             dx, dy = dx/len*joy.r, dy/len*joy.r
         end
         joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
+        
+        -- Обновляем направление движения
+        if len > 5 then
+            moveDir.x = dx / len
+            moveDir.y = dy / len
+        end
     end
     
     if id == atk.id then
-        local ax, ay = x - atk.x, y - atk.y
-        local len = math.sqrt(ax*ax + ay*ay)
-        if len > 5 then
-            aim.x = ax / len
-            aim.y = ay / len
-        end
+        -- При удержании кнопки атаки ничего не делаем
     end
 end
 
@@ -121,9 +133,10 @@ function controls.touchreleased(id)
         atk.id = nil
         atk.hold = false
         shot = true
-        dx, dy = aim.x, aim.y
+        -- Стреляем в направлении движения
+        dx, dy = moveDir.x, moveDir.y
         if dx == 0 and dy == 0 then
-            dy = -1
+            dy = -1 -- По умолчанию вверх
         end
     end
     
@@ -141,10 +154,8 @@ function controls.keypressed(key)
     
     if key == "space" then 
         keys.space = true
-        -- Имитация нажатия на кнопку атаки
         atk.id = -1
         atk.hold = true
-        aim.x, aim.y = 0, -1
     end
 end
 
@@ -156,12 +167,15 @@ function controls.keyreleased(key)
     
     if key == "space" then 
         keys.space = false
-        -- Имитация отпускания кнопки атаки
         if atk.id == -1 then
             atk.id = nil
             atk.hold = false
-            -- Возвращаем данные для выстрела
-            return true, aim.x, aim.y
+            -- Стреляем в направлении движения
+            local dx, dy = moveDir.x, moveDir.y
+            if dx == 0 and dy == 0 then
+                dy = -1
+            end
+            return true, dx, dy
         end
     end
 end
@@ -181,17 +195,17 @@ function controls.draw()
     love.graphics.setColor(0.5, 0, 1, 0.6)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
     
-    -- Aim line
+    -- Показываем направление движения на кнопке атаки
     if atk.hold then
         love.graphics.setColor(1, 1, 1, 0.6)
         love.graphics.setLineWidth(3)
         local len = 35
         love.graphics.line(
             atk.x, atk.y,
-            atk.x + aim.x * len,
-            atk.y + aim.y * len
+            atk.x + moveDir.x * len,
+            atk.y + moveDir.y * len
         )
-        love.graphics.circle("fill", atk.x + aim.x * len, atk.y + aim.y * len, 4)
+        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 4)
     end
     
     -- Button text
@@ -204,7 +218,7 @@ function controls.draw()
     -- Подсказка по клавиатуре
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(font or love.graphics.newFont(14))
-    love.graphics.printf("WASD - Move | SPACE - Shot", 10, 10, 400, "left")
+    love.graphics.printf("WASD - Move | SPACE - Shot in direction", 10, 10, 400, "left")
 end
 
 return controls
