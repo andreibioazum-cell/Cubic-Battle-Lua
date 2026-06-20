@@ -1,224 +1,282 @@
-local controls = {}
-local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
-local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
-local font = nil
+local controls = require("controls")
+local enemy = require("enemy")
+local game = {}
 
--- Направление движения (для стрельбы)
-local moveDir = { x = 0, y = -1 }
+local WORLD_SIZE = 3000
+local cube = { x = 1500, y = 1500, speed = 260, hp = 5, angle = 0, hit = 0 }
+local cam = { x = 0, y = 0 }
+local bullets = {}
+local coins = 0
+local selected_skin = "default"
+local dead = false
+local bg = nil
+local playerImg = nil
+local diamondImg = nil
+local menuFont = nil
 
--- Клавиатурное управление
-local keys = {
-    up = false,
-    down = false,
-    left = false,
-    right = false,
-    space = false
-}
-
-function controls.load()
-    local success, err = pcall(function()
-        font = love.graphics.newFont(20)
+-- Безопасная загрузка изображений
+local function safeLoadImage(name, fallbackColor)
+    local success, img = pcall(function()
+        return love.graphics.newImage(name)
     end)
-    if not success then
-        font = love.graphics.newFont(20)
+    if success and img then
+        return img
+    else
+        -- Создаем цветной квадрат
+        local canvas = love.graphics.newCanvas(64, 64)
+        love.graphics.setCanvas(canvas)
+        love.graphics.clear(fallbackColor or {1, 1, 1, 1})
+        love.graphics.setCanvas()
+        print("Warning: Could not load " .. name .. ", using fallback")
+        return canvas
     end
-    controls.resize()
 end
 
-function controls.resize()
-    local w, h = love.graphics.getDimensions()
-    joy.cy = h - 90
-    joy.sy = joy.cy
-    atk.x = w - 90
-    atk.y = h - 90
+function game.load()
+    controls.load()
+    
+    menuFont = love.graphics.newFont(16)
+    
+    cube.x, cube.y = 1500, 1500
+    cube.hp = 5
+    dead = false
+    bullets = {}
+    
+    -- Загружаем изображения с fallback
+    bg = safeLoadImage("grass.png", {0.2, 0.5, 0.2, 1})
+    if bg.setWrap then
+        bg:setWrap("repeat", "repeat")
+    end
+    
+    playerImg = safeLoadImage("player.png", {0, 0.5, 1, 1})
+    diamondImg = safeLoadImage("player_diamond.png", {0, 1, 1, 1})
+    
+    enemy.load()
+    enemy.reset()
+    enemy.spawnNow(cube.x + 300, cube.y + 300)
+    enemy.setDeathCallback(function()
+        coins = coins + 50
+        _G.GameState.current = "lobby"
+    end)
 end
 
-function controls.update(dt) end
+function game.update(dt)
+    if dead then return end
+    controls.update(dt)
 
-function controls.getMove()
-    -- Сначала проверяем сенсор/мышь
-    if joy.id then
-        local dx, dy = joy.sx - joy.cx, joy.sy - joy.cy
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len == 0 then return 0, 0 end
-        moveDir.x = dx/len
-        moveDir.y = dy/len
-        return moveDir.x, moveDir.y
-    end
-    
-    -- Потом клавиатуру
-    local dx, dy = 0, 0
-    if keys.left then dx = -1 end
-    if keys.right then dx = 1 end
-    if keys.up then dy = -1 end
-    if keys.down then dy = 1 end
-    
-    -- Нормализация для диагонального движения
-    if dx ~= 0 and dy ~= 0 then
-        local len = math.sqrt(2)
-        dx = dx / len
-        dy = dy / len
-    end
-    
+    local dx, dy = controls.getMove()
+    cube.x = math.max(0, math.min(WORLD_SIZE, cube.x + dx * cube.speed * dt))
+    cube.y = math.max(0, math.min(WORLD_SIZE, cube.y + dy * cube.speed * dt))
     if dx ~= 0 or dy ~= 0 then
-        moveDir.x = dx
-        moveDir.y = dy
+        cube.angle = math.atan2(dy, dx) + math.pi / 2
     end
-    
-    return dx, dy
-end
 
-function controls.getAim()
-    -- Возвращаем направление движения
-    return moveDir.x, moveDir.y
-end
+    local sw, sh = love.graphics.getDimensions()
+    cam.x = cam.x + (cube.x - sw / 2 - cam.x) * 5 * dt
+    cam.y = cam.y + (cube.y - sh / 2 - cam.y) * 5 * dt
 
-function controls.isAiming() 
-    return atk.hold 
-end
-
-function controls.touchpressed(id, x, y)
-    -- Joystick
-    local dx, dy = x - joy.cx, y - joy.cy
-    if dx*dx + dy*dy < joy.r*joy.r then
-        joy.id = id
-        joy.sx, joy.sy = x, y
-        -- Обновляем направление при касании джойстика
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len > 5 then
-            moveDir.x = dx / len
-            moveDir.y = dy / len
-        end
-    end
-    
-    -- Attack button
-    local ax, ay = x - atk.x, y - atk.y
-    if ax*ax + ay*ay < atk.r*atk.r then
-        atk.id = id
-        atk.hold = true
-    end
-end
-
-function controls.touchmoved(id, x, y)
-    if id == joy.id then
-        local dx, dy = x - joy.cx, y - joy.cy
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len > joy.r then
-            dx, dy = dx/len*joy.r, dy/len*joy.r
-        end
-        joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
-        
-        -- Обновляем направление движения
-        if len > 5 then
-            moveDir.x = dx / len
-            moveDir.y = dy / len
-        end
-    end
-    
-    if id == atk.id then
-        -- При удержании кнопки атаки ничего не делаем
-    end
-end
-
-function controls.touchreleased(id)
-    local shot = false
-    local dx, dy = 0, 0
-    
-    if id == joy.id then
-        joy.id = nil
-        joy.sx, joy.sy = joy.cx, joy.cy
-    end
-    
-    if id == atk.id then
-        atk.id = nil
-        atk.hold = false
-        shot = true
-        -- Стреляем в направлении движения
-        dx, dy = moveDir.x, moveDir.y
-        if dx == 0 and dy == 0 then
-            dy = -1 -- По умолчанию вверх
-        end
-    end
-    
-    return shot, dx, dy
-end
-
--- ============================================================
--- УПРАВЛЕНИЕ С КЛАВИАТУРЫ
--- ============================================================
-function controls.keypressed(key)
-    if key == "w" or key == "up" then keys.up = true end
-    if key == "s" or key == "down" then keys.down = true end
-    if key == "a" or key == "left" then keys.left = true end
-    if key == "d" or key == "right" then keys.right = true end
-    
-    if key == "space" then 
-        keys.space = true
-        atk.id = -1
-        atk.hold = true
-    end
-end
-
-function controls.keyreleased(key)
-    if key == "w" or key == "up" then keys.up = false end
-    if key == "s" or key == "down" then keys.down = false end
-    if key == "a" or key == "left" then keys.left = false end
-    if key == "d" or key == "right" then keys.right = false end
-    
-    if key == "space" then 
-        keys.space = false
-        if atk.id == -1 then
-            atk.id = nil
-            atk.hold = false
-            -- Стреляем в направлении движения
-            local dx, dy = moveDir.x, moveDir.y
-            if dx == 0 and dy == 0 then
-                dy = -1
+    for i = #bullets, 1, -1 do
+        local b = bullets[i]
+        if b and type(b.x) == "number" and type(b.y) == "number" then
+            b.x = b.x + b.vx * dt
+            b.y = b.y + b.vy * dt
+            if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
+                table.remove(bullets, i)
             end
-            return true, dx, dy
+        else
+            table.remove(bullets, i)
+        end
+    end
+
+    enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
+        cube.hp = cube.hp - dmg
+        if cube.hp <= 0 then
+            dead = true
+            if game.onDeath then
+                game.onDeath()
+            end
+            _G.GameState.current = "lobby"
+        end
+    end)
+end
+
+function game.draw()
+    love.graphics.push()
+    love.graphics.translate(-cam.x, -cam.y)
+
+    local sw, sh = love.graphics.getDimensions()
+    local tw = bg and bg:getWidth() or 64
+    local th = bg and bg:getHeight() or 64
+    
+    if bg then
+        for x = math.floor(cam.x / tw) * tw, cam.x + sw, tw do
+            for y = math.floor(cam.y / th) * th, cam.y + sh, th do
+                love.graphics.draw(bg, x, y)
+            end
+        end
+    else
+        -- Если нет фона, рисуем зеленый
+        love.graphics.setColor(0.2, 0.5, 0.2)
+        love.graphics.rectangle("fill", 0, 0, WORLD_SIZE, WORLD_SIZE)
+    end
+
+    enemy.draw()
+
+    love.graphics.setColor(1, 1, 1)
+    local img = selected_skin == "diamond" and diamondImg or playerImg
+    if img then
+        local w = img:getWidth() or 64
+        local h = img:getHeight() or 64
+        love.graphics.draw(
+            img, cube.x, cube.y,
+            cube.angle,
+            55 / w, 55 / h,
+            w / 2, h / 2
+        )
+    else
+        -- Если нет изображения, рисуем синий квадрат
+        love.graphics.setColor(0, 0.5, 1)
+        love.graphics.rectangle("fill", cube.x - 27, cube.y - 27, 54, 54)
+    end
+
+    -- Рисуем линию направления
+    love.graphics.setColor(1, 1, 1, 0.2)
+    love.graphics.setLineWidth(2)
+    local aimX, aimY = controls.getAim()
+    local len = 40
+    love.graphics.line(
+        cube.x, cube.y,
+        cube.x + aimX * len,
+        cube.y + aimY * len
+    )
+
+    for _, b in ipairs(bullets) do
+        if b and type(b.x) == "number" and type(b.y) == "number" then
+            love.graphics.setColor(1, 1, 0)
+            love.graphics.circle("fill", b.x, b.y, 5)
+        end
+    end
+    love.graphics.pop()
+
+    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.rectangle("fill", 20, 20, 200, 20)
+    love.graphics.setColor(0, 1, 0)
+    love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
+    
+    local screenW, screenH = love.graphics.getDimensions()
+    local menuBtnX = screenW - 120
+    local menuBtnY = 15
+    local menuBtnW = 100
+    local menuBtnH = 35
+    
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.rectangle("fill", menuBtnX + 2, menuBtnY + 2, menuBtnW, menuBtnH, 8)
+    love.graphics.setColor(0.8, 0.2, 0.2, 0.85)
+    love.graphics.rectangle("fill", menuBtnX, menuBtnY, menuBtnW, menuBtnH, 8)
+    love.graphics.setColor(1, 0.3, 0.3, 0.2)
+    love.graphics.rectangle("fill", menuBtnX + 3, menuBtnY + 3, menuBtnW - 6, menuBtnH / 2 - 2, 6)
+    
+    love.graphics.setColor(1, 1, 1)
+    if menuFont then
+        love.graphics.setFont(menuFont)
+    end
+    love.graphics.printf("MENU", menuBtnX, menuBtnY + 8, menuBtnW, "center")
+    
+    controls.draw()
+end
+
+function game.touchpressed(id, x, y)
+    local screenW, screenH = love.graphics.getDimensions()
+    local menuBtnX = screenW - 120
+    local menuBtnY = 15
+    local menuBtnW = 100
+    local menuBtnH = 35
+    
+    if x >= menuBtnX and x <= menuBtnX + menuBtnW and
+       y >= menuBtnY and y <= menuBtnY + menuBtnH then
+        playSound("click")
+        _G.GameState.current = "lobby"
+        return
+    end
+    
+    controls.touchpressed(id, x, y)
+end
+
+function game.touchmoved(id, x, y)
+    controls.touchmoved(id, x, y)
+end
+
+function game.touchreleased(id, x, y)
+    local shot, dx, dy = controls.touchreleased(id)
+    if shot then
+        playSound("shot")
+        
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len > 0 then
+            dx = dx / len
+            dy = dy / len
+        else
+            dx, dy = 0, -1
+        end
+        
+        local bullet = {
+            x = cube.x or 0,
+            y = cube.y or 0,
+            vx = dx * 400,
+            vy = dy * 400
+        }
+        
+        table.insert(bullets, bullet)
+    end
+end
+
+function game.keypressed(key)
+    if key == "escape" then
+        playSound("click")
+        _G.GameState.current = "lobby"
+        return
+    end
+    
+    if controls.keypressed then
+        controls.keypressed(key)
+    end
+end
+
+function game.keyreleased(key)
+    if controls.keyreleased then
+        local shot, dx, dy = controls.keyreleased(key)
+        if shot then
+            playSound("shot")
+            
+            local len = math.sqrt(dx*dx + dy*dy)
+            if len > 0 then
+                dx = dx / len
+                dy = dy / len
+            else
+                dx, dy = 0, -1
+            end
+            
+            local bullet = {
+                x = cube.x or 0,
+                y = cube.y or 0,
+                vx = dx * 400,
+                vy = dy * 400
+            }
+            table.insert(bullets, bullet)
         end
     end
 end
 
-function controls.draw()
-    if not font then
-        controls.load()
-    end
-    
-    -- Joystick
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
-    
-    -- Attack button
-    love.graphics.setColor(0.5, 0, 1, 0.6)
-    love.graphics.circle("fill", atk.x, atk.y, atk.r)
-    
-    -- Показываем направление движения на кнопке атаки
-    if atk.hold then
-        love.graphics.setColor(1, 1, 1, 0.6)
-        love.graphics.setLineWidth(3)
-        local len = 35
-        love.graphics.line(
-            atk.x, atk.y,
-            atk.x + moveDir.x * len,
-            atk.y + moveDir.y * len
-        )
-        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 4)
-    end
-    
-    -- Button text
-    love.graphics.setColor(1, 1, 1)
-    if font then
-        love.graphics.setFont(font)
-        love.graphics.printf("SHOT", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
-    end
-    
-    -- Подсказка по клавиатуре
-    love.graphics.setColor(1, 1, 1, 0.3)
-    love.graphics.setFont(font or love.graphics.newFont(14))
-    love.graphics.printf("WASD - Move | SPACE - Shot in direction", 10, 10, 400, "left")
+function game.setOnDeath(fn)
+    game.onDeath = fn
 end
 
-return controls
+function game.setCoins(c)
+    coins = c
+end
+
+function game.setSkin(s)
+    selected_skin = s
+end
+
+return game
