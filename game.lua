@@ -154,6 +154,17 @@ function game.draw()
         love.graphics.rectangle("fill", cube.x - 27, cube.y - 27, 54, 54)
     end
 
+    -- ПРИЦЕЛ (линия направления)
+    love.graphics.setColor(1, 1, 1, 0.2)
+    love.graphics.setLineWidth(2)
+    local aimX, aimY = controls.getAim()
+    local len = 40
+    love.graphics.line(
+        cube.x, cube.y,
+        cube.x + aimX * len,
+        cube.y + aimY * len
+    )
+
     -- Пули
     for _, b in ipairs(bullets) do
         if b and type(b.x) == "number" and type(b.y) == "number" then
@@ -236,16 +247,17 @@ function game.draw()
     love.graphics.setFont(menuFont or love.graphics.newFont(12))
     love.graphics.printf("MENU", menuBtnX, menuBtnY + 10, menuBtnW, "center")
     
+    -- ============================================================
+    -- РИСУЕМ ДЖОЙСТИК И КНОПКУ SHOT (НОРМАЛЬНЫЕ)
+    -- ============================================================
+    controls.draw()
+    
     -- НИЖНЯЯ ПАНЕЛЬ
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.rectangle("fill", 0, screenH - 28, screenW, 28)
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(uiFont or love.graphics.newFont(11))
     love.graphics.printf("WASD - Move | SPACE - Attack | ESC - Menu", 0, screenH - 22, screenW, "center")
-    
-    -- УБИРАЕМ РИСОВАНИЕ ДЖОЙСТИКА И ПРИЦЕЛА
-    -- Вместо controls.draw() ничего не рисуем
-    -- controls.draw() - удалено!
 end
 
 function game.touchpressed(id, x, y)
