@@ -220,6 +220,11 @@ function lobby.draw()
     if keyboard.isActive() then
         keyboard.draw()
     end
+    
+    -- Подсказка по клавиатуре
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.setFont(fontBtn)
+    love.graphics.printf("ESC - Exit", 10, love.graphics.getHeight() - 30, 200, "left")
 end
 
 function drawShop()
@@ -456,6 +461,15 @@ function lobby.handleTextInput(text)
 end
 
 function lobby.keypressed(key)
+    if key == "escape" then
+        if shop_open then
+            shop_open = false
+        elseif promoActive then
+            promoActive = false
+            love.keyboard.setTextInput(false)
+        end
+    end
+    
     if key == "backspace" and promoActive then
         promoInput = promoInput:sub(1, -2)
     end
