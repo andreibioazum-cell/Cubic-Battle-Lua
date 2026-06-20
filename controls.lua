@@ -1,12 +1,12 @@
 local controls = {}
 local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
 local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
-local aim = { x = 0, y = -1 }  -- По умолчанию вверх
+local aim = { x = 0, y = -1 }
 local font = nil
 
 function controls.load()
     local success, err = pcall(function()
-        font = love.graphics.newFont("Fredoka-Bold.ttf", 20)
+        font = love.graphics.newFont(20)
     end)
     if not success then
         font = love.graphics.newFont(20)
@@ -33,32 +33,29 @@ function controls.getMove()
 end
 
 function controls.getAim()
-    -- Возвращаем сохраненное направление прицела
     return aim.x, aim.y
 end
 
 function controls.isAiming() return atk.hold end
 
 function controls.touchpressed(id, x, y)
-    -- Джойстик
+    -- Joystick
     local dx, dy = x - joy.cx, y - joy.cy
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
         joy.sx, joy.sy = x, y
     end
     
-    -- Кнопка выстрела
+    -- Attack button
     local ax, ay = x - atk.x, y - atk.y
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
-        -- Вычисляем направление от центра кнопки к месту касания
         local len = math.sqrt(ax*ax + ay*ay)
-        if len > 5 then  -- Минимальное расстояние, чтобы избежать (0,0)
+        if len > 5 then
             aim.x = ax / len
             aim.y = ay / len
         else
-            -- Если нажали в центр - стреляем вверх
             aim.x, aim.y = 0, -1
         end
     end
@@ -74,7 +71,6 @@ function controls.touchmoved(id, x, y)
         joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
     end
     
-    -- Обновляем прицел при движении на кнопке выстрела
     if id == atk.id then
         local ax, ay = x - atk.x, y - atk.y
         local len = math.sqrt(ax*ax + ay*ay)
@@ -98,9 +94,7 @@ function controls.touchreleased(id)
         atk.id = nil
         atk.hold = false
         shot = true
-        -- Используем сохраненное направление
         dx, dy = aim.x, aim.y
-        -- Если всё равно (0,0), стреляем вверх
         if dx == 0 and dy == 0 then
             dy = -1
         end
@@ -114,36 +108,34 @@ function controls.draw()
         controls.load()
     end
     
-    -- Джойстик
-    love.graphics.setColor(0,0,0,0.5)
+    -- Joystick
+    love.graphics.setColor(0, 0, 0, 0.5)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(1,1,1)
+    love.graphics.setColor(1, 1, 1)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
     
-    -- Кнопка выстрела
+    -- Attack button
     love.graphics.setColor(0.5, 0, 1, 0.6)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
     
-    -- Линия прицела (показывает куда полетит пуля)
+    -- Aim line
     if atk.hold then
         love.graphics.setColor(1, 1, 1, 0.6)
         love.graphics.setLineWidth(3)
         local len = 35
-        -- Стрелка от центра кнопки в направлении прицела
         love.graphics.line(
             atk.x, atk.y,
             atk.x + aim.x * len,
             atk.y + aim.y * len
         )
-        -- Кружок на конце
         love.graphics.circle("fill", atk.x + aim.x * len, atk.y + aim.y * len, 4)
     end
     
-    -- Текст на кнопке
-    love.graphics.setColor(1,1,1)
+    -- Button text
+    love.graphics.setColor(1, 1, 1)
     if font then
         love.graphics.setFont(font)
-        love.graphics.printf("Shot", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
+        love.graphics.printf("SHOT", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
     end
 end
 
