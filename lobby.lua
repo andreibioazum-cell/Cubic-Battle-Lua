@@ -9,7 +9,7 @@ local stars = {}
 
 local skins = {
     default = { name = "Default Cube", price = 0, owned = true },
-    diamond = { name = "Diamond Cube", price = 20, owned = false }
+    diamond = { name = "Diamond Cube", price = 100, owned = false }
 }
 local selected_skin = "default"
 
@@ -19,7 +19,6 @@ local promoResult = ""
 local promoResultColor = {1, 1, 1}
 local promoCooldown = 0
 
--- ПРОМО-КОДЫ
 local promoCodes = {
     ["KAKAK"] = { reward = 100, description = "KAKAK!", maxUses = 999, used = 0 },
     ["KAKAK2026"] = { reward = 100, description = "Godzilla KAKAK!", maxUses = 999, used = 0 },
@@ -32,9 +31,6 @@ local promoCodes = {
 
 local usedByPlayer = {}
 
--- ============================================================
--- СОХРАНЕНИЕ
--- ============================================================
 local function saveGame()
     local data = string.format("%d\n%s\n%s", 
         coins or 0, 
@@ -59,9 +55,6 @@ local function loadSave()
     end
 end
 
--- ============================================================
--- ПРОМО-КОДЫ СОХРАНЕНИЕ
--- ============================================================
 local function loadPromoCodes()
     local data = love.filesystem.read("promo_stats.txt")
     if data then
@@ -73,7 +66,6 @@ local function loadPromoCodes()
         end
     end
     
-    -- Загружаем использованные коды игроком
     local used = love.filesystem.read("used_promos.txt")
     if used then
         for code in used:gmatch("[^\r\n]+") do
@@ -96,9 +88,6 @@ local function savePromoCodes()
     love.filesystem.write("used_promos.txt", used)
 end
 
--- ============================================================
--- ФОН
--- ============================================================
 local function createBG()
     local w, h = love.graphics.getDimensions()
     bgCanvas = love.graphics.newCanvas(w, h)
@@ -111,9 +100,6 @@ local function createBG()
     love.graphics.setCanvas()
 end
 
--- ============================================================
--- АКТИВАЦИЯ ПРОМО-КОДА
--- ============================================================
 local function activatePromoCode()
     local code = string.upper(promoInput or "")
     
@@ -143,7 +129,6 @@ local function activatePromoCode()
         return
     end
     
-    -- Активируем код
     promo.used = promo.used + 1
     usedByPlayer[code] = true
     coins = (coins or 0) + promo.reward
@@ -159,11 +144,7 @@ local function activatePromoCode()
     print("Promo activated! Coins: " .. coins)
 end
 
--- ============================================================
--- ЗАГРУЗКА ЛОББИ
--- ============================================================
 function lobby.load()
-    -- Шрифты
     local success, err = pcall(function()
         fontTitle = love.graphics.newFont("Fredoka-Bold.ttf", 48)
     end)
@@ -178,12 +159,10 @@ function lobby.load()
         fontBtn = love.graphics.newFont(20)
     end
     
-    -- Загрузка данных
     loadSave()
     loadPromoCodes()
     createBG()
     
-    -- Звезды
     stars = {}
     for i = 1, 50 do
         table.insert(stars, { x = math.random(), y = math.random(), s = 0.1 + math.random() * 0.4 })
@@ -200,19 +179,14 @@ function lobby.update(dt)
     end
 end
 
--- ============================================================
--- РИСОВАНИЕ
--- ============================================================
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
     
-    -- Фон
     love.graphics.setColor(1, 1, 1)
     if bgCanvas then
         love.graphics.draw(bgCanvas)
     end
     
-    -- Звезды
     for _, s in ipairs(stars) do
         love.graphics.setColor(1, 1, 1, 0.3 + 0.3 * math.sin(animTimer * 2 + s.x * 10))
         love.graphics.circle("fill",
@@ -222,19 +196,16 @@ function lobby.draw()
         )
     end
     
-    -- Заголовок
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("CUBIC BATTLE", 0, h / 2 - 180, w, "center")
     
-    -- Монеты
     love.graphics.setColor(1, 1, 0)
     love.graphics.setFont(fontBtn)
     love.graphics.printf("Cubicoins: " .. (coins or 0), 0, h / 2 - 80, w, "center")
     
     local bx = w / 2 - 120
     
-    -- КНОПКА PLAY
     love.graphics.setColor(0.2, 0.6, 0.8, 0.9)
     love.graphics.rectangle("fill", bx, h / 2 - 20, 240, 50, 10)
     love.graphics.setColor(0.3, 0.8, 1, 0.3)
@@ -243,7 +214,6 @@ function lobby.draw()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("PLAY", bx, h / 2 - 5, 240, "center")
     
-    -- КНОПКА SHOP
     love.graphics.setColor(0.4, 0.2, 0.8, 0.9)
     love.graphics.rectangle("fill", bx, h / 2 + 45, 240, 50, 10)
     love.graphics.setColor(0.6, 0.3, 1, 0.3)
@@ -252,7 +222,6 @@ function lobby.draw()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("SHOP", bx, h / 2 + 60, 240, "center")
     
-    -- КНОПКА PROMO CODE
     love.graphics.setColor(0.8, 0.2, 0.8, 0.8)
     love.graphics.rectangle("fill", bx, h / 2 + 110, 240, 40, 10)
     love.graphics.setColor(0.9, 0.3, 0.9, 0.3)
@@ -261,7 +230,6 @@ function lobby.draw()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("PROMO CODE", bx, h / 2 + 123, 240, "center")
     
-    -- ПОЛЕ ВВОДА ПРОМО-КОДА
     if promoActive then
         local inputX = bx
         local inputY = h / 2 + 160
@@ -286,14 +254,12 @@ function lobby.draw()
             love.graphics.printf(displayText, inputX + 10, inputY + 10, inputW - 20, "left")
         end
         
-        -- КНОПКА OK
         love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
         love.graphics.rectangle("fill", inputX + inputW - 60, inputY + 5, 55, 30, 6)
         love.graphics.setColor(1, 1, 1)
         love.graphics.setFont(fontBtn)
         love.graphics.printf("OK", inputX + inputW - 60, inputY + 10, 55, "center")
         
-        -- РЕЗУЛЬТАТ
         if promoResult ~= "" then
             love.graphics.setColor(promoResultColor)
             love.graphics.setFont(fontBtn)
@@ -301,62 +267,49 @@ function lobby.draw()
         end
     end
     
-    -- МАГАЗИН
     if shop_open then
         drawShop()
     end
     
-    -- Подсказка
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(fontBtn)
     love.graphics.printf("ESC - Exit | WASD - Move | SPACE - Shot", 10, love.graphics.getHeight() - 30, 400, "left")
 end
 
--- ============================================================
--- МАГАЗИН
--- ============================================================
 function drawShop()
     local w, h = love.graphics.getDimensions()
     local shop_w, shop_h = 400, 300
     local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
     
-    -- Тень
     love.graphics.setColor(0, 0, 0, 0.7)
     love.graphics.rectangle("fill", shop_x + 10, shop_y + 10, shop_w, shop_h, 15)
     
-    -- Фон
     love.graphics.setColor(0.1, 0.05, 0.2, 0.95)
     love.graphics.rectangle("fill", shop_x, shop_y, shop_w, shop_h, 15)
     
-    -- Рамка
     love.graphics.setColor(0.5, 0.2, 1, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12)
     
-    -- Кнопка закрыть
     love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
     love.graphics.rectangle("fill", shop_x + shop_w - 80, shop_y + 10, 60, 30, 8)
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fontBtn)
     love.graphics.printf("X", shop_x + shop_w - 78, shop_y + 17, 56, "center")
     
-    -- Заголовок
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("SHOP", shop_x + 20, shop_y + 15, 200, "left")
     
-    -- Линия
     love.graphics.setColor(0.5, 0.2, 1, 0.2)
     love.graphics.rectangle("fill", shop_x + 20, shop_y + 70, shop_w - 40, 2)
     
-    -- Товар
     local item_x, item_y = shop_x + 20, shop_y + 85
     local item_w, item_h = shop_w - 40, 60
     
     love.graphics.setColor(0.2, 0.1, 0.4, 0.8)
     love.graphics.rectangle("fill", item_x, item_y, item_w, item_h, 8)
     
-    -- Иконка
     love.graphics.setColor(0, 0.8, 1, 0.8)
     love.graphics.polygon("fill",
         item_x + 30, item_y + 15,
@@ -366,14 +319,12 @@ function drawShop()
         item_x + 30, item_y + 15
     )
     
-    -- Название
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(fontBtn)
     love.graphics.printf("Diamond Cube", item_x + 70, item_y + 12, 150, "left")
     love.graphics.setColor(0.7, 0.7, 0.7, 0.8)
     love.graphics.printf("100 Cubicoins", item_x + 70, item_y + 35, 150, "left")
     
-    -- Кнопка
     if skins.diamond.owned then
         if selected_skin == "diamond" then
             love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
@@ -397,14 +348,10 @@ function drawShop()
     end
 end
 
--- ============================================================
--- ОБРАБОТКА КАСАНИЙ/КЛИКОВ
--- ============================================================
 function lobby.touchpressed(id, x, y)
     local w, h = love.graphics.getDimensions()
     local bx = w / 2 - 120
     
-    -- КНОПКА PLAY
     if x >= bx and x <= bx + 240 then
         if y >= h / 2 - 20 and y <= h / 2 + 30 then
             playSound("click")
@@ -416,14 +363,12 @@ function lobby.touchpressed(id, x, y)
             return
         end
         
-        -- КНОПКА SHOP
         if y >= h / 2 + 45 and y <= h / 2 + 95 then
             playSound("click")
             shop_open = not shop_open
             return
         end
         
-        -- КНОПКА PROMO CODE
         if y >= h / 2 + 110 and y <= h / 2 + 150 then
             playSound("click")
             promoActive = not promoActive
@@ -438,7 +383,6 @@ function lobby.touchpressed(id, x, y)
         end
     end
     
-    -- ПОЛЕ ВВОДА ПРОМО-КОДА
     if promoActive then
         local inputX = bx
         local inputY = h / 2 + 160
@@ -458,12 +402,10 @@ function lobby.touchpressed(id, x, y)
         end
     end
     
-    -- МАГАЗИН
     if shop_open then
         local shop_w, shop_h = 400, 300
         local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
         
-        -- Закрыть
         if x >= shop_x + shop_w - 80 and x <= shop_x + shop_w - 20 and
            y >= shop_y + 10 and y <= shop_y + 40 then
             shop_open = false
@@ -471,7 +413,6 @@ function lobby.touchpressed(id, x, y)
             return
         end
         
-        -- Купить/Надеть
         local item_x, item_y = shop_x + 20, shop_y + 85
         local item_w, item_h = shop_w - 40, 60
         if x >= item_x + item_w - 80 and x <= item_x + item_w - 20 and
@@ -502,9 +443,6 @@ function lobby.resize()
     createBG()
 end
 
--- ============================================================
--- КЛАВИАТУРА
--- ============================================================
 function lobby.keypressed(key)
     if key == "escape" then
         if shop_open then
@@ -532,5 +470,4 @@ function lobby.handleTextInput(text)
     end
 end
 
-return lobby
 return lobby
