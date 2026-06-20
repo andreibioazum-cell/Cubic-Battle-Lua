@@ -22,7 +22,6 @@ function enemy.spawnNow(x, y)
         shootT = 0,
         angle = 0
     }
-    -- Вызываем событие спавна врага для модов
     local modSystem = require("mod_system")
     modSystem.trigger("onEnemySpawn", e)
 end
@@ -73,7 +72,6 @@ function enemy.update(dt, px, py, pBullets, onHitPlayer)
             e.hp = e.hp - 1
             table.remove(pBullets, i)
             
-            -- Вызываем событие попадания для модов
             local modSystem = require("mod_system")
             modSystem.gameHit(e, 1)
             
