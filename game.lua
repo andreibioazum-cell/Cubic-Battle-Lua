@@ -14,6 +14,26 @@ local playerImg = nil
 local diamondImg = nil
 local menuFont = nil
 
+-- Функция сохранения монет
+local function saveCoins()
+    local data = love.filesystem.read("save.txt")
+    if data then
+        local lines = {}
+        for line in data:gmatch("[^\r\n]+") do
+            table.insert(lines, line)
+        end
+        -- Обновляем только монеты
+        lines[1] = tostring(coins)
+        local newData = table.concat(lines, "\n")
+        love.filesystem.write("save.txt", newData)
+    else
+        -- Если файла нет, создаем
+        local data = string.format("%d\n%s\n%s", coins, "default", selected_skin)
+        love.filesystem.write("save.txt", data)
+    end
+    print("Coins saved: " .. coins)
+end
+
 local function safeLoadImage(name, fallbackColor)
     local success, img = pcall(function()
         return love.graphics.newImage(name)
@@ -53,6 +73,7 @@ function game.load()
     enemy.setDeathCallback(function()
         coins = coins + 50
         print("Enemy killed! Coins: " .. coins)
+        saveCoins() -- СОХРАНЯЕМ МОНЕТЫ!
         _G.GameState.current = "lobby"
     end)
 end
@@ -157,6 +178,11 @@ function game.draw()
     love.graphics.setColor(0, 1, 0)
     love.graphics.rectangle("fill", 20, 20, 200 * (cube.hp / 5), 20)
     
+    -- Показываем монеты в игре
+    love.graphics.setColor(1, 1, 0)
+    love.graphics.setFont(menuFont or love.graphics.newFont(16))
+    love.graphics.printf("Coins: " .. coins, 20, 50, 200, "left")
+    
     local screenW, screenH = love.graphics.getDimensions()
     local menuBtnX = screenW - 120
     local menuBtnY = 15
@@ -189,6 +215,7 @@ function game.touchpressed(id, x, y)
     if x >= menuBtnX and x <= menuBtnX + menuBtnW and
        y >= menuBtnY and y <= menuBtnY + menuBtnH then
         playSound("click")
+        saveCoins() -- Сохраняем перед выходом
         _G.GameState.current = "lobby"
         return
     end
@@ -227,6 +254,7 @@ end
 function game.keypressed(key)
     if key == "escape" then
         playSound("click")
+        saveCoins() -- Сохраняем перед выходом
         _G.GameState.current = "lobby"
         return
     end
