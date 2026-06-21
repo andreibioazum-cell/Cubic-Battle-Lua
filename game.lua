@@ -15,7 +15,14 @@ local diamondImg = nil
 local menuFont = nil
 local uiFont = nil
 
--- Функция сохранения монет
+-- ============================================================
+-- СПОСОБНОСТЬ АЛМАЗНОГО КУБИКА
+-- ============================================================
+local abilityActive = false
+local abilityTimer = 0
+local abilityDuration = 2.5 -- 2.5 секунды неуязвимости
+local isInvulnerable = false
+
 local function saveCoins()
     local data = love.filesystem.read("save.txt")
     if data then
@@ -57,6 +64,9 @@ function game.load()
     cube.hp = 5
     dead = false
     bullets = {}
+    abilityActive = false
+    abilityTimer = 0
+    isInvulnerable = false
     
     bg = safeLoadImage("grass.png", {0.2, 0.5, 0.2, 1})
     if bg.setWrap then
@@ -79,6 +89,15 @@ end
 function game.update(dt)
     if dead then return end
     controls.update(dt)
+
+    -- Обновление способности
+    if abilityActive then
+        abilityTimer = abilityTimer - dt
+        if abilityTimer <= 0 then
+            abilityActive = false
+            isInvulnerable = false
+        end
+    end
 
     local dx, dy = controls.getMove()
     cube.x = math.max(0, math.min(WORLD_SIZE, cube.x + dx * cube.speed * dt))
@@ -105,6 +124,10 @@ function game.update(dt)
     end
 
     enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
+        -- Если неуязвим - не получаем урон
+        if isInvulnerable then
+            return
+        end
         cube.hp = cube.hp - dmg
         if cube.hp <= 0 then
             dead = true
@@ -140,6 +163,18 @@ function game.draw()
     -- Рисуем игрока
     love.graphics.setColor(1, 1, 1)
     local img = selected_skin == "diamond" and diamondImg or playerImg
+    
+    -- Эффект щита при активной способности
+    if abilityActive and selected_skin == "diamond" then
+        love.graphics.setColor(0.6, 0.2, 1, 0.3 + 0.2 * math.sin(love.timer.getTime() * 6))
+        love.graphics.circle("fill", cube.x, cube.y, 50)
+        love.graphics.setColor(0.8, 0.4, 1, 0.2 + 0.1 * math.sin(love.timer.getTime() * 8))
+        love.graphics.circle("fill", cube.x, cube.y, 60)
+        love.graphics.setColor(0.6, 0.2, 1, 0.3)
+        love.graphics.setLineWidth(2)
+        love.graphics.circle("line", cube.x, cube.y, 50)
+    end
+    
     if img then
         local w = img:getWidth() or 64
         local h = img:getHeight() or 64
@@ -154,7 +189,7 @@ function game.draw()
         love.graphics.rectangle("fill", cube.x - 27, cube.y - 27, 54, 54)
     end
 
-    -- ПРИЦЕЛ (линия направления)
+    -- ПРИЦЕЛ
     love.graphics.setColor(1, 1, 1, 0.2)
     love.graphics.setLineWidth(2)
     local aimX, aimY = controls.getAim()
@@ -177,7 +212,7 @@ function game.draw()
     love.graphics.pop()
 
     -- ============================================================
-    -- UI (HP И МОНЕТЫ)
+    -- UI
     -- ============================================================
     local screenW, screenH = love.graphics.getDimensions()
     
@@ -187,7 +222,7 @@ function game.draw()
     love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
     love.graphics.rectangle("fill", 0, 48, screenW, 2)
     
-    -- HP Бар (сердце)
+    -- HP Бар
     love.graphics.setColor(1, 0.2, 0.2)
     love.graphics.circle("fill", 25, 20, 8)
     love.graphics.circle("fill", 39, 20, 8)
@@ -230,6 +265,13 @@ function game.draw()
     love.graphics.setFont(uiFont or love.graphics.newFont(14))
     love.graphics.printf(coins, 242, 12, 100, "left")
     
+    -- СТАТУС СПОСОБНОСТИ
+    if abilityActive then
+        love.graphics.setColor(0.6, 0.2, 1, 0.8)
+        love.graphics.setFont(love.graphics.newFont(12))
+        love.graphics.printf("✦ SHIELD ACTIVE", screenW/2 - 70, 16, 140, "center")
+    end
+    
     -- КНОПКА MENU
     local menuBtnX = screenW - 90
     local menuBtnY = 8
@@ -248,7 +290,7 @@ function game.draw()
     love.graphics.printf("MENU", menuBtnX, menuBtnY + 10, menuBtnW, "center")
     
     -- ============================================================
-    -- РИСУЕМ ДЖОЙСТИК И КНОПКУ SHOT (ОДИН ДЖОЙСТИК)
+    -- КНОПКИ УПРАВЛЕНИЯ
     -- ============================================================
     controls.draw()
     
@@ -257,7 +299,7 @@ function game.draw()
     love.graphics.rectangle("fill", 0, screenH - 28, screenW, 28)
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(uiFont or love.graphics.newFont(11))
-    love.graphics.printf("WASD - Move | SPACE - Attack | ESC - Menu", 0, screenH - 22, screenW, "center")
+    love.graphics.printf("WASD - Move | SPACE - Attack | E - Shield | ESC - Menu", 0, screenH - 22, screenW, "center")
 end
 
 function game.touchpressed(id, x, y)
@@ -275,7 +317,13 @@ function game.touchpressed(id, x, y)
         return
     end
     
-    controls.touchpressed(id, x, y)
+    local result = controls.touchpressed(id, x, y)
+    if result == "ability" then
+        -- Активируем способность (только для алмазного скина)
+        if selected_skin == "diamond" then
+            activateAbility()
+        end
+    end
 end
 
 function game.touchmoved(id, x, y)
@@ -283,10 +331,10 @@ function game.touchmoved(id, x, y)
 end
 
 function game.touchreleased(id, x, y)
-    local shot, dx, dy = controls.touchreleased(id)
+    local shot, dx, dy, abilityUsed = controls.touchreleased(id)
+    
     if shot then
         playSound("shot")
-        
         local len = math.sqrt(dx*dx + dy*dy)
         if len > 0 then
             dx = dx / len
@@ -294,15 +342,19 @@ function game.touchreleased(id, x, y)
         else
             dx, dy = 0, -1
         end
-        
         local bullet = {
             x = cube.x or 0,
             y = cube.y or 0,
             vx = dx * 400,
             vy = dy * 400
         }
-        
         table.insert(bullets, bullet)
+    end
+    
+    if abilityUsed then
+        if selected_skin == "diamond" then
+            activateAbility()
+        end
     end
 end
 
@@ -315,16 +367,20 @@ function game.keypressed(key)
     end
     
     if controls.keypressed then
-        controls.keypressed(key)
+        local result = controls.keypressed(key)
+        if result == "ability" then
+            if selected_skin == "diamond" then
+                activateAbility()
+            end
+        end
     end
 end
 
 function game.keyreleased(key)
     if controls.keyreleased then
-        local shot, dx, dy = controls.keyreleased(key)
+        local shot, dx, dy, abilityUsed = controls.keyreleased(key)
         if shot then
             playSound("shot")
-            
             local len = math.sqrt(dx*dx + dy*dy)
             if len > 0 then
                 dx = dx / len
@@ -332,7 +388,6 @@ function game.keyreleased(key)
             else
                 dx, dy = 0, -1
             end
-            
             local bullet = {
                 x = cube.x or 0,
                 y = cube.y or 0,
@@ -341,7 +396,27 @@ function game.keyreleased(key)
             }
             table.insert(bullets, bullet)
         end
+        if abilityUsed then
+            if selected_skin == "diamond" then
+                activateAbility()
+            end
+        end
     end
+end
+
+-- ============================================================
+-- АКТИВАЦИЯ СПОСОБНОСТИ
+-- ============================================================
+function activateAbility()
+    if selected_skin ~= "diamond" then return end
+    if abilityActive then return end
+    if not controls.canUseAbility() then return end
+    
+    abilityActive = true
+    abilityTimer = abilityDuration
+    isInvulnerable = true
+    controls.useAbility()
+    playSound("success")
 end
 
 function game.setOnDeath(fn)
