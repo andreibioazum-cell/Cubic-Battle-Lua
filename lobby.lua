@@ -13,24 +13,6 @@ local skins = {
 }
 local selected_skin = "default"
 
-local promoInput = ""
-local promoActive = false
-local promoResult = ""
-local promoResultColor = {1, 1, 1}
-local promoCooldown = 0
-
-local promoCodes = {
-    ["KAKAK"] = { reward = 100, description = "KAKAK!", maxUses = 999, used = 0 },
-    ["KAKAK2026"] = { reward = 100, description = "Godzilla KAKAK!", maxUses = 999, used = 0 },
-    ["CUBIC"] = { reward = 50, description = "Cubic", maxUses = 999, used = 0 },
-    ["BETA2026"] = { reward = 200, description = "Beta tester", maxUses = 100, used = 0 },
-    ["FURRY"] = { reward = 150, description = "Furry", maxUses = 50, used = 0 },
-    ["GODZILLA"] = { reward = 500, description = "Godzilla!", maxUses = 10, used = 0 },
-    ["PLATI"] = { reward = 1000, description = "Pay or no badge!", maxUses = 5, used = 0 }
-}
-
-local usedByPlayer = {}
-
 -- ============================================================
 -- СОХРАНЕНИЕ И ЗАГРУЗКА
 -- ============================================================
@@ -58,39 +40,6 @@ local function loadSave()
     end
 end
 
-local function loadPromoCodes()
-    local data = love.filesystem.read("promo_stats.txt")
-    if data then
-        for line in data:gmatch("[^\r\n]+") do
-            local code, uses = line:match("([^:]+):(%d+)")
-            if code and uses and promoCodes[code] then
-                promoCodes[code].used = tonumber(uses) or 0
-            end
-        end
-    end
-    
-    local used = love.filesystem.read("used_promos.txt")
-    if used then
-        for code in used:gmatch("[^\r\n]+") do
-            usedByPlayer[code] = true
-        end
-    end
-end
-
-local function savePromoCodes()
-    local stats = ""
-    for code, info in pairs(promoCodes) do
-        stats = stats .. code .. ":" .. info.used .. "\n"
-    end
-    love.filesystem.write("promo_stats.txt", stats)
-    
-    local used = ""
-    for code in pairs(usedByPlayer) do
-        used = used .. code .. "\n"
-    end
-    love.filesystem.write("used_promos.txt", used)
-end
-
 local function createBG()
     local w, h = love.graphics.getDimensions()
     bgCanvas = love.graphics.newCanvas(w, h)
@@ -101,51 +50,6 @@ local function createBG()
         love.graphics.rectangle("fill", 0, i * (h / 60), w, h / 60 + 1)
     end
     love.graphics.setCanvas()
-end
-
--- ============================================================
--- АКТИВАЦИЯ ПРОМО-КОДА
--- ============================================================
-local function activatePromoCode()
-    local code = string.upper(promoInput or "")
-    
-    if code == "" then
-        promoResult = "Enter a code!"
-        promoResultColor = {1, 0.3, 0.3}
-        return
-    end
-    
-    if not promoCodes[code] then
-        promoResult = "Invalid code!"
-        promoResultColor = {1, 0.3, 0.3}
-        return
-    end
-    
-    local promo = promoCodes[code]
-    
-    if usedByPlayer[code] then
-        promoResult = "Already used!"
-        promoResultColor = {1, 0.3, 0.3}
-        return
-    end
-    
-    if promo.used >= promo.maxUses then
-        promoResult = "Code expired!"
-        promoResultColor = {1, 0.3, 0.3}
-        return
-    end
-    
-    promo.used = promo.used + 1
-    usedByPlayer[code] = true
-    coins = (coins or 0) + promo.reward
-    
-    saveGame()
-    savePromoCodes()
-    
-    promoResult = promo.description .. " +" .. promo.reward .. " coins!"
-    promoResultColor = {0.3, 1, 0.3}
-    promoInput = ""
-    promoCooldown = 2
 end
 
 -- ============================================================
@@ -167,7 +71,6 @@ function lobby.load()
     end
     
     loadSave()
-    loadPromoCodes()
     createBG()
     
     stars = {}
@@ -178,10 +81,6 @@ end
 
 function lobby.update(dt)
     animTimer = animTimer + dt
-    
-    if promoCooldown > 0 then
-        promoCooldown = promoCooldown - dt
-    end
 end
 
 -- ============================================================
@@ -256,73 +155,10 @@ function lobby.draw()
     love.graphics.setFont(fontBtn)
     love.graphics.printf("SHOP", bx, h / 2 + 60, 240, "center")
     
-    -- PROMO CODE
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", bx + 3, h / 2 + 113, 240, 40, 10)
-    love.graphics.setColor(0.8, 0.2, 0.8, 0.9)
-    love.graphics.rectangle("fill", bx, h / 2 + 110, 240, 40, 10)
-    love.graphics.setColor(0.9, 0.3, 0.9, 0.2)
-    love.graphics.rectangle("fill", bx + 5, h / 2 + 115, 230, 12, 6)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("PROMO CODE", bx, h / 2 + 123, 240, "center")
-    
-    -- ПОЛЕ ВВОДА ПРОМО-КОДА
-    if promoActive then
-        local inputX = bx
-        local inputY = h / 2 + 160
-        local inputW = 240
-        local inputH = 40
-        
-        love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", inputX + 3, inputY + 3, inputW, inputH, 8)
-        
-        love.graphics.setColor(0.1, 0.05, 0.2, 0.95)
-        love.graphics.rectangle("fill", inputX, inputY, inputW, inputH, 8)
-        
-        love.graphics.setColor(0.5, 0.2, 1, 0.5)
-        love.graphics.setLineWidth(2)
-        love.graphics.rectangle("line", inputX, inputY, inputW, inputH, 8)
-        
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.setFont(fontBtn)
-        local displayText = promoInput or ""
-        if displayText == "" then
-            love.graphics.setColor(0.5, 0.5, 0.5)
-            love.graphics.printf("Enter code...", inputX + 15, inputY + 10, inputW - 80, "left")
-        else
-            love.graphics.setColor(1, 1, 0)
-            love.graphics.printf(displayText, inputX + 15, inputY + 10, inputW - 80, "left")
-        end
-        
-        love.graphics.setColor(0, 0, 0, 0.3)
-        love.graphics.rectangle("fill", inputX + inputW - 57, inputY + 8, 52, 30, 6)
-        love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
-        love.graphics.rectangle("fill", inputX + inputW - 60, inputY + 5, 55, 30, 6)
-        love.graphics.setColor(0.3, 1, 0.3, 0.2)
-        love.graphics.rectangle("fill", inputX + inputW - 57, inputY + 8, 49, 12, 4)
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.setFont(fontBtn)
-        love.graphics.printf("OK", inputX + inputW - 60, inputY + 10, 55, "center")
-        
-        if promoResult ~= "" then
-            love.graphics.setColor(promoResultColor)
-            love.graphics.setFont(fontBtn)
-            love.graphics.printf(promoResult, inputX, inputY + 50, inputW, "center")
-        end
-    end
-    
     -- МАГАЗИН
     if shop_open then
         drawShop()
     end
-    
-    -- НИЖНЯЯ ПАНЕЛЬ
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", 0, h - 30, w, 30)
-    love.graphics.setColor(1, 1, 1, 0.3)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("ESC - Exit | WASD - Move | SPACE - Shot", 0, h - 24, w, "center")
 end
 
 -- ============================================================
@@ -330,7 +166,7 @@ end
 -- ============================================================
 function drawShop()
     local w, h = love.graphics.getDimensions()
-    local shop_w, shop_h = 420, 320
+    local shop_w, shop_h = 420, 280
     local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
     
     -- Тень
@@ -477,42 +313,10 @@ function lobby.touchpressed(id, x, y)
             shop_open = not shop_open
             return
         end
-        
-        if y >= h / 2 + 110 and y <= h / 2 + 150 then
-            playSound("click")
-            promoActive = not promoActive
-            if promoActive then
-                promoInput = ""
-                promoResult = ""
-                love.keyboard.setTextInput(true)
-            else
-                love.keyboard.setTextInput(false)
-            end
-            return
-        end
-    end
-    
-    if promoActive then
-        local inputX = bx
-        local inputY = h / 2 + 160
-        local inputW = 240
-        local inputH = 40
-        
-        if x >= inputX and x <= inputX + inputW - 60 and y >= inputY and y <= inputY + inputH then
-            love.keyboard.setTextInput(true)
-            return
-        end
-        
-        if x >= inputX + inputW - 60 and x <= inputX + inputW and y >= inputY + 5 and y <= inputY + 35 then
-            if promoCooldown <= 0 then
-                activatePromoCode()
-            end
-            return
-        end
     end
     
     if shop_open then
-        local shop_w, shop_h = 420, 320
+        local shop_w, shop_h = 420, 280
         local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
         
         if x >= shop_x + shop_w - 60 and x <= shop_x + shop_w - 20 and
@@ -555,26 +359,7 @@ function lobby.keypressed(key)
     if key == "escape" then
         if shop_open then
             shop_open = false
-        elseif promoActive then
-            promoActive = false
-            love.keyboard.setTextInput(false)
         end
-    end
-    
-    if key == "backspace" and promoActive then
-        promoInput = promoInput:sub(1, -2)
-    end
-    
-    if key == "return" or key == "enter" then
-        if promoActive and promoCooldown <= 0 then
-            activatePromoCode()
-        end
-    end
-end
-
-function lobby.handleTextInput(text)
-    if promoActive then
-        promoInput = promoInput .. text
     end
 end
 
