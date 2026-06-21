@@ -159,8 +159,8 @@ function game.draw()
         end
     end
     
-    -- ЩИТ
-    if shieldActive then
+    -- ЩИТ (ТОЛЬКО ДЛЯ АЛМАЗНОГО СКИНА)
+    if shieldActive and selectedSkin == "diamond" then
         love.graphics.setColor(0.6, 0.2, 1, 0.3 + 0.2 * math.sin(love.timer.getTime() * 6))
         love.graphics.circle("fill", player.x, player.y, 45)
         love.graphics.setColor(0.8, 0.4, 1, 0.2)
@@ -177,9 +177,7 @@ function game.draw()
     
     love.graphics.pop()
     
-    -- ============================================================
     -- UI
-    -- ============================================================
     local sw, sh = love.graphics.getDimensions()
     
     love.graphics.setColor(0, 0, 0, 0.7)
@@ -206,9 +204,15 @@ function game.draw()
     love.graphics.setColor(1, 0.8, 0)
     love.graphics.printf("COINS: " .. coins, sw - 150, 12, 140, "right")
     
-    -- ============================================================
-    -- КНОПКА MENU (В ЛЕВОМ ВЕРХНЕМ УГЛУ)
-    -- ============================================================
+    -- ИНФО О СКИНЕ
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.setFont(love.graphics.newFont(10))
+    if selectedSkin == "diamond" then
+        love.graphics.setColor(0.6, 0.2, 1, 0.5)
+        love.graphics.printf("DIAMOND SKIN - SHIELD READY", sw/2 - 80, 45, 160, "center")
+    end
+    
+    -- КНОПКА MENU
     local menuX = sw - 90
     local menuY = 4
     local menuW = 80
@@ -227,7 +231,11 @@ function game.draw()
     -- ПОДСКАЗКА
     love.graphics.setColor(1, 1, 1, 0.4)
     love.graphics.setFont(love.graphics.newFont(11))
-    love.graphics.printf("WASD - Move | SPACE - Attack | E - Shield", 0, sh - 25, sw, "center")
+    if selectedSkin == "diamond" then
+        love.graphics.printf("WASD - Move | SPACE - Attack | E - Shield", 0, sh - 25, sw, "center")
+    else
+        love.graphics.printf("WASD - Move | SPACE - Attack | Buy Diamond Skin for Shield!", 0, sh - 25, sw, "center")
+    end
     
     controls.draw()
 end
@@ -249,6 +257,33 @@ function game.shoot()
         vx = aimX * 400,
         vy = aimY * 400
     })
+end
+
+-- ============================================================
+-- АКТИВАЦИЯ СПОСОБНОСТИ (ТОЛЬКО ДЛЯ АЛМАЗНОГО СКИНА)
+-- ============================================================
+function game.activateShield()
+    -- ПРОВЕРКА: только для алмазного скина
+    if selectedSkin ~= "diamond" then
+        print("You need Diamond Skin for shield!")
+        return false
+    end
+    
+    if shieldActive then
+        print("Shield already active!")
+        return false
+    end
+    
+    if not controls.canUseAbility() then
+        print("Shield on cooldown!")
+        return false
+    end
+    
+    shieldActive = true
+    shieldTimer = shieldDuration
+    controls.useAbility()
+    print("Shield activated! (Diamond Skin)")
+    return true
 end
 
 -- ============================================================
@@ -275,12 +310,7 @@ function game.mousepressed(x, y, button)
     end
     
     if result == "ability" then
-        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
-            shieldActive = true
-            shieldTimer = shieldDuration
-            controls.useAbility()
-            print("Shield activated!")
-        end
+        game.activateShield()
     end
 end
 
@@ -296,12 +326,7 @@ function game.mousereleased(x, y, button)
     end
     
     if abilityUsed then
-        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
-            shieldActive = true
-            shieldTimer = shieldDuration
-            controls.useAbility()
-            print("Shield activated!")
-        end
+        game.activateShield()
     end
 end
 
@@ -321,12 +346,7 @@ function game.touchreleased(id, x, y)
     end
     
     if abilityUsed then
-        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
-            shieldActive = true
-            shieldTimer = shieldDuration
-            controls.useAbility()
-            print("Shield activated!")
-        end
+        game.activateShield()
     end
 end
 
@@ -343,12 +363,7 @@ function game.keypressed(key)
     end
     
     if result == "ability" then
-        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
-            shieldActive = true
-            shieldTimer = shieldDuration
-            controls.useAbility()
-            print("Shield activated!")
-        end
+        game.activateShield()
     end
 end
 
@@ -369,6 +384,7 @@ end
 
 function game.setSkin(s)
     selectedSkin = s or "default"
+    print("Skin set to: " .. selectedSkin)
 end
 
 function game.resize()
