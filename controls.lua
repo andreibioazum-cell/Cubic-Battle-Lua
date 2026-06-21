@@ -298,7 +298,7 @@ function controls.draw()
     love.graphics.printf("A", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
     
     -- ============================================================
-    -- КНОПКА СПОСОБНОСТИ (ФИОЛЕТОВАЯ С БУКВОЙ "S")
+    -- КНОПКА СПОСОБНОСТИ (ФИОЛЕТОВАЯ С БУКВОЙ "S") - БЕЗ ЦИФР
     -- ============================================================
     
     -- Тень
@@ -307,19 +307,19 @@ function controls.draw()
     
     -- Основной круг
     if ability.cooldown > 0 then
-        -- Перезарядка (серый)
+        -- Перезарядка (серый с затемнением)
         love.graphics.setColor(0.3, 0.3, 0.4, 0.7)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
         
-        -- Затемнение с процентом
-        love.graphics.setColor(0, 0, 0, 0.3)
+        -- Затемнение с анимацией перезарядки (круговая заливка)
+        love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.arc("fill", ability.x, ability.y, ability.r, 
             -math.pi/2, -math.pi/2 + (1 - ability.cooldown / ability.maxCooldown) * 2 * math.pi)
         
-        -- Текст перезарядки
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.setFont(love.graphics.newFont(14))
-        love.graphics.printf(math.ceil(ability.cooldown), ability.x - ability.r, ability.y - 10, ability.r*2, "center")
+        -- Обводка
+        love.graphics.setColor(0.4, 0.4, 0.5, 0.3)
+        love.graphics.setLineWidth(2)
+        love.graphics.circle("line", ability.x, ability.y, ability.r)
     else
         -- Готова к использованию (фиолетовая)
         love.graphics.setColor(0.6, 0.2, 0.9, 0.9)
@@ -334,7 +334,7 @@ function controls.draw()
         love.graphics.setLineWidth(2)
         love.graphics.circle("line", ability.x, ability.y, ability.r)
         
-        -- Анимация готовности
+        -- Анимация готовности (пульсация)
         local pulse = 0.8 + 0.2 * math.sin(love.timer.getTime() * 2)
         love.graphics.setColor(0.8, 0.4, 1, pulse * 0.15)
         love.graphics.circle("fill", ability.x, ability.y, ability.r + 6)
@@ -345,11 +345,11 @@ function controls.draw()
     love.graphics.setFont(font)
     love.graphics.printf("S", ability.x - ability.r, ability.y - 14, ability.r*2, "center")
     
-    -- Подпись под кнопкой способности
+    -- Подпись под кнопкой (только текст, без цифр)
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(love.graphics.newFont(9))
     if ability.cooldown > 0 then
-        love.graphics.printf("CD: " .. math.ceil(ability.cooldown) .. "s", ability.x - 25, ability.y + ability.r + 6, 50, "center")
+        love.graphics.printf("READY", ability.x - 25, ability.y + ability.r + 6, 50, "center")
     else
         love.graphics.printf("SHIELD", ability.x - 25, ability.y + ability.r + 6, 50, "center")
     end
