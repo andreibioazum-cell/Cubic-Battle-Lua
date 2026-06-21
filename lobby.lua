@@ -20,6 +20,7 @@ local function saveGame()
         selected_skin or "default"
     )
     love.filesystem.write("save.txt", data)
+    print("Saved: " .. data)
 end
 
 local function loadSave()
@@ -34,6 +35,9 @@ local function loadSave()
             skins.diamond.owned = true
         end
         selected_skin = lines[3] or "default"
+        print("Loaded: coins=" .. coins .. " skin=" .. selected_skin)
+    else
+        print("No save file found")
     end
 end
 
@@ -163,12 +167,12 @@ function drawShop()
     love.graphics.setLineWidth(2)
     love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12)
     
-    -- Заголовок SHOP (слева)
+    -- Заголовок SHOP
     love.graphics.setColor(1, 1, 0, 0.9)
     love.graphics.setFont(fontTitle)
     love.graphics.printf("SHOP", shop_x + 20, shop_y + 15, 150, "left")
     
-    -- Баланс (справа)
+    -- Баланс
     love.graphics.setColor(1, 1, 0)
     love.graphics.setFont(fontBtn)
     love.graphics.printf("Balance: " .. coins, shop_x + shop_w - 160, shop_y + 22, 140, "right")
@@ -279,6 +283,7 @@ function lobby.mousepressed(x, y, button)
     
     if x >= bx and x <= bx + 240 then
         if y >= h / 2 - 20 and y <= h / 2 + 30 then
+            print("Starting game with skin: " .. selected_skin)
             local g = require("game")
             g.setCoins(coins)
             g.setSkin(selected_skin)
@@ -312,13 +317,23 @@ function lobby.mousepressed(x, y, button)
                 skins.diamond.owned = true
                 selected_skin = "diamond"
                 saveGame()
+                print("Bought diamond skin!")
             elseif skins.diamond.owned then
-                selected_skin = "diamond"
+                if selected_skin == "diamond" then
+                    selected_skin = "default"
+                else
+                    selected_skin = "diamond"
+                end
                 saveGame()
+                print("Equipped: " .. selected_skin)
             end
             return
         end
     end
+end
+
+function lobby.touchpressed(id, x, y)
+    lobby.mousepressed(x, y, 1)
 end
 
 function lobby.keypressed(key)
