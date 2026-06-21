@@ -4,8 +4,6 @@ local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
 local ability = { id = nil, x = 0, y = 0, r = 40, hold = false, cooldown = 0, maxCooldown = 5 }
 local font = nil
 
-local moveDir = { x = 0, y = 0 }
-
 local keys = {
     up = false,
     down = false,
@@ -43,12 +41,12 @@ function controls.update(dt)
 end
 
 function controls.getMove()
-    -- ДЖОЙСТИК
+    -- ЕСЛИ ДЖОЙСТИК АКТИВЕН
     if joy.id then
         local dx = joy.sx - joy.cx
         local dy = joy.sy - joy.cy
         local len = math.sqrt(dx*dx + dy*dy)
-        if len > 5 then
+        if len > 10 then
             return dx/len, dy/len
         else
             return 0, 0
@@ -72,7 +70,15 @@ function controls.getMove()
 end
 
 function controls.getAim()
-    return moveDir.x, moveDir.y
+    if joy.id then
+        local dx = joy.sx - joy.cx
+        local dy = joy.sy - joy.cy
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len > 10 then
+            return dx/len, dy/len
+        end
+    end
+    return 0, -1
 end
 
 function controls.isAiming() 
@@ -96,28 +102,29 @@ end
 -- ============================================================
 function controls.touchpressed(id, x, y)
     -- ДЖОЙСТИК
-    local dx, dy = x - joy.cx, y - joy.cy
+    local dx = x - joy.cx
+    local dy = y - joy.cy
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
         joy.sx = x
         joy.sy = y
     end
     
-    -- КНОПКА АТАКИ
-    local ax, ay = x - atk.x, y - atk.y
+    -- КНОПКА АТАКИ (A)
+    local ax = x - atk.x
+    local ay = y - atk.y
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
-        return "attack"
     end
     
-    -- КНОПКА СПОСОБНОСТИ
-    local abx, aby = x - ability.x, y - ability.y
+    -- КНОПКА СПОСОБНОСТИ (S)
+    local abx = x - ability.x
+    local aby = y - ability.y
     if abx*abx + aby*aby < ability.r*ability.r then
         if ability.cooldown <= 0 then
             ability.id = id
             ability.hold = true
-            return "ability"
         end
     end
 end
@@ -143,19 +150,25 @@ function controls.touchreleased(id)
     local abilityUsed = false
     local dx, dy = 0, 0
     
+    -- ОТПУСКАЕМ ДЖОЙСТИК -> ВОЗВРАЩАЕМ В ЦЕНТР
     if id == joy.id then
         joy.id = nil
         joy.sx = joy.cx
         joy.sy = joy.cy
     end
     
+    -- ОТПУСКАЕМ АТАКУ
     if id == atk.id then
         atk.id = nil
         atk.hold = false
         shot = true
         dx, dy = controls.getMove()
+        if dx == 0 and dy == 0 then
+            dy = -1
+        end
     end
     
+    -- ОТПУСКАЕМ СПОСОБНОСТЬ
     if id == ability.id then
         ability.id = nil
         ability.hold = false
@@ -169,7 +182,7 @@ function controls.touchreleased(id)
 end
 
 -- ============================================================
--- КЛАВИАТУРА
+-- КЛАВИАТУРА (ПК)
 -- ============================================================
 function controls.keypressed(key)
     if key == "w" or key == "up" then keys.up = true end
@@ -181,7 +194,6 @@ function controls.keypressed(key)
         keys.space = true
         atk.id = -1
         atk.hold = true
-        return "attack"
     end
     
     if key == "e" or key == "q" then
@@ -189,7 +201,6 @@ function controls.keypressed(key)
         if ability.cooldown <= 0 then
             ability.id = -1
             ability.hold = true
-            return "ability"
         end
     end
 end
@@ -206,6 +217,9 @@ function controls.keyreleased(key)
             atk.id = nil
             atk.hold = false
             local dx, dy = controls.getMove()
+            if dx == 0 and dy == 0 then
+                dy = -1
+            end
             return "attack", dx, dy
         end
     end
@@ -228,26 +242,27 @@ end
 -- ============================================================
 function controls.mousepressed(x, y, button)
     if button == 1 then
-        local dx, dy = x - joy.cx, y - joy.cy
+        local dx = x - joy.cx
+        local dy = y - joy.cy
         if dx*dx + dy*dy < joy.r*joy.r then
             joy.id = 1
             joy.sx = x
             joy.sy = y
         end
         
-        local ax, ay = x - atk.x, y - atk.y
+        local ax = x - atk.x
+        local ay = y - atk.y
         if ax*ax + ay*ay < atk.r*atk.r then
             atk.id = 1
             atk.hold = true
-            return "attack"
         end
         
-        local abx, aby = x - ability.x, y - ability.y
+        local abx = x - ability.x
+        local aby = y - ability.y
         if abx*abx + aby*aby < ability.r*ability.r then
             if ability.cooldown <= 0 then
                 ability.id = 1
                 ability.hold = true
-                return "ability"
             end
         end
     end
@@ -286,6 +301,9 @@ function controls.mousereleased(x, y, button)
             atk.hold = false
             shot = true
             dx, dy = controls.getMove()
+            if dx == 0 and dy == 0 then
+                dy = -1
+            end
         end
         
         if ability.id then
