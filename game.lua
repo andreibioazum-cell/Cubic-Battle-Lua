@@ -16,6 +16,7 @@ local shieldTimer = 0
 local shieldDuration = 2.5
 
 local playerImg = nil
+local diamondImg = nil
 local grassImg = nil
 
 local function saveGame()
@@ -38,6 +39,7 @@ function game.load()
         grassImg = nil
     end
     
+    -- ЗАГРУЗКА ОБЫЧНОГО СКИНА
     local success2, img2 = pcall(function()
         return love.graphics.newImage("player.png")
     end)
@@ -46,6 +48,18 @@ function game.load()
         print("Loaded player.png")
     else
         playerImg = nil
+    end
+    
+    -- ЗАГРУЗКА АЛМАЗНОГО СКИНА
+    local success3, img3 = pcall(function()
+        return love.graphics.newImage("player_diamond.png")
+    end)
+    if success3 and img3 then
+        diamondImg = img3
+        print("Loaded player_diamond.png")
+    else
+        diamondImg = nil
+        print("player_diamond.png not found")
     end
     
     enemy.load()
@@ -140,11 +154,19 @@ function game.draw()
     
     enemy.draw()
     
-    -- ИГРОК
-    if playerImg then
-        love.graphics.setColor(1, 1, 1)
+    -- ============================================================
+    -- ИГРОК С ВЫБРАННЫМ СКИНОМ
+    -- ============================================================
+    love.graphics.setColor(1, 1, 1)
+    
+    if selectedSkin == "diamond" and diamondImg then
+        -- АЛМАЗНЫЙ СКИН
+        love.graphics.draw(diamondImg, player.x, player.y, player.angle, 1, 1, 32, 32)
+    elseif playerImg then
+        -- ОБЫЧНЫЙ СКИН
         love.graphics.draw(playerImg, player.x, player.y, player.angle, 1, 1, 32, 32)
     else
+        -- FALLBACK
         if selectedSkin == "diamond" then
             love.graphics.setColor(0, 0.8, 1)
             love.graphics.polygon("fill",
@@ -209,7 +231,7 @@ function game.draw()
     love.graphics.setFont(love.graphics.newFont(10))
     if selectedSkin == "diamond" then
         love.graphics.setColor(0.6, 0.2, 1, 0.5)
-        love.graphics.printf("DIAMOND SKIN - SHIELD READY", sw/2 - 80, 45, 160, "center")
+        love.graphics.printf("DIAMOND SKIN - PRESS E FOR SHIELD", sw/2 - 100, 45, 200, "center")
     end
     
     -- КНОПКА MENU
