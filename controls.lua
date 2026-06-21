@@ -101,13 +101,14 @@ end
 -- ТАЧ
 -- ============================================================
 function controls.touchpressed(id, x, y)
-    -- ДЖОЙСТИК
+    -- ДЖОЙСТИК - проверяем попадание ВНУТРЬ КРУГА
     local dx = x - joy.cx
     local dy = y - joy.cy
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
         joy.sx = x
         joy.sy = y
+        print("Joystick pressed: " .. id)
     end
     
     -- КНОПКА АТАКИ (A)
@@ -116,6 +117,7 @@ function controls.touchpressed(id, x, y)
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
+        print("Attack pressed: " .. id)
     end
     
     -- КНОПКА СПОСОБНОСТИ (S)
@@ -125,6 +127,7 @@ function controls.touchpressed(id, x, y)
         if ability.cooldown <= 0 then
             ability.id = id
             ability.hold = true
+            print("Ability pressed: " .. id)
         end
     end
 end
@@ -150,11 +153,14 @@ function controls.touchreleased(id)
     local abilityUsed = false
     local dx, dy = 0, 0
     
-    -- ОТПУСКАЕМ ДЖОЙСТИК -> ВОЗВРАЩАЕМ В ЦЕНТР
+    print("Released: " .. id)
+    
+    -- ОТПУСКАЕМ ДЖОЙСТИК
     if id == joy.id then
         joy.id = nil
         joy.sx = joy.cx
         joy.sy = joy.cy
+        print("Joystick released - CENTER")
     end
     
     -- ОТПУСКАЕМ АТАКУ
@@ -166,6 +172,7 @@ function controls.touchreleased(id)
         if dx == 0 and dy == 0 then
             dy = -1
         end
+        print("Attack released")
     end
     
     -- ОТПУСКАЕМ СПОСОБНОСТЬ
@@ -176,6 +183,7 @@ function controls.touchreleased(id)
             abilityUsed = true
             ability.cooldown = ability.maxCooldown
         end
+        print("Ability released")
     end
     
     return shot, dx, dy, abilityUsed
