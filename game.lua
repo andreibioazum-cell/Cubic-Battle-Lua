@@ -209,7 +209,7 @@ function game.draw()
     love.graphics.pop()
 
     -- ============================================================
-    -- UI
+    -- UI (ВЕРХНЯЯ ПАНЕЛЬ)
     -- ============================================================
     local screenW, screenH = love.graphics.getDimensions()
     
@@ -219,19 +219,21 @@ function game.draw()
     love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
     love.graphics.rectangle("fill", 0, 48, screenW, 2)
     
-    -- HP Бар
+    -- ============================================================
+    -- ПРОСТОЙ HP БАР (БЕЗ СЕРДЕЧЕК)
+    -- ============================================================
+    
+    -- Иконка HP (простой красный кружок)
     love.graphics.setColor(1, 0.2, 0.2)
-    love.graphics.circle("fill", 25, 20, 8)
-    love.graphics.circle("fill", 39, 20, 8)
-    love.graphics.polygon("fill",
-        25, 16,
-        32, 28,
-        39, 16
-    )
+    love.graphics.circle("fill", 20, 22, 10)
+    love.graphics.setColor(1, 0.4, 0.4)
+    love.graphics.circle("fill", 20, 22, 6)
     
+    -- Подложка HP бара
     love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
-    love.graphics.rectangle("fill", 53, 12, 150, 18, 9)
+    love.graphics.rectangle("fill", 40, 12, 160, 20, 10)
     
+    -- Заполнение HP бара
     local hpPercent = cube.hp / 5
     if hpPercent > 0.6 then
         love.graphics.setColor(0, 1, 0)
@@ -240,17 +242,21 @@ function game.draw()
     else
         love.graphics.setColor(1, 0, 0)
     end
-    love.graphics.rectangle("fill", 53, 12, 150 * hpPercent, 18, 9)
+    love.graphics.rectangle("fill", 42, 14, 156 * hpPercent, 16, 8)
     
-    love.graphics.setColor(1, 1, 1, 0.5)
+    -- Обводка HP бара
+    love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", 53, 12, 150, 18, 9)
+    love.graphics.rectangle("line", 40, 12, 160, 20, 10)
     
+    -- Текст HP (количество)
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(uiFont or love.graphics.newFont(11))
-    love.graphics.printf(math.ceil(cube.hp) .. "/5", 53, 14, 150, "center")
+    love.graphics.printf(math.ceil(cube.hp) .. "/5", 40, 14, 160, "center")
     
+    -- ============================================================
     -- МОНЕТЫ
+    -- ============================================================
     love.graphics.setColor(1, 0.8, 0)
     love.graphics.circle("fill", 225, 19, 10)
     love.graphics.setColor(1, 0.9, 0.2)
