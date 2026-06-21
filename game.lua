@@ -15,9 +15,6 @@ local diamondImg = nil
 local menuFont = nil
 local uiFont = nil
 
--- ============================================================
--- СПОСОБНОСТЬ АЛМАЗНОГО КУБИКА
--- ============================================================
 local abilityActive = false
 local abilityTimer = 0
 local abilityDuration = 2.5
@@ -219,21 +216,15 @@ function game.draw()
     love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
     love.graphics.rectangle("fill", 0, 48, screenW, 2)
     
-    -- ============================================================
-    -- ПРОСТОЙ HP БАР (БЕЗ СЕРДЕЧЕК)
-    -- ============================================================
-    
-    -- Иконка HP (простой красный кружок)
+    -- HP Бар
     love.graphics.setColor(1, 0.2, 0.2)
     love.graphics.circle("fill", 20, 22, 10)
     love.graphics.setColor(1, 0.4, 0.4)
     love.graphics.circle("fill", 20, 22, 6)
     
-    -- Подложка HP бара
     love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
     love.graphics.rectangle("fill", 40, 12, 160, 20, 10)
     
-    -- Заполнение HP бара
     local hpPercent = cube.hp / 5
     if hpPercent > 0.6 then
         love.graphics.setColor(0, 1, 0)
@@ -244,19 +235,15 @@ function game.draw()
     end
     love.graphics.rectangle("fill", 42, 14, 156 * hpPercent, 16, 8)
     
-    -- Обводка HP бара
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setLineWidth(1)
     love.graphics.rectangle("line", 40, 12, 160, 20, 10)
     
-    -- Текст HP (количество)
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(uiFont or love.graphics.newFont(11))
     love.graphics.printf(math.ceil(cube.hp) .. "/5", 40, 14, 160, "center")
     
-    -- ============================================================
     -- МОНЕТЫ
-    -- ============================================================
     love.graphics.setColor(1, 0.8, 0)
     love.graphics.circle("fill", 225, 19, 10)
     love.graphics.setColor(1, 0.9, 0.2)
@@ -307,8 +294,7 @@ function game.touchpressed(id, x, y)
     
     if x >= menuBtnX and x <= menuBtnX + menuBtnW and
        y >= menuBtnY and y <= menuBtnY + menuBtnH then
-        -- Используем глобальную функцию playSound из main.lua
-        if playSound then playSound("click") end
+        playSound("click")
         saveCoins()
         _G.GameState.current = "lobby"
         return
@@ -330,7 +316,7 @@ function game.touchreleased(id, x, y)
     local shot, dx, dy, abilityUsed = controls.touchreleased(id)
     
     if shot then
-        if playSound then playSound("shot") end
+        playSound("shot")
         local len = math.sqrt(dx*dx + dy*dy)
         if len > 0 then
             dx = dx / len
@@ -356,7 +342,7 @@ end
 
 function game.keypressed(key)
     if key == "escape" then
-        if playSound then playSound("click") end
+        playSound("click")
         saveCoins()
         _G.GameState.current = "lobby"
         return
@@ -376,7 +362,7 @@ function game.keyreleased(key)
     if controls.keyreleased then
         local shot, dx, dy, abilityUsed = controls.keyreleased(key)
         if shot then
-            if playSound then playSound("shot") end
+            playSound("shot")
             local len = math.sqrt(dx*dx + dy*dy)
             if len > 0 then
                 dx = dx / len
@@ -409,7 +395,7 @@ function activateAbility()
     abilityTimer = abilityDuration
     isInvulnerable = true
     controls.useAbility()
-    if playSound then playSound("success") end
+    playSound("success")
 end
 
 function game.setOnDeath(fn)
