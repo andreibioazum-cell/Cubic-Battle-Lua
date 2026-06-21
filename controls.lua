@@ -1,5 +1,5 @@
 local controls = {}
-local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
+local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 55, sr = 25 }
 local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
 local ability = { id = nil, x = 0, y = 0, r = 40, hold = false, cooldown = 0, maxCooldown = 5 }
 local font = nil
@@ -27,11 +27,11 @@ end
 
 function controls.resize()
     local w, h = love.graphics.getDimensions()
-    joy.cy = h - 90
+    joy.cy = h - 100
     joy.sy = joy.cy
     atk.x = w - 90
     atk.y = h - 90
-    ability.x = w - 170
+    ability.x = w - 180
     ability.y = h - 90
 end
 
@@ -93,10 +93,9 @@ function controls.useAbility()
 end
 
 -- ============================================================
--- ТАЧ КАК В СТАРОМ (НАЖИМАЕШЬ НА СТИК)
+-- ТАЧ / МЫШЬ
 -- ============================================================
 function controls.touchpressed(id, x, y)
-    -- ДЖОЙСТИК (как в старом - проверяем попадание В СТИК)
     local dx, dy = x - joy.cx, y - joy.cy
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
@@ -108,7 +107,6 @@ function controls.touchpressed(id, x, y)
         end
     end
     
-    -- КНОПКА АТАКИ (как в старом)
     local ax, ay = x - atk.x, y - atk.y
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
@@ -120,7 +118,6 @@ function controls.touchpressed(id, x, y)
         end
     end
     
-    -- КНОПКА СПОСОБНОСТИ (новая)
     local abx, aby = x - ability.x, y - ability.y
     if abx*abx + aby*aby < ability.r*ability.r then
         if ability.cooldown <= 0 then
@@ -242,7 +239,6 @@ end
 -- ============================================================
 function controls.mousepressed(x, y, button)
     if button == 1 then
-        -- ДЖОЙСТИК (как в старом - проверяем попадание В СТИК)
         local dx, dy = x - joy.cx, y - joy.cy
         if dx*dx + dy*dy < joy.r*joy.r then
             joy.id = 1
@@ -254,7 +250,6 @@ function controls.mousepressed(x, y, button)
             end
         end
         
-        -- КНОПКА АТАКИ
         local ax, ay = x - atk.x, y - atk.y
         if ax*ax + ay*ay < atk.r*atk.r then
             atk.id = 1
@@ -262,7 +257,6 @@ function controls.mousepressed(x, y, button)
             return "attack"
         end
         
-        -- КНОПКА СПОСОБНОСТИ
         local abx, aby = x - ability.x, y - ability.y
         if abx*abx + aby*aby < ability.r*ability.r then
             if ability.cooldown <= 0 then
@@ -325,7 +319,7 @@ function controls.mousereleased(x, y, button)
 end
 
 -- ============================================================
--- РИСОВАНИЕ (БЕЛЫЙ ДЖОЙСТИК КАК В СТАРОМ + КНОПКИ)
+-- РИСОВАНИЕ (БЕЛЫЙ ГУИ)
 -- ============================================================
 function controls.draw()
     if not font then
@@ -333,75 +327,115 @@ function controls.draw()
     end
     
     -- ============================================================
-    -- ДЖОЙСТИК (КАК В СТАРОМ)
+    -- БЕЛЫЙ ДЖОЙСТИК
     -- ============================================================
-    love.graphics.setColor(0, 0, 0, 0.4)
+    
+    -- Подложка (полупрозрачная)
+    love.graphics.setColor(0.15, 0.15, 0.25, 0.25)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(0.5, 0.2, 1, 0.3)
+    
+    -- Обводка подложки (белая)
+    love.graphics.setColor(1, 1, 1, 0.15)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
     
-    love.graphics.setColor(1, 1, 1, 0.8)
+    -- Стик (БЕЛЫЙ)
+    love.graphics.setColor(1, 1, 1, 0.95)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
-    love.graphics.setColor(0.8, 0.4, 1, 0.5)
-    love.graphics.circle("fill", joy.sx, joy.sy, joy.sr * 0.6)
+    
+    -- Блик на стике
+    love.graphics.setColor(1, 1, 1, 0.4)
+    love.graphics.circle("fill", joy.sx - 7, joy.sy - 8, joy.sr * 0.35)
+    love.graphics.setColor(1, 1, 1, 0.15)
+    love.graphics.circle("fill", joy.sx - 10, joy.sy - 12, joy.sr * 0.15)
     
     -- ============================================================
-    -- КНОПКА АТАКИ (КАК В СТАРОМ - SHOT)
+    -- КНОПКА АТАКИ (A) - СИНЯЯ/ГОЛУБАЯ
     -- ============================================================
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.circle("fill", atk.x + 2, atk.y + 2, atk.r)
-    love.graphics.setColor(0.5, 0, 1, 0.8)
+    
+    -- Тень
+    love.graphics.setColor(0, 0, 0, 0.2)
+    love.graphics.circle("fill", atk.x + 3, atk.y + 3, atk.r)
+    
+    -- Основной круг (голубой)
+    love.graphics.setColor(0.2, 0.6, 0.9, 0.9)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
-    love.graphics.setColor(0.6, 0.2, 1, 0.3)
+    
+    -- Блик
+    love.graphics.setColor(0.5, 0.8, 1, 0.2)
+    love.graphics.circle("fill", atk.x - 15, atk.y - 15, atk.r * 0.4)
+    
+    -- Обводка
+    love.graphics.setColor(0.3, 0.7, 1, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", atk.x, atk.y, atk.r)
     
     if atk.hold then
-        love.graphics.setColor(1, 1, 1, 0.6)
-        love.graphics.setLineWidth(3)
-        local len = 35
-        love.graphics.line(
-            atk.x, atk.y,
-            atk.x + moveDir.x * len,
-            atk.y + moveDir.y * len
-        )
-        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 5)
+        love.graphics.setColor(1, 1, 1, 0.15)
+        love.graphics.circle("fill", atk.x, atk.y, atk.r + 8)
     end
     
+    -- Буква A
     love.graphics.setColor(1, 1, 1)
-    if font then
-        love.graphics.setFont(font)
-        love.graphics.printf("SHOT", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
-    end
+    love.graphics.setFont(font)
+    love.graphics.printf("A", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
+    
+    -- Подпись
+    love.graphics.setColor(1, 1, 1, 0.2)
+    love.graphics.setFont(love.graphics.newFont(9))
+    love.graphics.printf("FIRE", atk.x - 20, atk.y + atk.r + 6, 40, "center")
     
     -- ============================================================
-    -- КНОПКА СПОСОБНОСТИ (НОВАЯ - S)
+    -- КНОПКА СПОСОБНОСТИ (S) - ФИОЛЕТОВАЯ
     -- ============================================================
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.circle("fill", ability.x + 2, ability.y + 2, ability.r)
+    
+    love.graphics.setColor(0, 0, 0, 0.2)
+    love.graphics.circle("fill", ability.x + 3, ability.y + 3, ability.r)
     
     if ability.cooldown > 0 then
+        -- Перезарядка
         love.graphics.setColor(0.3, 0.3, 0.4, 0.7)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.arc("fill", ability.x, ability.y, ability.r, 
             -math.pi/2, -math.pi/2 + (1 - ability.cooldown / ability.maxCooldown) * 2 * math.pi)
+        
+        love.graphics.setColor(0.4, 0.4, 0.5, 0.3)
+        love.graphics.setLineWidth(2)
+        love.graphics.circle("line", ability.x, ability.y, ability.r)
     else
-        love.graphics.setColor(0.5, 0, 1, 0.8)
+        -- Готова
+        love.graphics.setColor(0.6, 0.2, 0.9, 0.9)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
-        love.graphics.setColor(0.6, 0.2, 1, 0.3)
+        
+        -- Блик
+        love.graphics.setColor(0.8, 0.4, 1, 0.2)
+        love.graphics.circle("fill", ability.x - 12, ability.y - 12, ability.r * 0.35)
+        
+        -- Обводка
+        love.graphics.setColor(0.7, 0.3, 1, 0.3)
         love.graphics.setLineWidth(2)
         love.graphics.circle("line", ability.x, ability.y, ability.r)
         
+        -- Пульсация готовности
         local pulse = 0.8 + 0.2 * math.sin(love.timer.getTime() * 2)
         love.graphics.setColor(0.8, 0.4, 1, pulse * 0.15)
         love.graphics.circle("fill", ability.x, ability.y, ability.r + 6)
     end
     
+    -- Буква S
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(font)
     love.graphics.printf("S", ability.x - ability.r, ability.y - 14, ability.r*2, "center")
+    
+    -- Подпись
+    love.graphics.setColor(1, 1, 1, 0.2)
+    love.graphics.setFont(love.graphics.newFont(9))
+    if ability.cooldown > 0 then
+        love.graphics.printf("READY", ability.x - 25, ability.y + ability.r + 6, 50, "center")
+    else
+        love.graphics.printf("SHIELD", ability.x - 25, ability.y + ability.r + 6, 50, "center")
+    end
 end
 
 return controls
