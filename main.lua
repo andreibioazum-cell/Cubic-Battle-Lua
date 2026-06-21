@@ -1,16 +1,13 @@
--- Подключаем все модули
 local lobby = require("lobby")
 local game = require("game")
 local keyboard = require("game_keyboard")
 local shop = require("shop")
 local sights = require("sights")
 
--- Глобальное состояние игры
 _G.GameState = { current = "lobby" }
 _G.shop = shop
 _G.sights = sights
 
--- Таблица состояний
 local states = {
     lobby = lobby,
     game = game
@@ -18,21 +15,11 @@ local states = {
 
 local lastState = nil
 
--- ============================================================
--- ФУНКЦИЯ ВОСПРОИЗВЕДЕНИЯ ЗВУКА
--- ============================================================
 function playSound(name)
     if _G.sounds and _G.sounds[name] then
         local source = _G.sounds[name]
-        if source then
-            if source.clone then
-                local clone = source:clone()
-                if clone then
-                    clone:play()
-                end
-            elseif source.play then
-                source:play()
-            end
+        if source and source.play then
+            source:play()
         end
     end
 end
@@ -43,9 +30,6 @@ function love.load()
     
     keyboard.init()
     
-    -- ============================================================
-    -- ЗАГРУЗКА ЗВУКОВ
-    -- ============================================================
     _G.sounds = {}
     
     local function loadSound(name, file)
@@ -56,9 +40,6 @@ function love.load()
             source:setVolume(0.5)
             source:setLooping(false)
             _G.sounds[name] = source
-            print("Loaded: " .. name)
-        else
-            print("Could not load: " .. file)
         end
     end
     
@@ -67,7 +48,6 @@ function love.load()
     loadSound("success", "success.mp3")
     loadSound("error", "error.mp3")
 
-    -- Загрузка состояний
     local g = require("game")
     if g.setOnDeath then
         g.setOnDeath(function()
