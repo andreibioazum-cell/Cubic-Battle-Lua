@@ -1,18 +1,34 @@
 local controls = {}
-local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 55, sr = 25 }
-local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
-local ability = { id = nil, x = 0, y = 0, r = 40, hold = false, cooldown = 0, maxCooldown = 5 }
-local font = nil
+
+local joystick = {
+    id = nil,
+    cx = 90, cy = 0,
+    sx = 90, sy = 0,
+    radius = 55,
+    stickRadius = 25
+}
+
+local attack = {
+    id = nil,
+    x = 0, y = 0,
+    radius = 55,
+    holding = false
+}
+
+local ability = {
+    id = nil,
+    x = 0, y = 0,
+    radius = 40,
+    cooldown = 0,
+    maxCooldown = 5,
+    holding = false
+}
 
 local moveDir = { x = 0, y = -1 }
+local font = nil
 
 local keys = {
-    up = false,
-    down = false,
-    left = false,
-    right = false,
-    space = false,
-    ability = false
+    up = false, down = false, left = false, right = false
 }
 
 function controls.load()
@@ -22,10 +38,10 @@ end
 
 function controls.resize()
     local w, h = love.graphics.getDimensions()
-    joy.cy = h - 100
-    joy.sy = joy.cy
-    atk.x = w - 90
-    atk.y = h - 90
+    joystick.cy = h - 100
+    joystick.sy = joystick.cy
+    attack.x = w - 90
+    attack.y = h - 90
     ability.x = w - 180
     ability.y = h - 90
 end
@@ -38,13 +54,12 @@ function controls.update(dt)
 end
 
 function controls.getMove()
-    if joy.id then
-        local dx, dy = joy.sx - joy.cx, joy.sy - joy.cy
+    if joystick.id then
+        local dx = joystick.sx - joystick.cx
+        local dy = joystick.sy - joystick.cy
         local len = math.sqrt(dx*dx + dy*dy)
         if len == 0 then return 0, 0 end
-        moveDir.x = dx/len
-        moveDir.y = dy/len
-        return moveDir.x, moveDir.y
+        return dx/len, dy/len
     end
     
     local dx, dy = 0, 0
@@ -83,138 +98,72 @@ function controls.useAbility()
     return false
 end
 
-function controls.touchpressed(id, x, y)
-    local dx, dy = x - joy.cx, y - joy.cy
-    if dx*dx + dy*dy < joy.r*joy.r then
-        joy.id = id
-        joy.sx, joy.sy = x, y
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len > 5 then
-            moveDir.x = dx / len
-            moveDir.y = dy / len
+function controls.mousepressed(x, y, button)
+    if button == 1 then
+        local dx = x - joystick.cx
+        local dy = y - joystick.cy
+        if dx*dx + dy*dy < joystick.radius*joystick.radius then
+            joystick.id = 1
+            joystick.sx = x
+            joystick.sy = y
+            local len = math.sqrt(dx*dx + dy*dy)
+            if len > 5 then
+                moveDir.x = dx / len
+                moveDir.y = dy / len
+            end
         end
-    end
-    
-    local ax, ay = x - atk.x, y - atk.y
-    if ax*ax + ay*ay < atk.r*atk.r then
-        atk.id = id
-        atk.hold = true
-        local len = math.sqrt(ax*ax + ay*ay)
-        if len > 5 then
-            moveDir.x = ax / len
-            moveDir.y = ay / len
-        end
-    end
-    
-    local abx, aby = x - ability.x, y - ability.y
-    if abx*abx + aby*aby < ability.r*ability.r then
-        if ability.cooldown <= 0 then
-            ability.id = id
-            ability.hold = true
-            return "ability"
-        end
-    end
-end
-
-function controls.touchmoved(id, x, y)
-    if id == joy.id then
-        local dx, dy = x - joy.cx, y - joy.cy
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len > joy.r then
-            dx, dy = dx/len*joy.r, dy/len*joy.r
-        end
-        joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
         
-        if len > 5 then
-            moveDir.x = dx / len
-            moveDir.y = dy / len
+        local ax = x - attack.x
+        local ay = y - attack.y
+        if ax*ax + ay*ay < attack.radius*attack.radius then
+            attack.id = 1
+            attack.holding = true
+        end
+        
+        local abx = x - ability.x
+        local aby = y - ability.y
+        if abx*abx + aby*aby < ability.radius*ability.radius then
+            if ability.cooldown <= 0 then
+                ability.id = 1
+                ability.holding = true
+                return "ability"
+            end
         end
     end
 end
 
-function controls.touchreleased(id)
-    local shot = false
-    local abilityUsed = false
-    local dx, dy = 0, 0
-    
-    if id == joy.id then
-        joy.id = nil
-        joy.sx, joy.sy = joy.cx, joy.cy
-    end
-    
-    if id == atk.id then
-        atk.id = nil
-        atk.hold = false
-        shot = true
-        dx, dy = moveDir.x, moveDir.y
-        if dx == 0 and dy == 0 then
-            dy = -1
+function controls.mousereleased(x, y, button)
+    if button == 1 then
+        local shot = false
+        local abilityUsed = false
+        local dx, dy = 0, 0
+        
+        if joystick.id then
+            joystick.id = nil
+            joystick.sx = joystick.cx
+            joystick.sy = joystick.cy
         end
-    end
-    
-    if id == ability.id then
-        ability.id = nil
-        ability.hold = false
-        if ability.cooldown <= 0 then
-            abilityUsed = true
-            ability.cooldown = ability.maxCooldown
-        end
-    end
-    
-    return shot, dx, dy, abilityUsed
-end
-
-function controls.keypressed(key)
-    if key == "w" or key == "up" then keys.up = true end
-    if key == "s" or key == "down" then keys.down = true end
-    if key == "a" or key == "left" then keys.left = true end
-    if key == "d" or key == "right" then keys.right = true end
-    
-    if key == "space" then 
-        keys.space = true
-        atk.id = -1
-        atk.hold = true
-    end
-    
-    if key == "e" or key == "q" then
-        keys.ability = true
-        if ability.cooldown <= 0 then
-            ability.id = -1
-            ability.hold = true
-            return "ability"
-        end
-    end
-end
-
-function controls.keyreleased(key)
-    if key == "w" or key == "up" then keys.up = false end
-    if key == "s" or key == "down" then keys.down = false end
-    if key == "a" or key == "left" then keys.left = false end
-    if key == "d" or key == "right" then keys.right = false end
-    
-    if key == "space" then 
-        keys.space = false
-        if atk.id == -1 then
-            atk.id = nil
-            atk.hold = false
-            local dx, dy = moveDir.x, moveDir.y
+        
+        if attack.id then
+            attack.id = nil
+            attack.holding = false
+            shot = true
+            dx, dy = moveDir.x, moveDir.y
             if dx == 0 and dy == 0 then
                 dy = -1
             end
-            return true, dx, dy, false
         end
-    end
-    
-    if key == "e" or key == "q" then
-        keys.ability = false
-        if ability.id == -1 then
+        
+        if ability.id then
             ability.id = nil
-            ability.hold = false
+            ability.holding = false
             if ability.cooldown <= 0 then
+                abilityUsed = true
                 ability.cooldown = ability.maxCooldown
-                return false, 0, 0, true
             end
         end
+        
+        return shot, dx, dy, abilityUsed
     end
 end
 
@@ -223,65 +172,62 @@ function controls.draw()
         controls.load()
     end
     
-    -- ДЖОЙСТИК
+    -- Joystick
     love.graphics.setColor(0, 0, 0, 0.25)
-    love.graphics.circle("fill", joy.cx + 3, joy.cy + 3, joy.r)
+    love.graphics.circle("fill", joystick.cx + 3, joystick.cy + 3, joystick.radius)
     love.graphics.setColor(0.25, 0.25, 0.35, 0.25)
-    love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
+    love.graphics.circle("fill", joystick.cx, joystick.cy, joystick.radius)
     love.graphics.setColor(0.5, 0.5, 0.6, 0.25)
     love.graphics.setLineWidth(2)
-    love.graphics.circle("line", joy.cx, joy.cy, joy.r)
+    love.graphics.circle("line", joystick.cx, joystick.cy, joystick.radius)
     love.graphics.setColor(1, 1, 1, 0.9)
-    love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
+    love.graphics.circle("fill", joystick.sx, joystick.sy, joystick.stickRadius)
     love.graphics.setColor(0.6, 0.6, 0.7, 0.3)
     love.graphics.setLineWidth(1.5)
-    love.graphics.circle("line", joy.sx, joy.sy, joy.sr)
+    love.graphics.circle("line", joystick.sx, joystick.sy, joystick.stickRadius)
     
-    -- КНОПКА АТАКИ
+    -- Attack button
     love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.circle("fill", atk.x + 3, atk.y + 3, atk.r)
+    love.graphics.circle("fill", attack.x + 3, attack.y + 3, attack.radius)
     love.graphics.setColor(0.8, 0.15, 0.15, 0.9)
-    love.graphics.circle("fill", atk.x, atk.y, atk.r)
+    love.graphics.circle("fill", attack.x, attack.y, attack.radius)
     love.graphics.setColor(0.9, 0.2, 0.2, 0.4)
     love.graphics.setLineWidth(2)
-    love.graphics.circle("line", atk.x, atk.y, atk.r)
+    love.graphics.circle("line", attack.x, attack.y, attack.radius)
     
-    if atk.hold then
+    if attack.holding then
         love.graphics.setColor(1, 1, 1, 0.2)
-        love.graphics.circle("fill", atk.x, atk.y, atk.r + 8)
-        love.graphics.setColor(1, 1, 1, 0.6)
-        love.graphics.setLineWidth(2)
-        love.graphics.line(atk.x, atk.y, atk.x + moveDir.x * 35, atk.y + moveDir.y * 35)
+        love.graphics.circle("fill", attack.x, attack.y, attack.radius + 8)
     end
     
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(font)
-    love.graphics.printf("A", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
+    love.graphics.printf("A", attack.x - attack.radius, attack.y - 14, attack.radius*2, "center")
     
-    -- КНОПКА СПОСОБНОСТИ
+    -- Ability button
     love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.circle("fill", ability.x + 3, ability.y + 3, ability.r)
+    love.graphics.circle("fill", ability.x + 3, ability.y + 3, ability.radius)
     
     if ability.cooldown > 0 then
         love.graphics.setColor(0.3, 0.3, 0.4, 0.7)
-        love.graphics.circle("fill", ability.x, ability.y, ability.r)
+        love.graphics.circle("fill", ability.x, ability.y, ability.radius)
         love.graphics.setColor(0, 0, 0, 0.4)
-        love.graphics.arc("fill", ability.x, ability.y, ability.r, 
+        love.graphics.arc("fill", ability.x, ability.y, ability.radius, 
             -math.pi/2, -math.pi/2 + (1 - ability.cooldown / ability.maxCooldown) * 2 * math.pi)
     else
         love.graphics.setColor(0.6, 0.2, 0.9, 0.9)
-        love.graphics.circle("fill", ability.x, ability.y, ability.r)
+        love.graphics.circle("fill", ability.x, ability.y, ability.radius)
         love.graphics.setColor(0.7, 0.3, 1, 0.4)
         love.graphics.setLineWidth(2)
-        love.graphics.circle("line", ability.x, ability.y, ability.r)
+        love.graphics.circle("line", ability.x, ability.y, ability.radius)
         local pulse = 0.8 + 0.2 * math.sin(love.timer.getTime() * 2)
         love.graphics.setColor(0.8, 0.4, 1, pulse * 0.15)
-        love.graphics.circle("fill", ability.x, ability.y, ability.r + 6)
+        love.graphics.circle("fill", ability.x, ability.y, ability.radius + 6)
     end
     
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(font)
-    love.graphics.printf("S", ability.x - ability.r, ability.y - 14, ability.r*2, "center")
+    love.graphics.printf("S", ability.x - ability.radius, ability.y - 14, ability.radius*2, "center")
 end
 
 return controls
