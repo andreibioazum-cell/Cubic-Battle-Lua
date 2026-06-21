@@ -307,7 +307,8 @@ function game.touchpressed(id, x, y)
     
     if x >= menuBtnX and x <= menuBtnX + menuBtnW and
        y >= menuBtnY and y <= menuBtnY + menuBtnH then
-        playSound("click")
+        -- Используем глобальную функцию playSound из main.lua
+        if playSound then playSound("click") end
         saveCoins()
         _G.GameState.current = "lobby"
         return
@@ -329,7 +330,7 @@ function game.touchreleased(id, x, y)
     local shot, dx, dy, abilityUsed = controls.touchreleased(id)
     
     if shot then
-        playSound("shot")
+        if playSound then playSound("shot") end
         local len = math.sqrt(dx*dx + dy*dy)
         if len > 0 then
             dx = dx / len
@@ -355,7 +356,7 @@ end
 
 function game.keypressed(key)
     if key == "escape" then
-        playSound("click")
+        if playSound then playSound("click") end
         saveCoins()
         _G.GameState.current = "lobby"
         return
@@ -375,7 +376,7 @@ function game.keyreleased(key)
     if controls.keyreleased then
         local shot, dx, dy, abilityUsed = controls.keyreleased(key)
         if shot then
-            playSound("shot")
+            if playSound then playSound("shot") end
             local len = math.sqrt(dx*dx + dy*dy)
             if len > 0 then
                 dx = dx / len
@@ -408,7 +409,7 @@ function activateAbility()
     abilityTimer = abilityDuration
     isInvulnerable = true
     controls.useAbility()
-    playSound("success")
+    if playSound then playSound("success") end
 end
 
 function game.setOnDeath(fn)
