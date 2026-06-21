@@ -1,39 +1,25 @@
 local shop = {}
 
 shop.items = {
-    { id = "speed_boost", name = "Speed Boost", price = 100, description = "Increase speed by 20%", owned = false },
-    { id = "shield", name = "Shield", price = 150, description = "Temporary protection", owned = false },
-    { id = "double_points", name = "Double Points", price = 120, description = "Earn 2x points", owned = false },
+    { id = "speed", name = "Speed Boost", price = 100, owned = false },
+    { id = "shield", name = "Shield", price = 150, owned = false }
 }
 
-shop.currency = 0
+shop.coins = 0
 
-function shop.addCurrency(amount)
-    shop.currency = shop.currency + amount
+function shop.addCoins(amount)
+    shop.coins = shop.coins + amount
 end
 
-function shop.buyItem(itemId)
-    for i, item in ipairs(shop.items) do
-        if item.id == itemId then
-            if shop.currency >= item.price then
-                shop.currency = shop.currency - item.price
-                item.owned = true
-                return true
-            end
-            return false
+function shop.buy(id)
+    for _, item in ipairs(shop.items) do
+        if item.id == id and not item.owned and shop.coins >= item.price then
+            shop.coins = shop.coins - item.price
+            item.owned = true
+            return true
         end
     end
     return false
-end
-
-function shop.getOwnedItems()
-    local owned = {}
-    for i, item in ipairs(shop.items) do
-        if item.owned then
-            table.insert(owned, item)
-        end
-    end
-    return owned
 end
 
 return shop
