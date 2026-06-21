@@ -3,116 +3,102 @@ local enemy = require("enemy")
 local game = {}
 
 local WORLD_SIZE = 3000
-local cube = { x = 1500, y = 1500, speed = 260, hp = 5, angle = 0 }
-local cam = { x = 0, y = 0 }
+local player = { x = 1500, y = 1500, speed = 250, hp = 5, maxHp = 5, angle = 0 }
+local camera = { x = 0, y = 0 }
 local bullets = {}
 local coins = 0
-local selected_skin = "default"
+local selectedSkin = "default"
 local dead = false
-local bg = nil
+local fontUI = nil
+
+local shieldActive = false
+local shieldTimer = 0
+local shieldDuration = 2.5
+
 local playerImg = nil
-local diamondImg = nil
-local uiFont = nil
 
-local abilityActive = false
-local abilityTimer = 0
-local abilityDuration = 2.5
-local isInvulnerable = false
-
-local function saveCoins()
-    local data = love.filesystem.read("save.txt")
-    if data then
-        local lines = {}
-        for line in data:gmatch("[^\r\n]+") do
-            table.insert(lines, line)
-        end
-        lines[1] = tostring(coins)
-        love.filesystem.write("save.txt", table.concat(lines, "\n"))
-    else
-        love.filesystem.write("save.txt", string.format("%d\n%s\n%s", coins, "default", selected_skin))
-    end
-end
-
-local function safeLoadImage(name, color)
-    local success, img = pcall(function()
-        return love.graphics.newImage(name)
-    end)
-    if success and img then
-        return img
-    else
-        local canvas = love.graphics.newCanvas(64, 64)
-        love.graphics.setCanvas(canvas)
-        love.graphics.clear(color or {1, 1, 1, 1})
-        love.graphics.setCanvas()
-        return canvas
-    end
+local function saveGame()
+    love.filesystem.write("save.txt", coins .. "\n" .. selectedSkin .. "\n" .. selectedSkin)
 end
 
 function game.load()
     controls.load()
-    uiFont = love.graphics.newFont(14)
+    fontUI = love.graphics.newFont(14)
     
-    cube.x, cube.y = 1500, 1500
-    cube.hp = 5
+    -- Загрузка текстуры игрока
+    local success, img = pcall(function()
+        return love.graphics.newImage("player.png")
+    end)
+    if success and img then
+        playerImg = img
+        print("Loaded player.png")
+    else
+        print("Could not load player.png, using fallback")
+        playerImg = nil
+    end
+    
+    -- Загружаем врага
+    enemy.load()
+    
+    player.x, player.y = 1500, 1500
+    player.hp = player.maxHp
     dead = false
     bullets = {}
-    abilityActive = false
-    isInvulnerable = false
+    shieldActive = false
+    shieldTimer = 0
     
-    bg = safeLoadImage("grass.png", {0.2, 0.5, 0.2, 1})
-    playerImg = safeLoadImage("player.png", {0, 0.5, 1, 1})
-    diamondImg = safeLoadImage("player_diamond.png", {0, 1, 1, 1})
-    
-    enemy.load()
     enemy.reset()
-    enemy.spawnNow(cube.x + 300, cube.y + 300)
+    enemy.spawnNow(player.x + 300, player.y + 300)
     enemy.setDeathCallback(function()
         coins = coins + 50
-        saveCoins()
+        saveGame()
         _G.GameState.current = "lobby"
+        print("Enemy killed! +50 coins")
     end)
+    
+    print("Game loaded! Skin: " .. selectedSkin)
 end
 
 function game.update(dt)
     if dead then return end
     controls.update(dt)
-
-    if abilityActive then
-        abilityTimer = abilityTimer - dt
-        if abilityTimer <= 0 then
-            abilityActive = false
-            isInvulnerable = false
+    
+    if shieldActive then
+        shieldTimer = shieldTimer - dt
+        if shieldTimer <= 0 then
+            shieldActive = false
         end
     end
-
+    
+    -- Движение
     local dx, dy = controls.getMove()
-    cube.x = math.max(0, math.min(WORLD_SIZE, cube.x + dx * cube.speed * dt))
-    cube.y = math.max(0, math.min(WORLD_SIZE, cube.y + dy * cube.speed * dt))
+    player.x = math.max(0, math.min(WORLD_SIZE, player.x + dx * player.speed * dt))
+    player.y = math.max(0, math.min(WORLD_SIZE, player.y + dy * player.speed * dt))
     if dx ~= 0 or dy ~= 0 then
-        cube.angle = math.atan2(dy, dx) + math.pi / 2
+        player.angle = math.atan2(dy, dx) + math.pi / 2
     end
-
+    
+    -- Камера
     local sw, sh = love.graphics.getDimensions()
-    cam.x = cam.x + (cube.x - sw / 2 - cam.x) * 5 * dt
-    cam.y = cam.y + (cube.y - sh / 2 - cam.y) * 5 * dt
-
+    camera.x = camera.x + (player.x - sw/2 - camera.x) * 5 * dt
+    camera.y = camera.y + (player.y - sh/2 - camera.y) * 5 * dt
+    
+    -- Обновление пуль
     for i = #bullets, 1, -1 do
         local b = bullets[i]
-        if b then
-            b.x = b.x + b.vx * dt
-            b.y = b.y + b.vy * dt
-            if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
-                table.remove(bullets, i)
-            end
+        b.x = b.x + b.vx * dt
+        b.y = b.y + b.vy * dt
+        if b.x < 0 or b.x > WORLD_SIZE or b.y < 0 or b.y > WORLD_SIZE then
+            table.remove(bullets, i)
         end
     end
-
-    enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
-        if isInvulnerable then return end
-        cube.hp = cube.hp - dmg
-        if cube.hp <= 0 then
+    
+    -- Обновление врага (передаем пули)
+    enemy.update(dt, player.x, player.y, bullets, function(dmg)
+        if shieldActive then return end
+        player.hp = player.hp - dmg
+        if player.hp <= 0 then
             dead = true
-            if game.onDeath then game.onDeath() end
             _G.GameState.current = "lobby"
         end
     end)
@@ -120,177 +106,185 @@ end
 
 function game.draw()
     love.graphics.push()
-    love.graphics.translate(-cam.x, -cam.y)
-
-    local sw, sh = love.graphics.getDimensions()
-    if bg then
-        local tw, th = bg:getWidth() or 64, bg:getHeight() or 64
-        for x = math.floor(cam.x / tw) * tw, cam.x + sw, tw do
-            for y = math.floor(cam.y / th) * th, cam.y + sh, th do
-                love.graphics.draw(bg, x, y)
-            end
+    love.graphics.translate(-camera.x, -camera.y)
+    
+    -- Фон
+    love.graphics.setColor(0.2, 0.5, 0.2)
+    love.graphics.rectangle("fill", 0, 0, WORLD_SIZE, WORLD_SIZE)
+    
+    -- Сетка
+    love.graphics.setColor(0.3, 0.6, 0.3, 0.3)
+    for x = 0, WORLD_SIZE, 100 do
+        love.graphics.line(x, 0, x, WORLD_SIZE)
+    end
+    for y = 0, WORLD_SIZE, 100 do
+        love.graphics.line(0, y, WORLD_SIZE, y)
+    end
+    
+    -- Рисуем врага
+    enemy.draw()
+    
+    -- Рисуем игрока
+    if playerImg then
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(playerImg, player.x, player.y, player.angle, 1, 1, 32, 32)
+    else
+        if selectedSkin == "diamond" then
+            love.graphics.setColor(0, 0.8, 1)
+            love.graphics.polygon("fill",
+                player.x, player.y - 30,
+                player.x + 30, player.y,
+                player.x, player.y + 30,
+                player.x - 30, player.y
+            )
+        else
+            love.graphics.setColor(0, 0.5, 1)
+            love.graphics.rectangle("fill", player.x - 25, player.y - 25, 50, 50)
         end
     end
-
-    enemy.draw()
-
-    love.graphics.setColor(1, 1, 1)
-    local img = selected_skin == "diamond" and diamondImg or playerImg
     
-    if abilityActive and selected_skin == "diamond" then
-        love.graphics.setColor(0.6, 0.2, 1, 0.4)
-        love.graphics.circle("fill", cube.x, cube.y, 50)
+    -- Щит
+    if shieldActive then
+        love.graphics.setColor(0.6, 0.2, 1, 0.3 + 0.2 * math.sin(love.timer.getTime() * 6))
+        love.graphics.circle("fill", player.x, player.y, 45)
         love.graphics.setColor(0.8, 0.4, 1, 0.2)
-        love.graphics.circle("fill", cube.x, cube.y, 60)
-        love.graphics.setColor(0.6, 0.2, 1, 0.3)
-        love.graphics.setLineWidth(2)
-        love.graphics.circle("line", cube.x, cube.y, 50)
+        love.graphics.circle("fill", player.x, player.y, 55)
     end
     
-    if img then
-        local w, h = img:getWidth() or 64, img:getHeight() or 64
-        love.graphics.draw(img, cube.x, cube.y, cube.angle, 55/w, 55/h, w/2, h/2)
-    end
-
-    love.graphics.setColor(1, 1, 1, 0.2)
-    love.graphics.setLineWidth(2)
-    local aimX, aimY = controls.getAim()
-    love.graphics.line(cube.x, cube.y, cube.x + aimX * 40, cube.y + aimY * 40)
-
+    -- Пули игрока
     for _, b in ipairs(bullets) do
         love.graphics.setColor(1, 1, 0)
         love.graphics.circle("fill", b.x, b.y, 5)
-        love.graphics.setColor(1, 1, 0, 0.2)
+        love.graphics.setColor(1, 1, 0, 0.3)
         love.graphics.circle("fill", b.x, b.y, 10)
     end
-    love.graphics.pop()
-
-    -- UI
-    local screenW, screenH = love.graphics.getDimensions()
     
-    love.graphics.setColor(0, 0, 0, 0.75)
-    love.graphics.rectangle("fill", 0, 0, screenW, 50)
-    love.graphics.setColor(0.3, 0.3, 0.5, 0.3)
-    love.graphics.rectangle("fill", 0, 48, screenW, 2)
+    love.graphics.pop()
+    
+    -- UI
+    local sw, sh = love.graphics.getDimensions()
+    
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", 0, 0, sw, 40)
     
     -- HP
-    love.graphics.setColor(1, 0.2, 0.2)
-    love.graphics.circle("fill", 20, 22, 10)
-    
-    love.graphics.setColor(0.2, 0.2, 0.2, 0.8)
-    love.graphics.rectangle("fill", 40, 12, 160, 20, 10)
-    
-    local hpPercent = cube.hp / 5
-    if hpPercent > 0.6 then love.graphics.setColor(0, 1, 0)
-    elseif hpPercent > 0.3 then love.graphics.setColor(1, 1, 0)
-    else love.graphics.setColor(1, 0, 0) end
-    love.graphics.rectangle("fill", 42, 14, 156 * hpPercent, 16, 8)
+    local hpPercent = player.hp / player.maxHp
+    if hpPercent > 0.6 then
+        love.graphics.setColor(0, 1, 0)
+    elseif hpPercent > 0.3 then
+        love.graphics.setColor(1, 1, 0)
+    else
+        love.graphics.setColor(1, 0, 0)
+    end
+    love.graphics.rectangle("fill", 10, 10, hpPercent * 150, 20)
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.rectangle("line", 10, 10, 150, 20)
     
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(uiFont)
-    love.graphics.printf(math.ceil(cube.hp) .. "/5", 40, 14, 160, "center")
+    love.graphics.setFont(fontUI)
+    love.graphics.printf(player.hp .. "/" .. player.maxHp, 10, 12, 150, "center")
     
     -- Монеты
     love.graphics.setColor(1, 0.8, 0)
-    love.graphics.circle("fill", 225, 19, 10)
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.setFont(uiFont)
-    love.graphics.printf(coins, 242, 12, 100, "left")
+    love.graphics.printf("COINS: " .. coins, sw - 150, 12, 140, "right")
     
-    -- MENU
-    local menuBtnX = screenW - 90
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", menuBtnX + 2, 10, 75, 34, 8)
-    love.graphics.setColor(0.8, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", menuBtnX, 8, 75, 34, 8)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(love.graphics.newFont(12))
-    love.graphics.printf("MENU", menuBtnX, 16, 75, "center")
+    -- Подсказка
+    love.graphics.setColor(1, 1, 1, 0.4)
+    love.graphics.setFont(love.graphics.newFont(11))
+    love.graphics.printf("WASD - Move | SPACE - Attack | E - Shield", 0, sh - 25, sw, "center")
     
     controls.draw()
 end
 
-function game.touchpressed(id, x, y)
-    local screenW, screenH = love.graphics.getDimensions()
-    local menuBtnX = screenW - 90
-    
-    if x >= menuBtnX and x <= menuBtnX + 75 and y >= 8 and y <= 42 then
-        playSound("click")
-        saveCoins()
-        _G.GameState.current = "lobby"
-        return
+-- ============================================================
+-- АТАКА (СПАВН ПУЛИ)
+-- ============================================================
+function game.shoot()
+    local aimX, aimY = controls.getAim()
+    local len = math.sqrt(aimX*aimX + aimY*aimY)
+    if len > 0 then
+        aimX, aimY = aimX/len, aimY/len
+    else
+        aimX, aimY = 0, -1
     end
-    
-    local result = controls.touchpressed(id, x, y)
-    if result == "ability" and selected_skin == "diamond" then
-        activateAbility()
-    end
+    table.insert(bullets, {
+        x = player.x,
+        y = player.y,
+        vx = aimX * 400,
+        vy = aimY * 400
+    })
+    print("Shot fired!")
 end
 
-function game.touchmoved(id, x, y)
-    controls.touchmoved(id, x, y)
-end
-
-function game.touchreleased(id, x, y)
-    local shot, dx, dy, abilityUsed = controls.touchreleased(id)
-    
-    if shot then
-        playSound("shot")
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len > 0 then dx, dy = dx/len, dy/len else dx, dy = 0, -1 end
-        table.insert(bullets, {x = cube.x, y = cube.y, vx = dx * 400, vy = dy * 400})
-    end
-    
-    if abilityUsed and selected_skin == "diamond" then
-        activateAbility()
-    end
-end
+-- ============================================================
+-- ОБРАБОТКА ВВОДА
+-- ============================================================
 
 function game.keypressed(key)
     if key == "escape" then
-        playSound("click")
-        saveCoins()
         _G.GameState.current = "lobby"
         return
     end
     
-    if controls.keypressed then
-        local result = controls.keypressed(key)
-        if result == "ability" and selected_skin == "diamond" then
-            activateAbility()
+    local result = controls.keypressed(key)
+    
+    if result == "attack" then
+        game.shoot()
+    end
+    
+    if result == "ability" then
+        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
+            shieldActive = true
+            shieldTimer = shieldDuration
+            controls.useAbility()
+            print("Shield activated!")
         end
     end
 end
 
 function game.keyreleased(key)
-    if controls.keyreleased then
-        local shot, dx, dy, abilityUsed = controls.keyreleased(key)
-        if shot then
-            playSound("shot")
-            local len = math.sqrt(dx*dx + dy*dy)
-            if len > 0 then dx, dy = dx/len, dy/len else dx, dy = 0, -1 end
-            table.insert(bullets, {x = cube.x, y = cube.y, vx = dx * 400, vy = dy * 400})
-        end
-        if abilityUsed and selected_skin == "diamond" then
-            activateAbility()
+    local result = controls.keyreleased(key)
+    
+    if result == "attack" then
+        local _, dx, dy = result
+        if dx and dy then
+            game.shoot()
         end
     end
 end
 
-function activateAbility()
-    if selected_skin ~= "diamond" then return end
-    if abilityActive then return end
-    if not controls.canUseAbility() then return end
+function game.mousepressed(x, y, button)
+    local result = controls.mousepressed(x, y, button)
     
-    abilityActive = true
-    abilityTimer = abilityDuration
-    isInvulnerable = true
-    controls.useAbility()
-    playSound("success")
+    if result == "attack" then
+        game.shoot()
+    end
+    
+    if result == "ability" then
+        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
+            shieldActive = true
+            shieldTimer = shieldDuration
+            controls.useAbility()
+            print("Shield activated!")
+        end
+    end
 end
 
-function game.setOnDeath(fn)
-    game.onDeath = fn
+function game.mousereleased(x, y, button)
+    local shot, dx, dy, abilityUsed = controls.mousereleased(x, y, button)
+    
+    if shot then
+        game.shoot()
+    end
+    
+    if abilityUsed then
+        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
+            shieldActive = true
+            shieldTimer = shieldDuration
+            controls.useAbility()
+            print("Shield activated!")
+        end
+    end
 end
 
 function game.setCoins(c)
@@ -298,7 +292,11 @@ function game.setCoins(c)
 end
 
 function game.setSkin(s)
-    selected_skin = s or "default"
+    selectedSkin = s or "default"
+end
+
+function game.resize()
+    controls.resize()
 end
 
 return game
