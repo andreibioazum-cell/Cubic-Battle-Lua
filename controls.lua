@@ -4,7 +4,7 @@ local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
 local ability = { id = nil, x = 0, y = 0, r = 40, hold = false, cooldown = 0, maxCooldown = 5 }
 local font = nil
 
-local moveDir = { x = 0, y = -1 }
+local moveDir = { x = 0, y = 0 }
 
 local keys = {
     up = false,
@@ -43,20 +43,19 @@ function controls.update(dt)
 end
 
 function controls.getMove()
-    -- ЕСЛИ ДЖОЙСТИК АКТИВЕН - ВОЗВРАЩАЕМ НАПРАВЛЕНИЕ
+    -- ДЖОЙСТИК
     if joy.id then
         local dx = joy.sx - joy.cx
         local dy = joy.sy - joy.cy
         local len = math.sqrt(dx*dx + dy*dy)
-        if len == 0 then 
-            return 0, 0  -- В ЦЕНТРЕ - НЕ ДВИГАЕМСЯ
+        if len > 5 then
+            return dx/len, dy/len
+        else
+            return 0, 0
         end
-        moveDir.x = dx/len
-        moveDir.y = dy/len
-        return moveDir.x, moveDir.y
     end
     
-    -- ЕСЛИ НЕТ ДЖОЙСТИКА - ИСПОЛЬЗУЕМ КЛАВИАТУРУ
+    -- КЛАВИАТУРА
     local dx, dy = 0, 0
     if keys.left then dx = -1 end
     if keys.right then dx = 1 end
@@ -67,15 +66,6 @@ function controls.getMove()
         local len = math.sqrt(2)
         dx = dx / len
         dy = dy / len
-    end
-    
-    if dx ~= 0 or dy ~= 0 then
-        moveDir.x = dx
-        moveDir.y = dy
-    else
-        -- ЕСЛИ НИЧЕГО НЕ НАЖАТО - НЕ ДВИГАЕМСЯ
-        moveDir.x = 0
-        moveDir.y = 0
     end
     
     return dx, dy
@@ -111,14 +101,6 @@ function controls.touchpressed(id, x, y)
         joy.id = id
         joy.sx = x
         joy.sy = y
-        local len = math.sqrt(dx*dx + dy*dy)
-        if len > 5 then
-            moveDir.x = dx / len
-            moveDir.y = dy / len
-        else
-            moveDir.x = 0
-            moveDir.y = 0
-        end
     end
     
     -- КНОПКА АТАКИ
@@ -126,11 +108,7 @@ function controls.touchpressed(id, x, y)
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
-        local len = math.sqrt(ax*ax + ay*ay)
-        if len > 5 then
-            moveDir.x = ax / len
-            moveDir.y = ay / len
-        end
+        return "attack"
     end
     
     -- КНОПКА СПОСОБНОСТИ
@@ -157,14 +135,6 @@ function controls.touchmoved(id, x, y)
             joy.sx = x
             joy.sy = y
         end
-        
-        if len > 5 then
-            moveDir.x = dx / len
-            moveDir.y = dy / len
-        else
-            moveDir.x = 0
-            moveDir.y = 0
-        end
     end
 end
 
@@ -177,19 +147,13 @@ function controls.touchreleased(id)
         joy.id = nil
         joy.sx = joy.cx
         joy.sy = joy.cy
-        moveDir.x = 0
-        moveDir.y = 0
     end
     
     if id == atk.id then
         atk.id = nil
         atk.hold = false
         shot = true
-        dx = moveDir.x
-        dy = moveDir.y
-        if dx == 0 and dy == 0 then
-            dy = -1
-        end
+        dx, dy = controls.getMove()
     end
     
     if id == ability.id then
@@ -205,7 +169,7 @@ function controls.touchreleased(id)
 end
 
 -- ============================================================
--- КЛАВИАТУРА (ПК)
+-- КЛАВИАТУРА
 -- ============================================================
 function controls.keypressed(key)
     if key == "w" or key == "up" then keys.up = true end
@@ -241,11 +205,7 @@ function controls.keyreleased(key)
         if atk.id == -1 then
             atk.id = nil
             atk.hold = false
-            local dx = moveDir.x
-            local dy = moveDir.y
-            if dx == 0 and dy == 0 then
-                dy = -1
-            end
+            local dx, dy = controls.getMove()
             return "attack", dx, dy
         end
     end
@@ -273,11 +233,6 @@ function controls.mousepressed(x, y, button)
             joy.id = 1
             joy.sx = x
             joy.sy = y
-            local len = math.sqrt(dx*dx + dy*dy)
-            if len > 5 then
-                moveDir.x = dx / len
-                moveDir.y = dy / len
-            end
         end
         
         local ax, ay = x - atk.x, y - atk.y
@@ -311,11 +266,6 @@ function controls.mousemoved(x, y, dx, dy, button)
             joy.sx = x
             joy.sy = y
         end
-        
-        if len > 5 then
-            moveDir.x = dx2 / len
-            moveDir.y = dy2 / len
-        end
     end
 end
 
@@ -329,19 +279,13 @@ function controls.mousereleased(x, y, button)
             joy.id = nil
             joy.sx = joy.cx
             joy.sy = joy.cy
-            moveDir.x = 0
-            moveDir.y = 0
         end
         
         if atk.id then
             atk.id = nil
             atk.hold = false
             shot = true
-            dx = moveDir.x
-            dy = moveDir.y
-            if dx == 0 and dy == 0 then
-                dy = -1
-            end
+            dx, dy = controls.getMove()
         end
         
         if ability.id then
