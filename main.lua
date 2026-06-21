@@ -26,7 +26,7 @@ function playSound(name)
         local source = _G.sounds[name]
         if source then
             -- Проверяем, есть ли метод clone (для статичных звуков)
-            if source:clone then
+            if source.clone then
                 local clone = source:clone()
                 if clone then
                     clone:setVolume(source:getVolume() or 0.5)
