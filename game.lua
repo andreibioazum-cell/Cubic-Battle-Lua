@@ -20,7 +20,7 @@ local uiFont = nil
 -- ============================================================
 local abilityActive = false
 local abilityTimer = 0
-local abilityDuration = 2.5 -- 2.5 секунды неуязвимости
+local abilityDuration = 2.5
 local isInvulnerable = false
 
 local function saveCoins()
@@ -90,7 +90,6 @@ function game.update(dt)
     if dead then return end
     controls.update(dt)
 
-    -- Обновление способности
     if abilityActive then
         abilityTimer = abilityTimer - dt
         if abilityTimer <= 0 then
@@ -124,7 +123,6 @@ function game.update(dt)
     end
 
     enemy.update(dt, cube.x, cube.y, bullets, function(dmg)
-        -- Если неуязвим - не получаем урон
         if isInvulnerable then
             return
         end
@@ -164,7 +162,6 @@ function game.draw()
     love.graphics.setColor(1, 1, 1)
     local img = selected_skin == "diamond" and diamondImg or playerImg
     
-    -- Эффект щита при активной способности
     if abilityActive and selected_skin == "diamond" then
         love.graphics.setColor(0.6, 0.2, 1, 0.3 + 0.2 * math.sin(love.timer.getTime() * 6))
         love.graphics.circle("fill", cube.x, cube.y, 50)
@@ -293,13 +290,6 @@ function game.draw()
     -- КНОПКИ УПРАВЛЕНИЯ
     -- ============================================================
     controls.draw()
-    
-    -- НИЖНЯЯ ПАНЕЛЬ
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.rectangle("fill", 0, screenH - 28, screenW, 28)
-    love.graphics.setColor(1, 1, 1, 0.3)
-    love.graphics.setFont(uiFont or love.graphics.newFont(11))
-    love.graphics.printf("WASD - Move | SPACE - Attack | E - Shield | ESC - Menu", 0, screenH - 22, screenW, "center")
 end
 
 function game.touchpressed(id, x, y)
@@ -319,7 +309,6 @@ function game.touchpressed(id, x, y)
     
     local result = controls.touchpressed(id, x, y)
     if result == "ability" then
-        -- Активируем способность (только для алмазного скина)
         if selected_skin == "diamond" then
             activateAbility()
         end
@@ -404,9 +393,6 @@ function game.keyreleased(key)
     end
 end
 
--- ============================================================
--- АКТИВАЦИЯ СПОСОБНОСТИ
--- ============================================================
 function activateAbility()
     if selected_skin ~= "diamond" then return end
     if abilityActive then return end
