@@ -31,7 +31,8 @@ function controls.resize()
     joy.sy = joy.cy
     atk.x = w - 90
     atk.y = h - 90
-    ability.x = w - 170
+    -- Смещаем кнопку способности левее на 10 пикселей (было -170, стало -180)
+    ability.x = w - 180
     ability.y = h - 90
 end
 
@@ -298,7 +299,7 @@ function controls.draw()
     love.graphics.printf("A", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
     
     -- ============================================================
-    -- КНОПКА СПОСОБНОСТИ (ФИОЛЕТОВАЯ С БУКВОЙ "S") - БЕЗ ЦИФР
+    -- КНОПКА СПОСОБНОСТИ (ФИОЛЕТОВАЯ С БУКВОЙ "S") - СМЕЩЕНА ЛЕВЕЕ
     -- ============================================================
     
     -- Тень
@@ -345,7 +346,7 @@ function controls.draw()
     love.graphics.setFont(font)
     love.graphics.printf("S", ability.x - ability.r, ability.y - 14, ability.r*2, "center")
     
-    -- Подпись под кнопкой (только текст, без цифр)
+    -- Подпись под кнопкой
     love.graphics.setColor(1, 1, 1, 0.3)
     love.graphics.setFont(love.graphics.newFont(9))
     if ability.cooldown > 0 then
