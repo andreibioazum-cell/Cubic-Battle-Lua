@@ -92,8 +92,11 @@ function controls.useAbility()
     return false
 end
 
+-- ============================================================
+-- ТАЧ КАК В СТАРОМ (НАЖИМАЕШЬ НА СТИК)
+-- ============================================================
 function controls.touchpressed(id, x, y)
-    -- ДЖОЙСТИК
+    -- ДЖОЙСТИК (как в старом - проверяем попадание В СТИК)
     local dx, dy = x - joy.cx, y - joy.cy
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
@@ -105,7 +108,7 @@ function controls.touchpressed(id, x, y)
         end
     end
     
-    -- КНОПКА АТАКИ (A)
+    -- КНОПКА АТАКИ (как в старом)
     local ax, ay = x - atk.x, y - atk.y
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
@@ -117,7 +120,7 @@ function controls.touchpressed(id, x, y)
         end
     end
     
-    -- КНОПКА СПОСОБНОСТИ (S)
+    -- КНОПКА СПОСОБНОСТИ (новая)
     local abx, aby = x - ability.x, y - ability.y
     if abx*abx + aby*aby < ability.r*ability.r then
         if ability.cooldown <= 0 then
@@ -176,6 +179,9 @@ function controls.touchreleased(id)
     return shot, dx, dy, abilityUsed
 end
 
+-- ============================================================
+-- КЛАВИАТУРА (ПК)
+-- ============================================================
 function controls.keypressed(key)
     if key == "w" or key == "up" then keys.up = true end
     if key == "s" or key == "down" then keys.down = true end
@@ -236,6 +242,7 @@ end
 -- ============================================================
 function controls.mousepressed(x, y, button)
     if button == 1 then
+        -- ДЖОЙСТИК (как в старом - проверяем попадание В СТИК)
         local dx, dy = x - joy.cx, y - joy.cy
         if dx*dx + dy*dy < joy.r*joy.r then
             joy.id = 1
@@ -247,6 +254,7 @@ function controls.mousepressed(x, y, button)
             end
         end
         
+        -- КНОПКА АТАКИ
         local ax, ay = x - atk.x, y - atk.y
         if ax*ax + ay*ay < atk.r*atk.r then
             atk.id = 1
@@ -254,6 +262,7 @@ function controls.mousepressed(x, y, button)
             return "attack"
         end
         
+        -- КНОПКА СПОСОБНОСТИ
         local abx, aby = x - ability.x, y - ability.y
         if abx*abx + aby*aby < ability.r*ability.r then
             if ability.cooldown <= 0 then
@@ -316,7 +325,7 @@ function controls.mousereleased(x, y, button)
 end
 
 -- ============================================================
--- РИСОВАНИЕ (БЕЛЫЙ ДЖОЙСТИК КАК В НАЧАЛЕ + КНОПКИ A и S)
+-- РИСОВАНИЕ (БЕЛЫЙ ДЖОЙСТИК КАК В СТАРОМ + КНОПКИ)
 -- ============================================================
 function controls.draw()
     if not font then
@@ -324,70 +333,64 @@ function controls.draw()
     end
     
     -- ============================================================
-    -- ДЖОЙСТИК (БЕЛЫЙ КАК В НАЧАЛЕ)
+    -- ДЖОЙСТИК (КАК В СТАРОМ)
     -- ============================================================
-    
-    -- Подложка
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    
-    -- Обводка подложки
-    love.graphics.setColor(0.5, 0.5, 0.6, 0.3)
+    love.graphics.setColor(0.5, 0.2, 1, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
     
-    -- Стик (БЕЛЫЙ)
-    love.graphics.setColor(1, 1, 1, 0.9)
+    love.graphics.setColor(1, 1, 1, 0.8)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
-    
-    -- Внутренний кружок стика
-    love.graphics.setColor(0.9, 0.9, 0.9, 0.3)
+    love.graphics.setColor(0.8, 0.4, 1, 0.5)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr * 0.6)
     
     -- ============================================================
-    -- КНОПКА АТАКИ (A) - КРАСНАЯ
+    -- КНОПКА АТАКИ (КАК В СТАРОМ - SHOT)
     -- ============================================================
-    
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.circle("fill", atk.x + 2, atk.y + 2, atk.r)
-    
-    love.graphics.setColor(0.8, 0.15, 0.15, 0.9)
+    love.graphics.setColor(0.5, 0, 1, 0.8)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
-    
-    love.graphics.setColor(0.9, 0.2, 0.2, 0.3)
+    love.graphics.setColor(0.6, 0.2, 1, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", atk.x, atk.y, atk.r)
     
     if atk.hold then
-        love.graphics.setColor(1, 1, 1, 0.15)
-        love.graphics.circle("fill", atk.x, atk.y, atk.r + 8)
+        love.graphics.setColor(1, 1, 1, 0.6)
+        love.graphics.setLineWidth(3)
+        local len = 35
+        love.graphics.line(
+            atk.x, atk.y,
+            atk.x + moveDir.x * len,
+            atk.y + moveDir.y * len
+        )
+        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 5)
     end
     
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(font)
-    love.graphics.printf("A", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
+    if font then
+        love.graphics.setFont(font)
+        love.graphics.printf("SHOT", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
+    end
     
     -- ============================================================
-    -- КНОПКА СПОСОБНОСТИ (S) - ФИОЛЕТОВАЯ
+    -- КНОПКА СПОСОБНОСТИ (НОВАЯ - S)
     -- ============================================================
-    
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.circle("fill", ability.x + 2, ability.y + 2, ability.r)
     
     if ability.cooldown > 0 then
-        -- Перезарядка
         love.graphics.setColor(0.3, 0.3, 0.4, 0.7)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
-        
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.arc("fill", ability.x, ability.y, ability.r, 
             -math.pi/2, -math.pi/2 + (1 - ability.cooldown / ability.maxCooldown) * 2 * math.pi)
     else
-        -- Готова
-        love.graphics.setColor(0.6, 0.2, 0.9, 0.9)
+        love.graphics.setColor(0.5, 0, 1, 0.8)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
-        
-        love.graphics.setColor(0.7, 0.3, 1, 0.3)
+        love.graphics.setColor(0.6, 0.2, 1, 0.3)
         love.graphics.setLineWidth(2)
         love.graphics.circle("line", ability.x, ability.y, ability.r)
         
