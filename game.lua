@@ -26,7 +26,7 @@ function game.load()
     controls.load()
     fontUI = love.graphics.newFont(14)
     
-    -- ЗАГРУЗКА ТЕКСТУРЫ ТРАВЫ
+    -- Загрузка текстур
     local success, img = pcall(function()
         return love.graphics.newImage("grass.png")
     end)
@@ -35,11 +35,9 @@ function game.load()
         grassImg:setWrap("repeat", "repeat")
         print("Loaded grass.png")
     else
-        print("Could not load grass.png, using fallback color")
         grassImg = nil
     end
     
-    -- Загрузка текстуры игрока
     local success2, img2 = pcall(function()
         return love.graphics.newImage("player.png")
     end)
@@ -47,11 +45,9 @@ function game.load()
         playerImg = img2
         print("Loaded player.png")
     else
-        print("Could not load player.png, using fallback")
         playerImg = nil
     end
     
-    -- Загружаем врага
     enemy.load()
     
     player.x, player.y = 1500, 1500
@@ -84,7 +80,6 @@ function game.update(dt)
         end
     end
     
-    -- Движение
     local dx, dy = controls.getMove()
     player.x = math.max(0, math.min(WORLD_SIZE, player.x + dx * player.speed * dt))
     player.y = math.max(0, math.min(WORLD_SIZE, player.y + dy * player.speed * dt))
@@ -92,12 +87,10 @@ function game.update(dt)
         player.angle = math.atan2(dy, dx) + math.pi / 2
     end
     
-    -- Камера
     local sw, sh = love.graphics.getDimensions()
     camera.x = camera.x + (player.x - sw/2 - camera.x) * 5 * dt
     camera.y = camera.y + (player.y - sh/2 - camera.y) * 5 * dt
     
-    -- Обновление пуль
     for i = #bullets, 1, -1 do
         local b = bullets[i]
         b.x = b.x + b.vx * dt
@@ -107,7 +100,6 @@ function game.update(dt)
         end
     end
     
-    -- Обновление врага (передаем пули)
     enemy.update(dt, player.x, player.y, bullets, function(dmg)
         if shieldActive then return end
         player.hp = player.hp - dmg
@@ -122,15 +114,11 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-camera.x, -camera.y)
     
-    -- ============================================================
-    -- РИСУЕМ ТЕКСТУРУ ТРАВЫ
-    -- ============================================================
+    -- ТРАВА
     if grassImg then
         local w, h = love.graphics.getDimensions()
         local tw = grassImg:getWidth()
         local th = grassImg:getHeight()
-        
-        -- Рисуем траву с повторением
         love.graphics.setColor(1, 1, 1)
         for x = math.floor(camera.x / tw) * tw - tw, camera.x + w + tw, tw do
             for y = math.floor(camera.y / th) * th - th, camera.y + h + th, th do
@@ -138,12 +126,10 @@ function game.draw()
             end
         end
     else
-        -- Fallback - зеленый фон
         love.graphics.setColor(0.2, 0.5, 0.2)
         love.graphics.rectangle("fill", 0, 0, WORLD_SIZE, WORLD_SIZE)
     end
     
-    -- Сетка (для ориентации)
     love.graphics.setColor(1, 1, 1, 0.05)
     for x = 0, WORLD_SIZE, 100 do
         love.graphics.line(x, 0, x, WORLD_SIZE)
@@ -152,10 +138,9 @@ function game.draw()
         love.graphics.line(0, y, WORLD_SIZE, y)
     end
     
-    -- Рисуем врага
     enemy.draw()
     
-    -- Рисуем игрока
+    -- ИГРОК
     if playerImg then
         love.graphics.setColor(1, 1, 1)
         love.graphics.draw(playerImg, player.x, player.y, player.angle, 1, 1, 32, 32)
@@ -174,7 +159,7 @@ function game.draw()
         end
     end
     
-    -- Щит
+    -- ЩИТ
     if shieldActive then
         love.graphics.setColor(0.6, 0.2, 1, 0.3 + 0.2 * math.sin(love.timer.getTime() * 6))
         love.graphics.circle("fill", player.x, player.y, 45)
@@ -182,7 +167,7 @@ function game.draw()
         love.graphics.circle("fill", player.x, player.y, 55)
     end
     
-    -- Пули игрока
+    -- ПУЛИ
     for _, b in ipairs(bullets) do
         love.graphics.setColor(1, 1, 0)
         love.graphics.circle("fill", b.x, b.y, 5)
@@ -217,11 +202,29 @@ function game.draw()
     love.graphics.setFont(fontUI)
     love.graphics.printf(player.hp .. "/" .. player.maxHp, 10, 12, 150, "center")
     
-    -- Монеты
+    -- МОНЕТЫ
     love.graphics.setColor(1, 0.8, 0)
     love.graphics.printf("COINS: " .. coins, sw - 150, 12, 140, "right")
     
-    -- Подсказка
+    -- ============================================================
+    -- КНОПКА MENU (В ЛЕВОМ ВЕРХНЕМ УГЛУ)
+    -- ============================================================
+    local menuX = sw - 90
+    local menuY = 4
+    local menuW = 80
+    local menuH = 32
+    
+    love.graphics.setColor(0, 0, 0, 0.4)
+    love.graphics.rectangle("fill", menuX + 2, menuY + 2, menuW, menuH, 8)
+    love.graphics.setColor(0.8, 0.2, 0.2, 0.9)
+    love.graphics.rectangle("fill", menuX, menuY, menuW, menuH, 8)
+    love.graphics.setColor(1, 0.3, 0.3, 0.2)
+    love.graphics.rectangle("fill", menuX + 3, menuY + 3, menuW - 6, 12, 6)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(love.graphics.newFont(12))
+    love.graphics.printf("MENU", menuX, menuY + 9, menuW, "center")
+    
+    -- ПОДСКАЗКА
     love.graphics.setColor(1, 1, 1, 0.4)
     love.graphics.setFont(love.graphics.newFont(11))
     love.graphics.printf("WASD - Move | SPACE - Attack | E - Shield", 0, sh - 25, sw, "center")
@@ -230,7 +233,7 @@ function game.draw()
 end
 
 -- ============================================================
--- АТАКА (СПАВН ПУЛИ)
+-- АТАКА
 -- ============================================================
 function game.shoot()
     local aimX, aimY = controls.getAim()
@@ -246,12 +249,86 @@ function game.shoot()
         vx = aimX * 400,
         vy = aimY * 400
     })
-    print("Shot fired!")
 end
 
 -- ============================================================
 -- ОБРАБОТКА ВВОДА
 -- ============================================================
+
+function game.mousepressed(x, y, button)
+    -- ПРОВЕРКА КНОПКИ MENU
+    local sw, sh = love.graphics.getDimensions()
+    local menuX = sw - 90
+    local menuY = 4
+    local menuW = 80
+    local menuH = 32
+    
+    if x >= menuX and x <= menuX + menuW and y >= menuY and y <= menuY + menuH then
+        _G.GameState.current = "lobby"
+        return
+    end
+    
+    local result = controls.mousepressed(x, y, button)
+    
+    if result == "attack" then
+        game.shoot()
+    end
+    
+    if result == "ability" then
+        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
+            shieldActive = true
+            shieldTimer = shieldDuration
+            controls.useAbility()
+            print("Shield activated!")
+        end
+    end
+end
+
+function game.mousemoved(x, y, dx, dy, button)
+    controls.mousemoved(x, y, dx, dy, button)
+end
+
+function game.mousereleased(x, y, button)
+    local shot, dx, dy, abilityUsed = controls.mousereleased(x, y, button)
+    
+    if shot then
+        game.shoot()
+    end
+    
+    if abilityUsed then
+        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
+            shieldActive = true
+            shieldTimer = shieldDuration
+            controls.useAbility()
+            print("Shield activated!")
+        end
+    end
+end
+
+function game.touchpressed(id, x, y)
+    game.mousepressed(x, y, 1)
+end
+
+function game.touchmoved(id, x, y)
+    controls.touchmoved(id, x, y)
+end
+
+function game.touchreleased(id, x, y)
+    local shot, dx, dy, abilityUsed = controls.touchreleased(id, x, y)
+    
+    if shot then
+        game.shoot()
+    end
+    
+    if abilityUsed then
+        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
+            shieldActive = true
+            shieldTimer = shieldDuration
+            controls.useAbility()
+            print("Shield activated!")
+        end
+    end
+end
 
 function game.keypressed(key)
     if key == "escape" then
@@ -282,40 +359,6 @@ function game.keyreleased(key)
         local _, dx, dy = result
         if dx and dy then
             game.shoot()
-        end
-    end
-end
-
-function game.mousepressed(x, y, button)
-    local result = controls.mousepressed(x, y, button)
-    
-    if result == "attack" then
-        game.shoot()
-    end
-    
-    if result == "ability" then
-        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
-            shieldActive = true
-            shieldTimer = shieldDuration
-            controls.useAbility()
-            print("Shield activated!")
-        end
-    end
-end
-
-function game.mousereleased(x, y, button)
-    local shot, dx, dy, abilityUsed = controls.mousereleased(x, y, button)
-    
-    if shot then
-        game.shoot()
-    end
-    
-    if abilityUsed then
-        if selectedSkin == "diamond" and not shieldActive and controls.canUseAbility() then
-            shieldActive = true
-            shieldTimer = shieldDuration
-            controls.useAbility()
-            print("Shield activated!")
         end
     end
 end
