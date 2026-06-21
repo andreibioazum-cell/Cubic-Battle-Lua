@@ -1,5 +1,5 @@
 local controls = {}
-local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 50, sr = 20 }
+local joy = { id = nil, cx = 90, cy = 0, sx = 90, sy = 0, r = 55, sr = 25 }
 local atk = { id = nil, x = 0, y = 0, r = 55, hold = false }
 local font = nil
 
@@ -25,7 +25,7 @@ end
 
 function controls.resize()
     local w, h = love.graphics.getDimensions()
-    joy.cy = h - 90
+    joy.cy = h - 100
     joy.sy = joy.cy
     atk.x = w - 90
     atk.y = h - 90
@@ -87,7 +87,6 @@ function controls.touchpressed(id, x, y)
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
         atk.hold = true
-        -- При нажатии на кнопку стреляем в направлении движения
         local len = math.sqrt(ax*ax + ay*ay)
         if len > 5 then
             moveDir.x = ax / len
@@ -172,45 +171,120 @@ function controls.draw()
         controls.load()
     end
     
-    -- ДЖОЙСТИК (НОРМАЛЬНЫЙ)
-    love.graphics.setColor(0, 0, 0, 0.4)
+    -- ============================================================
+    -- КРАСИВЫЙ БЕЛЫЙ ДЖОЙСТИК
+    -- ============================================================
+    
+    -- 1. Внешняя тень
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.circle("fill", joy.cx + 3, joy.cy + 3, joy.r)
+    
+    -- 2. Внешнее кольцо с градиентом (полупрозрачное)
+    love.graphics.setColor(0.3, 0.3, 0.4, 0.3)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    love.graphics.setColor(0.5, 0.2, 1, 0.3)
-    love.graphics.setLineWidth(2)
+    
+    -- 3. Обводка внешнего кольца
+    love.graphics.setColor(0.6, 0.6, 0.7, 0.3)
+    love.graphics.setLineWidth(3)
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
     
-    love.graphics.setColor(1, 1, 1, 0.8)
-    love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
-    love.graphics.setColor(0.8, 0.4, 1, 0.5)
-    love.graphics.circle("fill", joy.sx, joy.sy, joy.sr * 0.6)
+    -- 4. Декоративная пунктирная обводка
+    love.graphics.setColor(0.8, 0.8, 1, 0.15)
+    love.graphics.setLineWidth(1)
+    love.graphics.circle("line", joy.cx, joy.cy, joy.r - 8)
     
-    -- КНОПКА SHOT
-    love.graphics.setColor(0, 0, 0, 0.4)
-    love.graphics.circle("fill", atk.x + 2, atk.y + 2, atk.r)
-    love.graphics.setColor(0.5, 0, 1, 0.8)
-    love.graphics.circle("fill", atk.x, atk.y, atk.r)
-    love.graphics.setColor(0.6, 0.2, 1, 0.3)
+    -- 5. Крестик-прицел в центре джойстика (декоративный)
+    love.graphics.setColor(0.5, 0.5, 0.6, 0.15)
+    love.graphics.setLineWidth(1)
+    local crossSize = 12
+    love.graphics.line(joy.cx - crossSize, joy.cy, joy.cx + crossSize, joy.cy)
+    love.graphics.line(joy.cx, joy.cy - crossSize, joy.cx, joy.cy + crossSize)
+    
+    -- 6. Основной круг джойстика (БЕЛЫЙ С ГРАДИЕНТОМ)
+    -- Градиент: белый -> светло-серый
+    for i = 0, joy.sr do
+        local alpha = 0.95 - (i / joy.sr) * 0.3
+        love.graphics.setColor(1, 1, 1, alpha)
+        love.graphics.circle("fill", joy.sx, joy.sy, joy.sr - i * 0.3)
+    end
+    
+    -- 7. Блик на джойстике (сверху-слева)
+    love.graphics.setColor(1, 1, 1, 0.5)
+    love.graphics.circle("fill", joy.sx - 8, joy.sy - 10, joy.sr * 0.35)
+    
+    -- 8. Маленький блик
+    love.graphics.setColor(1, 1, 1, 0.2)
+    love.graphics.circle("fill", joy.sx - 12, joy.sy - 14, joy.sr * 0.15)
+    
+    -- 9. Обводка джойстика
+    love.graphics.setColor(0.7, 0.7, 0.8, 0.4)
+    love.graphics.setLineWidth(2)
+    love.graphics.circle("line", joy.sx, joy.sy, joy.sr)
+    
+    -- 10. Внутренняя обводка для объема
+    love.graphics.setColor(0.9, 0.9, 1, 0.2)
+    love.graphics.setLineWidth(1)
+    love.graphics.circle("line", joy.sx, joy.sy, joy.sr - 5)
+    
+    -- ============================================================
+    -- КРАСИВАЯ КНОПКА SHOT
+    -- ============================================================
+    
+    -- 1. Тень кнопки
+    love.graphics.setColor(0, 0, 0, 0.3)
+    love.graphics.circle("fill", atk.x + 3, atk.y + 3, atk.r)
+    
+    -- 2. Основной круг кнопки (красный с градиентом)
+    for i = 0, atk.r do
+        local alpha = 0.9 - (i / atk.r) * 0.3
+        local r = 0.9 - (i / atk.r) * 0.2
+        love.graphics.setColor(r, 0.1, 0.1, alpha)
+        love.graphics.circle("fill", atk.x, atk.y, atk.r - i * 0.3)
+    end
+    
+    -- 3. Блик на кнопке
+    love.graphics.setColor(1, 0.4, 0.4, 0.25)
+    love.graphics.circle("fill", atk.x - 15, atk.y - 15, atk.r * 0.5)
+    
+    -- 4. Обводка кнопки
+    love.graphics.setColor(0.9, 0.2, 0.2, 0.5)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", atk.x, atk.y, atk.r)
     
+    -- 5. Пульсирующий эффект при удержании
     if atk.hold then
-        love.graphics.setColor(1, 1, 1, 0.6)
+        local pulse = 0.2 + 0.2 * math.sin(love.timer.getTime() * 8)
+        love.graphics.setColor(1, 1, 1, pulse)
+        love.graphics.circle("fill", atk.x, atk.y, atk.r + 10)
+        
+        -- Линия направления
+        love.graphics.setColor(1, 1, 1, 0.7)
         love.graphics.setLineWidth(3)
-        local len = 35
+        local len = 40
         love.graphics.line(
             atk.x, atk.y,
             atk.x + moveDir.x * len,
             atk.y + moveDir.y * len
         )
-        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 5)
+        
+        -- Конечная точка линии (кружок)
+        love.graphics.setColor(1, 1, 1, 0.6)
+        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 6)
+        love.graphics.setColor(1, 1, 1, 0.3)
+        love.graphics.circle("fill", atk.x + moveDir.x * len, atk.y + moveDir.y * len, 10)
     end
     
-    -- Текст на кнопке
+    -- 6. Текст на кнопке (⚡)
     love.graphics.setColor(1, 1, 1)
     if font then
         love.graphics.setFont(font)
-        love.graphics.printf("SHOT", atk.x - atk.r, atk.y - 10, atk.r*2, "center")
+        love.graphics.printf("⚡", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
     end
+    
+    -- 7. Подпись под кнопкой
+    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.setFont(love.graphics.newFont(10))
+    love.graphics.printf("FIRE", atk.x - 20, atk.y + atk.r + 8, 40, "center")
 end
 
 return controls
