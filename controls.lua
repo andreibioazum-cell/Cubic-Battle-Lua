@@ -3,6 +3,7 @@ local controls = {}
 local joy  = { id=nil, cx=0, cy=0, sx=0, sy=0, r=45, sr=18 }
 local atk  = { id=nil, x=0, y=0, r=52, hold=false, press=0 }
 local back = { x=20, y=20, w=140, h=55 }
+local exitButton = { x = 0, y = 0, w = 140, h = 55 }
 
 local font
 local aimDx, aimDy = 0, -1
@@ -16,6 +17,8 @@ local function place()
     end
     atk.x = w - 80
     atk.y = h - 80
+    exitButton.x = w - exitButton.w - 20
+    exitButton.y = 20
 end
 
 local function drawSpacedText(text, x, y, w, align, font, spacing, alpha)
@@ -87,8 +90,8 @@ function controls.isAiming() return atk.hold end
 function controls.getAim() return aimDx, aimDy end
 
 function controls.touchpressed(id,x,y)
-    if x>=back.x and x<=back.x+back.w and
-       y>=back.y and y<=back.y+back.h then
+    if x>=exitButton.x and x<=exitButton.x+exitButton.w and
+       y>=exitButton.y and y<=exitButton.y+exitButton.h then
         GameState.current = "lobby"
         return
     end
@@ -162,16 +165,40 @@ function controls.draw()
     love.graphics.pop()
 
     love.graphics.setColor(0,0,0,0.20)
-    love.graphics.rectangle("fill", back.x+4, back.y+5, back.w, back.h, 14, 14)
+    love.graphics.rectangle("fill", exitButton.x+4, exitButton.y+5, exitButton.w, exitButton.h, 14, 14)
 
-    love.graphics.setColor(0.55, 0.20, 0.85, 1)
-    love.graphics.rectangle("fill", back.x, back.y, back.w, back.h, 14, 14)
+    love.graphics.setColor(0.90, 0.20, 0.60, 1)
+    love.graphics.rectangle("fill", exitButton.x, exitButton.y, exitButton.w, exitButton.h, 14, 14)
 
     love.graphics.setColor(0,0,0,1)
     love.graphics.setLineWidth(3.4)
-    love.graphics.rectangle("line", back.x, back.y, back.w, back.h, 14, 14)
+    love.graphics.rectangle("line", exitButton.x, exitButton.y, exitButton.w, exitButton.h, 14, 14)
 
-    drawSpacedText("Back", back.x, back.y+14, back.w, "center", font, font:getWidth("A")*0.05, 1)
+    drawSpacedText("Exit", exitButton.x, exitButton.y+14, exitButton.w, "center", font, font:getWidth("A")*0.05, 1)
+
+    love.graphics.setColor(0,0,0,0.20)
+    love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.circle("line", joy.cx, joy.cy, joy.r)
+    love.graphics.setColor(1,0.2,0.8,0.9)
+    love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
+
+    local scale = 1 - atk.press * 0.12
+    local r = atk.r * scale
+    local textScale = 1 - atk.press * 0.18
+    local textAlpha = 1 - atk.press * 0.45
+
+    love.graphics.setColor(0.95, 0.35, 0.75, 1)
+    love.graphics.circle("fill", atk.x, atk.y, r)
+    love.graphics.setColor(0,0,0,1)
+    love.graphics.setLineWidth(3.4)
+    love.graphics.circle("line", atk.x, atk.y, r)
+
+    love.graphics.push()
+    love.graphics.translate(atk.x, atk.y)
+    love.graphics.scale(textScale, textScale)
+    drawSpacedText("Shot", -atk.r, -14, atk.r*2, "center", font, font:getWidth("A")*0.05, textAlpha)
+    love.graphics.pop()
 
     love.graphics.setColor(1,1,1,1)
 end

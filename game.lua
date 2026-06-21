@@ -101,6 +101,7 @@ function game.update(dt)
         if b.life <= 0 then table.remove(bullets,i) end
     end
 
+    -- Use Lua enemy.update which will internally use native module if available
     enemy.update(dt, cube.x, cube.y, bullets, onHitPlayer)
 end
 
@@ -164,13 +165,22 @@ function game.draw()
     love.graphics.setFont(font)
 
     local barW, barH = 200, 18
-    local px = love.graphics.getWidth() - barW - 20
-    local py = 20
-    drawHPBar(px, py, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
+    local pxEnemy = 20
+    local pyEnemy = 20
+    local pxPlayer = love.graphics.getWidth() - barW - 20
+    local pyPlayer = 20
+    local e = enemy.get()
+    if e then
+        drawHPBar(pxEnemy, pyEnemy, barW, barH, e.hp, 5, {0.9,0.2,0.2})
+        love.graphics.setColor(1,1,1,1)
+        love.graphics.printf("Enemy HP " .. math.max(0,e.hp) .. " / 5",
+            pxEnemy, pyEnemy + 22, barW, "left")
+    end
 
     love.graphics.setColor(1,1,1,1)
-    love.graphics.printf("HP " .. math.max(0,cube.hp) .. " / " .. PLAYER_HP_MAX,
-        px, py + 22, barW, "right")
+    drawHPBar(pxPlayer, pyPlayer, barW, barH, cube.hp, PLAYER_HP_MAX, {0.3,0.85,0.35})
+    love.graphics.printf("Player HP " .. math.max(0,cube.hp) .. " / " .. PLAYER_HP_MAX,
+        pxPlayer, pyPlayer + 22, barW, "right")
 
     controls.draw()
 end

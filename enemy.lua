@@ -9,6 +9,7 @@ local MAX_HP = 5
 local RESPAWN = 2
 local ATTACK_CD = 1.0
 local DAMAGE = 1
+local respawnEnabled = true
 
 local e
 local timer = 0
@@ -44,12 +45,19 @@ function enemy.reset()
     timer = 0
 end
 
+function enemy.setRespawnEnabled(enabled)
+    respawnEnabled = enabled
+end
+
 function enemy.get()
     return e, SIZE, MAX_HP
 end
 
 function enemy.update(dt, px, py, bullets, onHitPlayer)
     if not e then
+        if not respawnEnabled then
+            return
+        end
         timer = timer + dt
         if timer >= RESPAWN then
             timer = 0
@@ -75,10 +83,13 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
         e.state = "wander"
     end
 
+    -- Try to use native C++ module if available
+    local ok_native, native = pcall(require, "native")
     if e.state == "chase" then
         e.x = e.x + nx * SPEED * dt
         e.y = e.y + ny * SPEED * dt
     elseif e.state == "retreat" then
+        if ok_native and native.enemy_reset then native.enemy_reset() end
         e.x = e.x - nx * SPEED * 0.8 * dt
         e.y = e.y - ny * SPEED * 0.8 * dt
     elseif e.state == "attack" then
@@ -89,6 +100,13 @@ function enemy.update(dt, px, py, bullets, onHitPlayer)
         end
     elseif e.state == "wander" then
         e.wanderT = e.wanderT - dt
+        if ok_native and native.enemy_get then
+            local t = native.enemy_get()
+            if t then
+                return t, SIZE, t.hp or MAX_HP
+            end
+            return nil, SIZE, MAX_HP
+        end
         if e.wanderT <= 0 then
             e.wanderT = 1 + math.random() * 2
             local a = math.random() * math.pi * 2

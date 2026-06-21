@@ -1,22 +1,30 @@
+local enemy = require("enemy")
 local lobby = {}
 
-local btn = { w=220, h=75, x=0, y=0 }
+local btnPlay = { w=240, h=72, x=0, y=0 }
+local btnRespawn = { w=240, h=72, x=0, y=0 }
+local btnExit = { w=240, h=72, x=0, y=0 }
 local grad, lastW, lastH = nil, 0, 0
 local fontTitle, fontSub, fontBtn
+local respawnEnabled = true
 
 local function mkGrad(w, h)
     return love.graphics.newMesh({
-        {0,0, 0,0, 0.45,0.15,0.80,1},
-        {w,0, 1,0, 0.55,0.20,0.85,1},
-        {w,h, 1,1, 0.85,0.30,0.65,1},
-        {0,h, 0,1, 0.80,0.25,0.70,1},
+        {0,0, 0,0, 0.08,0.03,0.15,1},
+        {w,0, 1,0, 0.18,0.05,0.30,1},
+        {w,h, 1,1, 0.08,0.02,0.18,1},
+        {0,h, 0,1, 0.02,0.01,0.08,1},
     }, "fan", "static")
 end
 
 local function place()
     local w, h = love.graphics.getDimensions()
-    btn.x = w/2 - btn.w/2
-    btn.y = h/2 + 50
+    btnPlay.x = w/2 - btnPlay.w/2
+    btnPlay.y = h/2 + 20
+    btnRespawn.x = w/2 - btnRespawn.w/2
+    btnRespawn.y = btnPlay.y + btnPlay.h + 16
+    btnExit.x = w/2 - btnExit.w/2
+    btnExit.y = btnRespawn.y + btnRespawn.h + 16
 end
 
 local function drawSpacedText(text, x, y, w, align, font, spacing)
@@ -70,6 +78,7 @@ function lobby.load()
     fontSub   = love.graphics.newFont("Fredoka-Bold.ttf", 22)
     fontBtn   = love.graphics.newFont("Fredoka-Bold.ttf", 30)
     place()
+    enemy.setRespawnEnabled(respawnEnabled)
 end
 
 function lobby.resize()
@@ -90,26 +99,43 @@ function lobby.draw()
     love.graphics.setColor(1,1,1,1)
     love.graphics.draw(grad, 0, 0)
 
-    drawSpacedText("Cubic Battle", 0, h/2 - 150, w, "center", fontTitle, fontTitle:getWidth("A")*0.05)
-    drawSpacedText("Touch & Dodge", 0, h/2 - 60, w, "center", fontSub, fontSub:getWidth("A")*0.05)
+    drawSpacedText("Cubic Battle", 0, h/2 - 170, w, "center", fontTitle, fontTitle:getWidth("A")*0.05)
+    drawSpacedText("Touch & Dodge", 0, h/2 - 95, w, "center", fontSub, fontSub:getWidth("A")*0.05)
 
-    love.graphics.setColor(0,0,0,0.20)
-    love.graphics.rectangle("fill", btn.x+5, btn.y+6, btn.w, btn.h, 16, 16)
+    local function drawButton(btn, color, label)
+        love.graphics.setColor(0,0,0,0.28)
+        love.graphics.rectangle("fill", btn.x+6, btn.y+6, btn.w, btn.h, 22, 22)
+        love.graphics.setColor(color)
+        love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 22, 22)
+        love.graphics.setColor(1,1,1,1)
+        love.graphics.setLineWidth(3)
+        love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 22, 22)
+        drawSpacedText(label, btn.x, btn.y + 20, btn.w, "center", fontBtn, fontBtn:getWidth("A")*0.05)
+    end
 
-    love.graphics.setColor(0.55, 0.20, 0.85, 1)
-    love.graphics.rectangle("fill", btn.x, btn.y, btn.w, btn.h, 16, 16)
-
-    love.graphics.setColor(0,0,0,1)
-    love.graphics.setLineWidth(3.4)
-    love.graphics.rectangle("line", btn.x, btn.y, btn.w, btn.h, 16, 16)
-
-    drawSpacedText("Play", btn.x, btn.y + 20, btn.w, "center", fontBtn, fontBtn:getWidth("A")*0.05)
+    drawButton(btnPlay, {0.16, 0.06, 0.22, 1}, "Play")
+    drawButton(btnRespawn, {0.12, 0.04, 0.18, 1}, respawnEnabled and "Respawn: ON" or "Respawn: OFF")
+    drawButton(btnExit, {0.18, 0.04, 0.20, 1}, "Exit")
 end
 
 function lobby.touchpressed(id, x, y)
-    if x>=btn.x and x<=btn.x+btn.w and
-       y>=btn.y and y<=btn.y+btn.h then
+    if x>=btnPlay.x and x<=btnPlay.x+btnPlay.w and
+       y>=btnPlay.y and y<=btnPlay.y+btnPlay.h then
         GameState.current = "game"
+        return
+    end
+
+    if x>=btnRespawn.x and x<=btnRespawn.x+btnRespawn.w and
+       y>=btnRespawn.y and y<=btnRespawn.y+btnRespawn.h then
+        respawnEnabled = not respawnEnabled
+        enemy.setRespawnEnabled(respawnEnabled)
+        return
+    end
+
+    if x>=btnExit.x and x<=btnExit.x+btnExit.w and
+       y>=btnExit.y and y<=btnExit.y+btnExit.h then
+        love.event.quit()
+        return
     end
 end
 
