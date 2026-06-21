@@ -39,6 +39,7 @@ end
 
 local function createBG()
     local w, h = love.graphics.getDimensions()
+    if w <= 0 or h <= 0 then return end
     bgCanvas = love.graphics.newCanvas(w, h)
     love.graphics.setCanvas(bgCanvas)
     for i = 0, 60 do
@@ -68,6 +69,7 @@ end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
+    if w <= 0 or h <= 0 then return end
     
     love.graphics.setColor(1, 1, 1)
     if bgCanvas then
@@ -127,6 +129,8 @@ end
 
 function drawShop()
     local w, h = love.graphics.getDimensions()
+    if w <= 0 or h <= 0 then return end
+    
     local shop_w, shop_h = 420, 280
     local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
     
@@ -210,6 +214,8 @@ end
 
 function lobby.touchpressed(id, x, y)
     local w, h = love.graphics.getDimensions()
+    if w <= 0 or h <= 0 then return end
+    
     local bx = w / 2 - 120
     
     if x >= bx and x <= bx + 240 then
