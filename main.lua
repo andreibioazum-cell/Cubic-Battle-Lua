@@ -24,18 +24,22 @@ local lastState = nil
 function playSound(name)
     if _G.sounds and _G.sounds[name] then
         local source = _G.sounds[name]
-        if source and source.clone then
-            local clone = source:clone()
-            if clone then
-                clone:setVolume(source:getVolume() or 0.5)
-                clone:setLooping(false)
-                clone:play()
-                love.timer.after(0.5, function()
-                    if clone then clone:stop() end
-                end)
+        if source then
+            -- Проверяем, есть ли метод clone (для статичных звуков)
+            if source:clone then
+                local clone = source:clone()
+                if clone then
+                    clone:setVolume(source:getVolume() or 0.5)
+                    clone:setLooping(false)
+                    clone:play()
+                    -- Автоматически очищаем через 2 секунды
+                    love.timer.after(2, function()
+                        if clone then clone:stop() end
+                    end)
+                end
+            elseif source.play then
+                source:play()
             end
-        elseif source and source.play then
-            source:play()
         end
     end
 end
@@ -48,34 +52,32 @@ function love.load()
     -- Инициализация клавиатуры
     keyboard.init()
     
-    -- Загрузка звуков
-    local soundSuccess, soundErr = pcall(function()
-        _G.sounds = {
-            click = love.audio.newSource("cartoon-button-click-sound.mp3", "static"),
-            shot = love.audio.newSource("loud-pistol-shot.mp3", "static"),
-            success = love.audio.newSource("success.mp3", "static"),
-            error = love.audio.newSource("error.mp3", "static")
-        }
-        if _G.sounds.click then 
-            _G.sounds.click:setVolume(0.5)
-            _G.sounds.click:setLooping(false)
+    -- ============================================================
+    -- ЗАГРУЗКА ЗВУКОВ
+    -- ============================================================
+    _G.sounds = {}
+    
+    -- Пробуем загрузить каждый звук отдельно
+    local function loadSound(name, file, volume)
+        local success, source = pcall(function()
+            return love.audio.newSource(file, "static")
+        end)
+        if success and source then
+            source:setVolume(volume or 0.5)
+            source:setLooping(false)
+            _G.sounds[name] = source
+            print("Loaded sound: " .. name .. " from " .. file)
+            return true
+        else
+            print("Warning: Could not load sound: " .. file)
+            return false
         end
-        if _G.sounds.shot then 
-            _G.sounds.shot:setVolume(0.3)
-            _G.sounds.shot:setLooping(false)
-        end
-        if _G.sounds.success then 
-            _G.sounds.success:setVolume(0.4)
-            _G.sounds.success:setLooping(false)
-        end
-        if _G.sounds.error then 
-            _G.sounds.error:setVolume(0.4)
-            _G.sounds.error:setLooping(false)
-        end
-    end)
-    if not soundSuccess then
-        _G.sounds = {}
     end
+    
+    loadSound("click", "cartoon-button-click-sound.mp3", 0.5)
+    loadSound("shot", "loud-pistol-shot.mp3", 0.3)
+    loadSound("success", "success.mp3", 0.4)
+    loadSound("error", "error.mp3", 0.4)
 
     -- Загрузка состояний
     local success, err = xpcall(function()
@@ -95,8 +97,8 @@ function love.load()
         lastState = _G.GameState.current
         
     end, function(err)
-        -- Обработка ошибок
         print("Error in love.load: " .. tostring(err))
+        print(debug.traceback())
     end)
 end
 
@@ -210,7 +212,7 @@ function love.resize(w, h)
 end
 
 -- ============================================================
--- ОБРАБОТКА ТЕКСТОВОГО ВВОДА (ДЛЯ ЭКРАННОЙ КЛАВИАТУРЫ)
+-- ОБРАБОТКА ТЕКСТОВОГО ВВОДА
 -- ============================================================
 function love.textinput(text)
     if keyboard.isActive() then
@@ -223,6 +225,5 @@ end
 -- ============================================================
 function love.errhand(msg)
     print("Error: " .. tostring(msg))
-    love.graphics.setColor(1, 0, 0)
-    love.graphics.print("Error: " .. tostring(msg), 10, 10)
+    print(debug.traceback())
 end
