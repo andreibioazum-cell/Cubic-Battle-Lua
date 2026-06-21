@@ -223,7 +223,6 @@ end
 -- ============================================================
 function love.errhand(msg)
     print("Error: " .. tostring(msg))
-    -- Показываем ошибку на экране
     love.graphics.setColor(1, 0, 0)
     love.graphics.print("Error: " .. tostring(msg), 10, 10)
 end
