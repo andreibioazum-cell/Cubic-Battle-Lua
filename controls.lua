@@ -43,15 +43,20 @@ function controls.update(dt)
 end
 
 function controls.getMove()
+    -- ЕСЛИ ДЖОЙСТИК АКТИВЕН - ВОЗВРАЩАЕМ НАПРАВЛЕНИЕ
     if joy.id then
-        local dx, dy = joy.sx - joy.cx, joy.sy - joy.cy
+        local dx = joy.sx - joy.cx
+        local dy = joy.sy - joy.cy
         local len = math.sqrt(dx*dx + dy*dy)
-        if len == 0 then return 0, 0 end
+        if len == 0 then 
+            return 0, 0  -- В ЦЕНТРЕ - НЕ ДВИГАЕМСЯ
+        end
         moveDir.x = dx/len
         moveDir.y = dy/len
         return moveDir.x, moveDir.y
     end
     
+    -- ЕСЛИ НЕТ ДЖОЙСТИКА - ИСПОЛЬЗУЕМ КЛАВИАТУРУ
     local dx, dy = 0, 0
     if keys.left then dx = -1 end
     if keys.right then dx = 1 end
@@ -67,6 +72,10 @@ function controls.getMove()
     if dx ~= 0 or dy ~= 0 then
         moveDir.x = dx
         moveDir.y = dy
+    else
+        -- ЕСЛИ НИЧЕГО НЕ НАЖАТО - НЕ ДВИГАЕМСЯ
+        moveDir.x = 0
+        moveDir.y = 0
     end
     
     return dx, dy
@@ -93,20 +102,26 @@ function controls.useAbility()
 end
 
 -- ============================================================
--- ТАЧ / МЫШЬ
+-- ТАЧ
 -- ============================================================
 function controls.touchpressed(id, x, y)
+    -- ДЖОЙСТИК
     local dx, dy = x - joy.cx, y - joy.cy
     if dx*dx + dy*dy < joy.r*joy.r then
         joy.id = id
-        joy.sx, joy.sy = x, y
+        joy.sx = x
+        joy.sy = y
         local len = math.sqrt(dx*dx + dy*dy)
         if len > 5 then
             moveDir.x = dx / len
             moveDir.y = dy / len
+        else
+            moveDir.x = 0
+            moveDir.y = 0
         end
     end
     
+    -- КНОПКА АТАКИ
     local ax, ay = x - atk.x, y - atk.y
     if ax*ax + ay*ay < atk.r*atk.r then
         atk.id = id
@@ -118,6 +133,7 @@ function controls.touchpressed(id, x, y)
         end
     end
     
+    -- КНОПКА СПОСОБНОСТИ
     local abx, aby = x - ability.x, y - ability.y
     if abx*abx + aby*aby < ability.r*ability.r then
         if ability.cooldown <= 0 then
@@ -130,16 +146,24 @@ end
 
 function controls.touchmoved(id, x, y)
     if id == joy.id then
-        local dx, dy = x - joy.cx, y - joy.cy
+        local dx = x - joy.cx
+        local dy = y - joy.cy
         local len = math.sqrt(dx*dx + dy*dy)
+        
         if len > joy.r then
-            dx, dy = dx/len*joy.r, dy/len*joy.r
+            joy.sx = joy.cx + (dx / len) * joy.r
+            joy.sy = joy.cy + (dy / len) * joy.r
+        else
+            joy.sx = x
+            joy.sy = y
         end
-        joy.sx, joy.sy = joy.cx + dx, joy.cy + dy
         
         if len > 5 then
             moveDir.x = dx / len
             moveDir.y = dy / len
+        else
+            moveDir.x = 0
+            moveDir.y = 0
         end
     end
 end
@@ -151,14 +175,18 @@ function controls.touchreleased(id)
     
     if id == joy.id then
         joy.id = nil
-        joy.sx, joy.sy = joy.cx, joy.cy
+        joy.sx = joy.cx
+        joy.sy = joy.cy
+        moveDir.x = 0
+        moveDir.y = 0
     end
     
     if id == atk.id then
         atk.id = nil
         atk.hold = false
         shot = true
-        dx, dy = moveDir.x, moveDir.y
+        dx = moveDir.x
+        dy = moveDir.y
         if dx == 0 and dy == 0 then
             dy = -1
         end
@@ -185,7 +213,7 @@ function controls.keypressed(key)
     if key == "a" or key == "left" then keys.left = true end
     if key == "d" or key == "right" then keys.right = true end
     
-    if key == "space" then 
+    if key == "space" then
         keys.space = true
         atk.id = -1
         atk.hold = true
@@ -208,12 +236,13 @@ function controls.keyreleased(key)
     if key == "a" or key == "left" then keys.left = false end
     if key == "d" or key == "right" then keys.right = false end
     
-    if key == "space" then 
+    if key == "space" then
         keys.space = false
         if atk.id == -1 then
             atk.id = nil
             atk.hold = false
-            local dx, dy = moveDir.x, moveDir.y
+            local dx = moveDir.x
+            local dy = moveDir.y
             if dx == 0 and dy == 0 then
                 dy = -1
             end
@@ -235,14 +264,15 @@ function controls.keyreleased(key)
 end
 
 -- ============================================================
--- MOUSE ПОДДЕРЖКА (ДЛЯ ПК)
+-- MOUSE (ПК)
 -- ============================================================
 function controls.mousepressed(x, y, button)
     if button == 1 then
         local dx, dy = x - joy.cx, y - joy.cy
         if dx*dx + dy*dy < joy.r*joy.r then
             joy.id = 1
-            joy.sx, joy.sy = x, y
+            joy.sx = x
+            joy.sy = y
             local len = math.sqrt(dx*dx + dy*dy)
             if len > 5 then
                 moveDir.x = dx / len
@@ -270,12 +300,17 @@ end
 
 function controls.mousemoved(x, y, dx, dy, button)
     if joy.id then
-        local dx2, dy2 = x - joy.cx, y - joy.cy
+        local dx2 = x - joy.cx
+        local dy2 = y - joy.cy
         local len = math.sqrt(dx2*dx2 + dy2*dy2)
+        
         if len > joy.r then
-            dx2, dy2 = dx2/len*joy.r, dy2/len*joy.r
+            joy.sx = joy.cx + (dx2 / len) * joy.r
+            joy.sy = joy.cy + (dy2 / len) * joy.r
+        else
+            joy.sx = x
+            joy.sy = y
         end
-        joy.sx, joy.sy = joy.cx + dx2, joy.cy + dy2
         
         if len > 5 then
             moveDir.x = dx2 / len
@@ -292,14 +327,18 @@ function controls.mousereleased(x, y, button)
         
         if joy.id then
             joy.id = nil
-            joy.sx, joy.sy = joy.cx, joy.cy
+            joy.sx = joy.cx
+            joy.sy = joy.cy
+            moveDir.x = 0
+            moveDir.y = 0
         end
         
         if atk.id then
             atk.id = nil
             atk.hold = false
             shot = true
-            dx, dy = moveDir.x, moveDir.y
+            dx = moveDir.x
+            dy = moveDir.y
             if dx == 0 and dy == 0 then
                 dy = -1
             end
@@ -319,53 +358,30 @@ function controls.mousereleased(x, y, button)
 end
 
 -- ============================================================
--- РИСОВАНИЕ (БЕЛЫЙ ГУИ)
+-- РИСОВАНИЕ
 -- ============================================================
 function controls.draw()
     if not font then
         controls.load()
     end
     
-    -- ============================================================
-    -- БЕЛЫЙ ДЖОЙСТИК
-    -- ============================================================
-    
-    -- Подложка (полупрозрачная)
+    -- ДЖОЙСТИК
     love.graphics.setColor(0.15, 0.15, 0.25, 0.25)
     love.graphics.circle("fill", joy.cx, joy.cy, joy.r)
-    
-    -- Обводка подложки (белая)
     love.graphics.setColor(1, 1, 1, 0.15)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", joy.cx, joy.cy, joy.r)
     
-    -- Стик (БЕЛЫЙ)
     love.graphics.setColor(1, 1, 1, 0.95)
     love.graphics.circle("fill", joy.sx, joy.sy, joy.sr)
-    
-    -- Блик на стике
     love.graphics.setColor(1, 1, 1, 0.4)
     love.graphics.circle("fill", joy.sx - 7, joy.sy - 8, joy.sr * 0.35)
-    love.graphics.setColor(1, 1, 1, 0.15)
-    love.graphics.circle("fill", joy.sx - 10, joy.sy - 12, joy.sr * 0.15)
     
-    -- ============================================================
-    -- КНОПКА АТАКИ (A) - СИНЯЯ/ГОЛУБАЯ
-    -- ============================================================
-    
-    -- Тень
+    -- КНОПКА АТАКИ (A)
     love.graphics.setColor(0, 0, 0, 0.2)
     love.graphics.circle("fill", atk.x + 3, atk.y + 3, atk.r)
-    
-    -- Основной круг (голубой)
     love.graphics.setColor(0.2, 0.6, 0.9, 0.9)
     love.graphics.circle("fill", atk.x, atk.y, atk.r)
-    
-    -- Блик
-    love.graphics.setColor(0.5, 0.8, 1, 0.2)
-    love.graphics.circle("fill", atk.x - 15, atk.y - 15, atk.r * 0.4)
-    
-    -- Обводка
     love.graphics.setColor(0.3, 0.7, 1, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", atk.x, atk.y, atk.r)
@@ -375,67 +391,35 @@ function controls.draw()
         love.graphics.circle("fill", atk.x, atk.y, atk.r + 8)
     end
     
-    -- Буква A
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(font)
     love.graphics.printf("A", atk.x - atk.r, atk.y - 14, atk.r*2, "center")
     
-    -- Подпись
-    love.graphics.setColor(1, 1, 1, 0.2)
-    love.graphics.setFont(love.graphics.newFont(9))
-    love.graphics.printf("FIRE", atk.x - 20, atk.y + atk.r + 6, 40, "center")
-    
-    -- ============================================================
-    -- КНОПКА СПОСОБНОСТИ (S) - ФИОЛЕТОВАЯ
-    -- ============================================================
-    
+    -- КНОПКА СПОСОБНОСТИ (S)
     love.graphics.setColor(0, 0, 0, 0.2)
     love.graphics.circle("fill", ability.x + 3, ability.y + 3, ability.r)
     
     if ability.cooldown > 0 then
-        -- Перезарядка
         love.graphics.setColor(0.3, 0.3, 0.4, 0.7)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.arc("fill", ability.x, ability.y, ability.r, 
             -math.pi/2, -math.pi/2 + (1 - ability.cooldown / ability.maxCooldown) * 2 * math.pi)
-        
-        love.graphics.setColor(0.4, 0.4, 0.5, 0.3)
-        love.graphics.setLineWidth(2)
-        love.graphics.circle("line", ability.x, ability.y, ability.r)
     else
-        -- Готова
         love.graphics.setColor(0.6, 0.2, 0.9, 0.9)
         love.graphics.circle("fill", ability.x, ability.y, ability.r)
-        
-        -- Блик
-        love.graphics.setColor(0.8, 0.4, 1, 0.2)
-        love.graphics.circle("fill", ability.x - 12, ability.y - 12, ability.r * 0.35)
-        
-        -- Обводка
         love.graphics.setColor(0.7, 0.3, 1, 0.3)
         love.graphics.setLineWidth(2)
         love.graphics.circle("line", ability.x, ability.y, ability.r)
         
-        -- Пульсация готовности
         local pulse = 0.8 + 0.2 * math.sin(love.timer.getTime() * 2)
         love.graphics.setColor(0.8, 0.4, 1, pulse * 0.15)
         love.graphics.circle("fill", ability.x, ability.y, ability.r + 6)
     end
     
-    -- Буква S
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(font)
     love.graphics.printf("S", ability.x - ability.r, ability.y - 14, ability.r*2, "center")
-    
-    -- Подпись
-    love.graphics.setColor(1, 1, 1, 0.2)
-    love.graphics.setFont(love.graphics.newFont(9))
-    if ability.cooldown > 0 then
-        love.graphics.printf("READY", ability.x - 25, ability.y + ability.r + 6, 50, "center")
-    else
-        love.graphics.printf("SHIELD", ability.x - 25, ability.y + ability.r + 6, 50, "center")
-    end
 end
 
 return controls
