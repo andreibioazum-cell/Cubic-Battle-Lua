@@ -59,11 +59,6 @@ function controls.update(dt)
         ability.cooldown = ability.cooldown - dt
         if ability.cooldown < 0 then ability.cooldown = 0 end
     end
-    
-    -- Плавное возвращение джойстика в центр
-    if joystick.active then
-        -- Если джойстик активен, обновляем позицию
-    end
 end
 
 function controls.getMove()
@@ -85,7 +80,6 @@ function controls.getMove()
     if keys.up then dy = -1 end
     if keys.down then dy = 1 end
     
-    -- Нормализуем диагональ
     if dx ~= 0 and dy ~= 0 then
         local len = math.sqrt(2)
         dx = dx / len
@@ -121,17 +115,16 @@ function controls.useAbility()
 end
 
 -- ============================================================
--- УПРАВЛЕНИЕ С МЫШИ (ПК) И ТАЧА (МОБИЛЬНЫЕ)
+-- ДЛЯ МЫШИ (ПК)
 -- ============================================================
-
 function controls.mousepressed(x, y, button)
     if button == 1 then
-        -- Проверяем попадание в джойстик
+        -- ДЖОЙСТИК - проверяем попадание
         local dx = x - joystick.cx
         local dy = y - joystick.cy
-        local distToJoystick = math.sqrt(dx*dx + dy*dy)
+        local dist = math.sqrt(dx*dx + dy*dy)
         
-        if distToJoystick < joystick.radius then
+        if dist < joystick.radius then
             joystick.id = 1
             joystick.active = true
             joystick.sx = x
@@ -140,24 +133,24 @@ function controls.mousepressed(x, y, button)
             return
         end
         
-        -- Проверяем попадание в кнопку атаки
+        -- КНОПКА АТАКИ
         local ax = x - attack.x
         local ay = y - attack.y
         if ax*ax + ay*ay < attack.radius*attack.radius then
             attack.id = 1
             attack.holding = true
-            print("Attack button pressed!")
+            print("Attack pressed!")
             return "attack"
         end
         
-        -- Проверяем попадание в кнопку способности
+        -- КНОПКА СПОСОБНОСТИ
         local abx = x - ability.x
         local aby = y - ability.y
         if abx*abx + aby*aby < ability.radius*ability.radius then
             if ability.cooldown <= 0 then
                 ability.id = 1
                 ability.holding = true
-                print("Ability button pressed!")
+                print("Ability pressed!")
                 return "ability"
             end
         end
@@ -165,13 +158,12 @@ function controls.mousepressed(x, y, button)
 end
 
 function controls.mousemoved(x, y, dx, dy, button)
-    -- Обновляем позицию джойстика при движении
+    -- ДВИЖЕНИЕ ДЖОЙСТИКА (если зажат)
     if joystick.active and joystick.id then
         local dx2 = x - joystick.cx
         local dy2 = y - joystick.cy
         local len = math.sqrt(dx2*dx2 + dy2*dy2)
         
-        -- Ограничиваем движение радиусом
         if len > joystick.radius then
             joystick.sx = joystick.cx + (dx2 / len) * joystick.radius
             joystick.sy = joystick.cy + (dy2 / len) * joystick.radius
@@ -180,7 +172,6 @@ function controls.mousemoved(x, y, dx, dy, button)
             joystick.sy = y
         end
         
-        -- Обновляем направление
         if len > 5 then
             moveDir.x = dx2 / len
             moveDir.y = dy2 / len
@@ -194,7 +185,7 @@ function controls.mousereleased(x, y, button)
         local abilityUsed = false
         local dx, dy = 0, 0
         
-        -- Отпускаем джойстик
+        -- ОТПУСКАЕМ ДЖОЙСТИК (возврат в центр)
         if joystick.id then
             joystick.id = nil
             joystick.active = false
@@ -203,7 +194,7 @@ function controls.mousereleased(x, y, button)
             print("Joystick released!")
         end
         
-        -- Отпускаем кнопку атаки
+        -- ОТПУСКАЕМ АТАКУ
         if attack.id then
             attack.id = nil
             attack.holding = false
@@ -215,7 +206,7 @@ function controls.mousereleased(x, y, button)
             print("Attack released!")
         end
         
-        -- Отпускаем кнопку способности
+        -- ОТПУСКАЕМ СПОСОБНОСТЬ
         if ability.id then
             ability.id = nil
             ability.holding = false
@@ -230,6 +221,9 @@ function controls.mousereleased(x, y, button)
     end
 end
 
+-- ============================================================
+-- ДЛЯ ТАЧА (МОБИЛЬНЫЕ)
+-- ============================================================
 function controls.touchpressed(id, x, y)
     return controls.mousepressed(x, y, 1)
 end
@@ -243,43 +237,35 @@ function controls.touchreleased(id, x, y)
 end
 
 -- ============================================================
--- УПРАВЛЕНИЕ С КЛАВИАТУРЫ (ПК)
+-- ДЛЯ КЛАВИАТУРЫ (ПК)
 -- ============================================================
-
 function controls.keypressed(key)
-    -- Движение
     if key == "w" or key == "up" then keys.up = true end
     if key == "s" or key == "down" then keys.down = true end
     if key == "a" or key == "left" then keys.left = true end
     if key == "d" or key == "right" then keys.right = true end
     
-    -- Атака (SPACE)
     if key == "space" then
         keys.space = true
         attack.holding = true
-        print("Space pressed!")
         return "attack"
     end
     
-    -- Способность (E)
     if key == "e" or key == "q" then
         keys.e = true
         if ability.cooldown <= 0 then
             ability.holding = true
-            print("E pressed!")
             return "ability"
         end
     end
 end
 
 function controls.keyreleased(key)
-    -- Движение
     if key == "w" or key == "up" then keys.up = false end
     if key == "s" or key == "down" then keys.down = false end
     if key == "a" or key == "left" then keys.left = false end
     if key == "d" or key == "right" then keys.right = false end
     
-    -- Атака (SPACE)
     if key == "space" then
         keys.space = false
         attack.holding = false
@@ -287,17 +273,14 @@ function controls.keyreleased(key)
         if dx == 0 and dy == 0 then
             dy = -1
         end
-        print("Space released!")
         return "attack", dx, dy
     end
     
-    -- Способность (E)
     if key == "e" or key == "q" then
         keys.e = false
         ability.holding = false
         if ability.cooldown <= 0 then
             ability.cooldown = ability.maxCooldown
-            print("E released!")
             return "ability"
         end
     end
@@ -308,41 +291,21 @@ function controls.draw()
         controls.load()
     end
     
-    -- ============================================================
     -- ДЖОЙСТИК
-    -- ============================================================
-    
-    -- Тень
     love.graphics.setColor(0, 0, 0, 0.25)
     love.graphics.circle("fill", joystick.cx + 3, joystick.cy + 3, joystick.radius)
-    
-    -- Фон джойстика
     love.graphics.setColor(0.25, 0.25, 0.35, 0.3)
     love.graphics.circle("fill", joystick.cx, joystick.cy, joystick.radius)
-    
-    -- Обводка
     love.graphics.setColor(0.5, 0.5, 0.6, 0.3)
     love.graphics.setLineWidth(2)
     love.graphics.circle("line", joystick.cx, joystick.cy, joystick.radius)
-    
-    -- Стик (двигающаяся часть)
     love.graphics.setColor(1, 1, 1, 0.9)
     love.graphics.circle("fill", joystick.sx, joystick.sy, joystick.stickRadius)
-    
-    -- Обводка стика
     love.graphics.setColor(0.6, 0.6, 0.7, 0.3)
     love.graphics.setLineWidth(1.5)
     love.graphics.circle("line", joystick.sx, joystick.sy, joystick.stickRadius)
     
-    -- Блик на стике
-    if joystick.active then
-        love.graphics.setColor(1, 1, 1, 0.2)
-        love.graphics.circle("fill", joystick.sx - 5, joystick.sy - 5, 8)
-    end
-    
-    -- ============================================================
     -- КНОПКА АТАКИ
-    -- ============================================================
     love.graphics.setColor(0, 0, 0, 0.3)
     love.graphics.circle("fill", attack.x + 3, attack.y + 3, attack.radius)
     love.graphics.setColor(0.8, 0.15, 0.15, 0.9)
@@ -354,17 +317,13 @@ function controls.draw()
     if attack.holding then
         love.graphics.setColor(1, 1, 1, 0.2)
         love.graphics.circle("fill", attack.x, attack.y, attack.radius + 8)
-        love.graphics.setColor(1, 1, 1, 0.1)
-        love.graphics.circle("fill", attack.x, attack.y, attack.radius + 16)
     end
     
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(font)
     love.graphics.printf("A", attack.x - attack.radius, attack.y - 14, attack.radius*2, "center")
     
-    -- ============================================================
     -- КНОПКА СПОСОБНОСТИ
-    -- ============================================================
     love.graphics.setColor(0, 0, 0, 0.3)
     love.graphics.circle("fill", ability.x + 3, ability.y + 3, ability.radius)
     
@@ -374,17 +333,12 @@ function controls.draw()
         love.graphics.setColor(0, 0, 0, 0.4)
         love.graphics.arc("fill", ability.x, ability.y, ability.radius, 
             -math.pi/2, -math.pi/2 + (1 - ability.cooldown / ability.maxCooldown) * 2 * math.pi)
-        love.graphics.setColor(0.4, 0.4, 0.5, 0.3)
-        love.graphics.setLineWidth(2)
-        love.graphics.circle("line", ability.x, ability.y, ability.radius)
     else
         love.graphics.setColor(0.6, 0.2, 0.9, 0.9)
         love.graphics.circle("fill", ability.x, ability.y, ability.radius)
         love.graphics.setColor(0.7, 0.3, 1, 0.4)
         love.graphics.setLineWidth(2)
         love.graphics.circle("line", ability.x, ability.y, ability.radius)
-        
-        -- Пульсация готовности
         local pulse = 0.8 + 0.2 * math.sin(love.timer.getTime() * 2)
         love.graphics.setColor(0.8, 0.4, 1, pulse * 0.15)
         love.graphics.circle("fill", ability.x, ability.y, ability.radius + 6)
