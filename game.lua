@@ -16,6 +16,7 @@ local shieldTimer = 0
 local shieldDuration = 2.5
 
 local playerImg = nil
+local grassImg = nil
 
 local function saveGame()
     love.filesystem.write("save.txt", coins .. "\n" .. selectedSkin .. "\n" .. selectedSkin)
@@ -25,12 +26,25 @@ function game.load()
     controls.load()
     fontUI = love.graphics.newFont(14)
     
-    -- Загрузка текстуры игрока
+    -- ЗАГРУЗКА ТЕКСТУРЫ ТРАВЫ
     local success, img = pcall(function()
-        return love.graphics.newImage("player.png")
+        return love.graphics.newImage("grass.png")
     end)
     if success and img then
-        playerImg = img
+        grassImg = img
+        grassImg:setWrap("repeat", "repeat")
+        print("Loaded grass.png")
+    else
+        print("Could not load grass.png, using fallback color")
+        grassImg = nil
+    end
+    
+    -- Загрузка текстуры игрока
+    local success2, img2 = pcall(function()
+        return love.graphics.newImage("player.png")
+    end)
+    if success2 and img2 then
+        playerImg = img2
         print("Loaded player.png")
     else
         print("Could not load player.png, using fallback")
@@ -108,12 +122,29 @@ function game.draw()
     love.graphics.push()
     love.graphics.translate(-camera.x, -camera.y)
     
-    -- Фон
-    love.graphics.setColor(0.2, 0.5, 0.2)
-    love.graphics.rectangle("fill", 0, 0, WORLD_SIZE, WORLD_SIZE)
+    -- ============================================================
+    -- РИСУЕМ ТЕКСТУРУ ТРАВЫ
+    -- ============================================================
+    if grassImg then
+        local w, h = love.graphics.getDimensions()
+        local tw = grassImg:getWidth()
+        local th = grassImg:getHeight()
+        
+        -- Рисуем траву с повторением
+        love.graphics.setColor(1, 1, 1)
+        for x = math.floor(camera.x / tw) * tw - tw, camera.x + w + tw, tw do
+            for y = math.floor(camera.y / th) * th - th, camera.y + h + th, th do
+                love.graphics.draw(grassImg, x, y)
+            end
+        end
+    else
+        -- Fallback - зеленый фон
+        love.graphics.setColor(0.2, 0.5, 0.2)
+        love.graphics.rectangle("fill", 0, 0, WORLD_SIZE, WORLD_SIZE)
+    end
     
-    -- Сетка
-    love.graphics.setColor(0.3, 0.6, 0.3, 0.3)
+    -- Сетка (для ориентации)
+    love.graphics.setColor(1, 1, 1, 0.05)
     for x = 0, WORLD_SIZE, 100 do
         love.graphics.line(x, 0, x, WORLD_SIZE)
     end
@@ -161,7 +192,9 @@ function game.draw()
     
     love.graphics.pop()
     
+    -- ============================================================
     -- UI
+    -- ============================================================
     local sw, sh = love.graphics.getDimensions()
     
     love.graphics.setColor(0, 0, 0, 0.7)
