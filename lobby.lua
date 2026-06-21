@@ -1,28 +1,21 @@
 local lobby = {}
 
-local fontTitle, fontBtn
-local animTimer = 0
+local fontLarge = nil
+local fontMedium = nil
+local fontSmall = nil
 local coins = 0
-local shop_open = false
-local bgCanvas = nil
-local stars = {}
-
+local selectedSkin = "default"
+local shopOpen = false
 local skins = {
-    default = { name = "Default Cube", price = 0, owned = true },
-    diamond = { name = "Diamond Cube", price = 100, owned = false }
+    default = { name = "Default", price = 0, owned = true },
+    diamond = { name = "Diamond", price = 100, owned = false }
 }
-local selected_skin = "default"
 
-local function saveGame()
-    local data = string.format("%d\n%s\n%s", 
-        coins or 0, 
-        skins.diamond.owned and "diamond" or "default", 
-        selected_skin or "default"
-    )
-    love.filesystem.write("save.txt", data)
-end
-
-local function loadSave()
+function lobby.load()
+    fontLarge = love.graphics.newFont(48)
+    fontMedium = love.graphics.newFont(24)
+    fontSmall = love.graphics.newFont(16)
+    
     local data = love.filesystem.read("save.txt")
     if data then
         local lines = {}
@@ -33,252 +26,175 @@ local function loadSave()
         if lines[2] == "diamond" then
             skins.diamond.owned = true
         end
-        selected_skin = lines[3] or "default"
+        selectedSkin = lines[3] or "default"
     end
-end
-
-local function createBG()
-    local w, h = love.graphics.getDimensions()
-    if w <= 0 or h <= 0 then return end
-    bgCanvas = love.graphics.newCanvas(w, h)
-    love.graphics.setCanvas(bgCanvas)
-    for i = 0, 60 do
-        local t = i / 60
-        love.graphics.setColor(0.08 + t * 0.07, 0.02 + t * 0.05, 0.18 + t * 0.3)
-        love.graphics.rectangle("fill", 0, i * (h / 60), w, h / 60 + 1)
-    end
-    love.graphics.setCanvas()
-end
-
-function lobby.load()
-    fontTitle = love.graphics.newFont(48)
-    fontBtn = love.graphics.newFont(20)
     
-    loadSave()
-    createBG()
-    
-    stars = {}
-    for i = 1, 50 do
-        table.insert(stars, { x = math.random(), y = math.random(), s = 0.1 + math.random() * 0.4 })
-    end
+    print("Lobby loaded! Coins: " .. coins)
 end
 
 function lobby.update(dt)
-    animTimer = animTimer + dt
 end
 
 function lobby.draw()
     local w, h = love.graphics.getDimensions()
-    if w <= 0 or h <= 0 then return end
     
-    love.graphics.setColor(1, 1, 1)
-    if bgCanvas then
-        love.graphics.draw(bgCanvas)
+    love.graphics.setColor(0.1, 0.05, 0.2)
+    love.graphics.rectangle("fill", 0, 0, w, h)
+    
+    for i = 1, 30 do
+        local x = (i * 137 + 42) % w
+        local y = (i * 251 + 13) % h
+        love.graphics.setColor(1, 1, 1, 0.3 + 0.3 * math.sin(i + love.timer.getTime()))
+        love.graphics.circle("fill", x, y, 1 + i % 3)
     end
     
-    for _, s in ipairs(stars) do
-        love.graphics.setColor(1, 1, 1, 0.3 + 0.3 * math.sin(animTimer * 2 + s.x * 10))
-        love.graphics.circle("fill",
-            (s.x * w + animTimer * 20 * s.s) % w,
-            (s.y * h + animTimer * 10 * s.s) % h,
-            1.5 + s.s
-        )
-    end
-    
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.setFont(fontTitle)
-    love.graphics.printf("CUBIC BATTLE", 3, h / 2 - 177, w, "center")
-    
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("CUBIC BATTLE", 0, h / 2 - 180, w, "center")
+    love.graphics.setFont(fontLarge)
+    love.graphics.printf("CUBIC BATTLE", 0, h/2 - 120, w, "center")
     
-    love.graphics.setColor(0.5, 0.3, 1, 0.6)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("SURVIVE & COLLECT", 0, h / 2 - 130, w, "center")
+    love.graphics.setColor(0.6, 0.3, 1, 0.7)
+    love.graphics.setFont(fontMedium)
+    love.graphics.printf("SURVIVE AND COLLECT", 0, h/2 - 70, w, "center")
     
     love.graphics.setColor(1, 0.8, 0)
-    love.graphics.circle("fill", w/2 - 80, h / 2 - 70, 14)
-    love.graphics.setColor(1, 1, 0)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("x " .. (coins or 0), w/2 - 55, h / 2 - 82, 100, "left")
+    love.graphics.setFont(fontMedium)
+    love.graphics.printf("COINS: " .. coins, 0, h/2 - 35, w, "center")
     
-    local bx = w / 2 - 120
+    local bx = w/2 - 100
     
-    -- PLAY
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", bx + 3, h / 2 - 17, 240, 50, 12)
-    love.graphics.setColor(0.2, 0.6, 0.8, 0.95)
-    love.graphics.rectangle("fill", bx, h / 2 - 20, 240, 50, 12)
+    love.graphics.setColor(0, 0, 0, 0.4)
+    love.graphics.rectangle("fill", bx + 3, h/2 + 10, 200, 50, 10)
+    love.graphics.setColor(0.2, 0.6, 0.8)
+    love.graphics.rectangle("fill", bx, h/2 + 7, 200, 50, 10)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("PLAY", bx, h / 2 - 5, 240, "center")
+    love.graphics.setFont(fontMedium)
+    love.graphics.printf("PLAY", bx, h/2 + 20, 200, "center")
     
-    -- SHOP
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", bx + 3, h / 2 + 48, 240, 50, 12)
-    love.graphics.setColor(0.4, 0.2, 0.8, 0.95)
-    love.graphics.rectangle("fill", bx, h / 2 + 45, 240, 50, 12)
+    love.graphics.setColor(0, 0, 0, 0.4)
+    love.graphics.rectangle("fill", bx + 3, h/2 + 70, 200, 50, 10)
+    love.graphics.setColor(0.5, 0.2, 0.8)
+    love.graphics.rectangle("fill", bx, h/2 + 67, 200, 50, 10)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("SHOP", bx, h / 2 + 60, 240, "center")
+    love.graphics.printf("SHOP", bx, h/2 + 80, 200, "center")
     
-    if shop_open then
+    if shopOpen then
         drawShop()
     end
 end
 
 function drawShop()
     local w, h = love.graphics.getDimensions()
-    if w <= 0 or h <= 0 then return end
-    
-    local shop_w, shop_h = 420, 280
-    local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
+    local sw, sh = 400, 250
+    local sx, sy = w/2 - sw/2, h/2 - sh/2
     
     love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", shop_x + 10, shop_y + 10, shop_w, shop_h, 15)
-    love.graphics.setColor(0.08, 0.04, 0.15, 0.97)
-    love.graphics.rectangle("fill", shop_x, shop_y, shop_w, shop_h, 15)
-    love.graphics.setColor(0.5, 0.2, 1, 0.4)
+    love.graphics.rectangle("fill", 0, 0, w, h)
+    
+    love.graphics.setColor(0.15, 0.08, 0.3, 0.95)
+    love.graphics.rectangle("fill", sx, sy, sw, sh, 10)
+    love.graphics.setColor(0.5, 0.2, 1, 0.3)
     love.graphics.setLineWidth(2)
-    love.graphics.rectangle("line", shop_x + 5, shop_y + 5, shop_w - 10, shop_h - 10, 12)
-    
-    love.graphics.setColor(1, 1, 0, 0.9)
-    love.graphics.setFont(fontTitle)
-    love.graphics.printf("SHOP", shop_x + 20, shop_y + 15, 150, "left")
+    love.graphics.rectangle("line", sx, sy, sw, sh, 10)
     
     love.graphics.setColor(1, 1, 0)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("Balance: " .. coins, shop_x + shop_w - 160, shop_y + 22, 140, "right")
-    
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", shop_x + shop_w - 57, shop_y + 8, 42, 30, 8)
-    love.graphics.setColor(0.6, 0.2, 0.2, 0.9)
-    love.graphics.rectangle("fill", shop_x + shop_w - 60, shop_y + 5, 40, 30, 8)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("X", shop_x + shop_w - 58, shop_y + 12, 36, "center")
-    
-    love.graphics.setColor(0.5, 0.2, 1, 0.2)
-    love.graphics.rectangle("fill", shop_x + 20, shop_y + 60, shop_w - 40, 2)
-    
-    local item_x, item_y = shop_x + 20, shop_y + 75
-    local item_w, item_h = shop_w - 40, 70
-    
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", item_x + 3, item_y + 3, item_w, item_h, 8)
-    love.graphics.setColor(0.2, 0.1, 0.4, 0.8)
-    love.graphics.rectangle("fill", item_x, item_y, item_w, item_h, 8)
-    love.graphics.setColor(0.5, 0.2, 1, 0.2)
-    love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", item_x, item_y, item_w, item_h, 8)
-    
-    love.graphics.setColor(0, 0.8, 1, 0.8)
-    love.graphics.polygon("fill",
-        item_x + 35, item_y + 20,
-        item_x + 50, item_y + 8,
-        item_x + 65, item_y + 20,
-        item_x + 50, item_y + 55,
-        item_x + 35, item_y + 20
-    )
+    love.graphics.setFont(fontMedium)
+    love.graphics.printf("SHOP", sx, sy + 10, sw, "center")
     
     love.graphics.setColor(1, 1, 1)
-    love.graphics.setFont(fontBtn)
-    love.graphics.printf("Diamond Cube", item_x + 80, item_y + 12, 150, "left")
+    love.graphics.setFont(fontSmall)
+    love.graphics.printf("Diamond Skin", sx + 20, sy + 60, sw - 40, "left")
     
-    love.graphics.setColor(1, 1, 0)
     if skins.diamond.owned then
-        love.graphics.printf("OWNED", item_x + 80, item_y + 38, 150, "left")
+        love.graphics.setColor(0, 1, 0)
+        love.graphics.printf("OWNED", sx + 20, sy + 85, sw - 40, "left")
     else
-        love.graphics.printf("100 coins", item_x + 80, item_y + 38, 150, "left")
+        love.graphics.setColor(1, 0.8, 0)
+        love.graphics.printf("100 coins", sx + 20, sy + 85, sw - 40, "left")
     end
     
+    local buyX = sx + sw - 100
     if skins.diamond.owned then
-        if selected_skin == "diamond" then
-            love.graphics.setColor(0.2, 0.8, 0.2, 0.9)
-            love.graphics.rectangle("fill", item_x + item_w - 60, item_y + 15, 40, 30, 8)
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.printf("ON", item_x + item_w - 58, item_y + 22, 36, "center")
+        love.graphics.setColor(0.2, 0.8, 0.2)
+    else
+        love.graphics.setColor(1, 0.8, 0.2)
+    end
+    love.graphics.rectangle("fill", buyX, sy + 60, 80, 35, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(fontSmall)
+    if skins.diamond.owned then
+        if selectedSkin == "diamond" then
+            love.graphics.printf("ON", buyX, sy + 70, 80, "center")
         else
-            love.graphics.setColor(0.2, 0.6, 1, 0.9)
-            love.graphics.rectangle("fill", item_x + item_w - 60, item_y + 15, 40, 30, 8)
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.printf("EQ", item_x + item_w - 58, item_y + 22, 36, "center")
+            love.graphics.printf("EQUIP", buyX, sy + 70, 80, "center")
         end
     else
-        love.graphics.setColor(1, 0.8, 0.2, 0.9)
-        love.graphics.rectangle("fill", item_x + item_w - 60, item_y + 15, 40, 30, 8)
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.printf("BUY", item_x + item_w - 58, item_y + 22, 36, "center")
+        love.graphics.printf("BUY", buyX, sy + 70, 80, "center")
     end
+    
+    love.graphics.setColor(1, 0.3, 0.3)
+    love.graphics.rectangle("fill", sx + sw - 40, sy + 5, 30, 30, 5)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("X", sx + sw - 40, sy + 10, 30, "center")
 end
 
-function lobby.touchpressed(id, x, y)
+function lobby.mousepressed(x, y, button)
     local w, h = love.graphics.getDimensions()
-    if w <= 0 or h <= 0 then return end
+    local bx = w/2 - 100
     
-    local bx = w / 2 - 120
-    
-    if x >= bx and x <= bx + 240 then
-        if y >= h / 2 - 20 and y <= h / 2 + 30 then
-            playSound("click")
-            local g = require("game")
-            g.setCoins(coins)
-            g.setSkin(selected_skin)
-            g.load()
+    if x >= bx and x <= bx + 200 then
+        if y >= h/2 + 7 and y <= h/2 + 57 then
+            print("Starting game...")
+            local game = require("game")
+            game.setCoins(coins)
+            game.setSkin(selectedSkin)
+            game.load()
             _G.GameState.current = "game"
             return
         end
         
-        if y >= h / 2 + 45 and y <= h / 2 + 95 then
-            playSound("click")
-            shop_open = not shop_open
+        if y >= h/2 + 67 and y <= h/2 + 117 then
+            shopOpen = not shopOpen
             return
         end
     end
     
-    if shop_open then
-        local shop_w, shop_h = 420, 280
-        local shop_x, shop_y = w / 2 - shop_w / 2, h / 2 - shop_h / 2 + 30
+    if shopOpen then
+        local sw, sh = 400, 250
+        local sx, sy = w/2 - sw/2, h/2 - sh/2
         
-        if x >= shop_x + shop_w - 60 and x <= shop_x + shop_w - 20 and
-           y >= shop_y + 5 and y <= shop_y + 35 then
-            shop_open = false
-            playSound("click")
+        if x >= sx + sw - 40 and x <= sx + sw - 10 and
+           y >= sy + 5 and y <= sy + 35 then
+            shopOpen = false
             return
         end
         
-        local item_x, item_y = shop_x + 20, shop_y + 75
-        local item_w, item_h = shop_w - 40, 70
-        if x >= item_x + item_w - 60 and x <= item_x + item_w - 20 and
-           y >= item_y + 15 and y <= item_y + 45 then
-            playSound("click")
+        local buyX = sx + sw - 100
+        if x >= buyX and x <= buyX + 80 and
+           y >= sy + 60 and y <= sy + 95 then
             if not skins.diamond.owned and coins >= 100 then
                 coins = coins - 100
                 skins.diamond.owned = true
-                selected_skin = "diamond"
-                saveGame()
+                selectedSkin = "diamond"
+                love.filesystem.write("save.txt", coins .. "\ndiamond\ndiamond")
+                print("Bought diamond skin!")
             elseif skins.diamond.owned then
-                selected_skin = "diamond"
-                saveGame()
+                selectedSkin = "diamond"
+                love.filesystem.write("save.txt", coins .. "\ndiamond\ndiamond")
+                print("Equipped diamond skin!")
+            else
+                print("Not enough coins!")
             end
-            return
         end
     end
-end
-
-function lobby.touchreleased(id, x, y)
-end
-
-function lobby.resize()
-    createBG()
 end
 
 function lobby.keypressed(key)
-    if key == "escape" then
-        if shop_open then
-            shop_open = false
-        end
+    if key == "escape" and shopOpen then
+        shopOpen = false
     end
+end
+
+function lobby.resize()
 end
 
 return lobby
